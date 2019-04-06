@@ -1,8 +1,8 @@
 import numpy as np
 
 
-class LogHMM:
-    def __init__(self, A=None, B=None, pi=None, **kwargs):
+class HMM:
+    def __init__(self, A=None, B=None, pi=None):
         """
         A simple HMM model for discrete observation spaces.
 
@@ -59,9 +59,11 @@ class LogHMM:
         s = np.random.multinomial(1, self.pi).argmax()
         states = [latent_state_types[s]]
 
+        # generate an emission given latent state
         v = np.random.multinomial(1, self.B[s, :]).argmax()
         emissions = [obs_types[v]]
 
+        # sample a latent transition, rinse, and repeat
         for i in range(n_steps - 1):
             s = np.random.multinomial(1, self.A[s, :]).argmax()
             states.append(latent_state_types[s])
@@ -111,8 +113,7 @@ class LogHMM:
             O = O.reshape(1, -1)
 
         self.O = O
-        self.T = self.O.shape[1]
-        self.I = self.O.shape[0]
+        self.I, self.T = self.O.shape
 
         if self.I != 1:
             raise ValueError("Likelihood only accepts a single sequence")
@@ -162,7 +163,7 @@ class LogHMM:
         Parameters
         ----------
         O : np.array of shape (T,)
-            A single observation sequence of length T
+            An observation sequence of length T
 
         Returns
         -------
@@ -208,7 +209,7 @@ class LogHMM:
 
         best_path_log_prob = viterbi[:, self.T - 1].max()
 
-        # backtrace through the trellis to get the most likely sequence of
+        # backtrack through the trellis to get the most likely sequence of
         # latent states
         pointer = viterbi[:, self.T - 1].argmax()
         best_path = [pointer]
@@ -244,7 +245,7 @@ class LogHMM:
         Parameters
         ----------
         Obs : numpy array of shape (T,)
-            A single observation sequence of length T
+            An observation sequence of length T
 
         Returns
         -------
@@ -324,14 +325,8 @@ class LogHMM:
                 )
         return backward
 
-    def train(
-        self,
-        O,
-        latent_state_types,
-        observation_types,
-        pi=None,
-        tol=0.00001,
-        verbose=True,
+    def fit(
+        self, O, latent_state_types, observation_types, pi=None, tol=1e-5, verbose=False
     ):
         """
         Given an observation sequence O and the set of possible latent states,
@@ -408,7 +403,7 @@ class LogHMM:
         while any([A_err > tol, B_err > tol, pi_err > tol]):
             if verbose:
                 print(
-                    "  Training step {}. A err: {:.5f}, B err: {:.5f} pi err: {:.5f}".format(
+                    "Training step {}. A err: {:.5f}, B err: {:.5f} pi err: {:.5f}".format(
                         step, A_err, B_err, pi_err
                     )
                 )
