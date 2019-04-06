@@ -29,6 +29,7 @@ class GMM(object):
         N = self.N
         C = self.C
 
+        eps = np.finfo(float).eps
         expec1, expec2 = 0.0, 0.0
         for i in range(N):
             x_i = self.X[i]
@@ -44,12 +45,12 @@ class GMM(object):
                 prob = z_nk * (log_p_x_i + log_pi_k)
 
                 expec1 += prob
-                expec2 += z_nk * np.log(z_nk)
+                expec2 += z_nk * np.log(z_nk + eps)
 
         loss = expec1 - expec2
         return loss
 
-    def fit(self, max_iter=75, rtol=1e-3, verbose=False):
+    def fit(self, max_iter=75, tol=1e-3, verbose=False):
         self._initialize_params()
         prev_vlb = -np.inf
 
@@ -62,7 +63,7 @@ class GMM(object):
                 if verbose:
                     print("{}. Lower bound: {}".format(_iter + 1, vlb))
 
-                if np.abs((vlb - prev_vlb) / prev_vlb) <= rtol or np.isnan(vlb):
+                if np.isnan(vlb) or np.abs((vlb - prev_vlb) / prev_vlb) <= tol:
                     break
 
                 prev_vlb = vlb
@@ -76,7 +77,8 @@ class GMM(object):
 
             except np.linalg.LinAlgError:
                 print("Singular matrix: components collapsed")
-                pass
+                return -1
+        return 0
 
     def _E_step(self):
         for i in range(self.N):
@@ -129,79 +131,22 @@ class GMM(object):
 
         assert_allclose(np.sum(self.pi), 1, err_msg="{}".format(np.sum(self.pi)))
 
-    def plot_clusters(self):
-        try:
-            import matplotlib.pyplot as plt
-        except:
-            raise ImportError("matplotlib is necessary for plotting")
-
-        C = self.C
-        X = self.X
-
-        xmin, xmax = (-5, 10)
-        ymin, ymax = (-5, 10)
-
-        fig, ax = plt.subplots(1, 1)
-        fig.set_size_inches(10, 10)
-
-        for c in range(C):
-            rv = np.random.multivariate_normal(self.mu[c], self.sigma[c])
-
-            x = np.linspace(xmin, xmax, 500)
-            y = np.linspace(ymin, ymax, 500)
-
-            X1, Y1 = np.meshgrid(x, y)
-            xy = np.column_stack([X1.flat, Y1.flat])
-
-            # density values at the grid points
-            Z = rv.pdf(xy).reshape(X1.shape)
-            ax = plot_countour(
-                X, X1, Y1, Z, ax=ax, xlim=(xmin, xmax), ylim=(ymin, ymax)
-            )
-            ax.plot(self.mu[c, 0], self.mu[c, 1], "ro")
-
-        # plot data points
-        labels = self.Q.argmax(1)
-        ax.scatter(X[:, 0], X[:, 1], c=labels, s=30)
-        plt.show()
-
 
 #######################################################################
 #                                Utils                                #
 #######################################################################
 
 
-def plot_countour(X, x, y, z, ax, xlim, ylim):
-    def fixed_aspect_ratio(ratio, ax):
-        """
-        Set a fixed aspect ratio on matplotlib plots
-        regardless of axis units
-        """
-        xvals, yvals = ax.get_xlim(), ax.get_ylim()
-
-        xrange = xvals[1] - xvals[0]
-        yrange = yvals[1] - yvals[0]
-        ax.set_aspect(ratio * (xrange / yrange), adjustable="box")
-
-    # contour the gridded data, plotting dots at the randomly spaced data points.
-    ax.contour(x, y, z, 6, linewidths=0.5, colors="k")
-
-    ax.set_xlim(*xlim)
-    ax.set_ylim(*ylim)
-    fixed_aspect_ratio(1, ax)
-    return ax
-
-
-def log_gaussian_pdf(x_i, mu_c, sigma_c):
+def log_gaussian_pdf(x_i, mu, sigma):
     """
-    Computes log N(x_i | mu_c, sigma_c)
+    Compute log N(x_i | mu, sigma)
     """
-    n = len(mu_c)
+    n = len(mu)
     a = n * np.log(2 * np.pi)
-    _, b = np.linalg.slogdet(sigma_c)
+    _, b = np.linalg.slogdet(sigma)
 
-    y = np.linalg.solve(sigma_c, x_i - mu_c)
-    c = np.dot(x_i - mu_c, y)
+    y = np.linalg.solve(sigma, x_i - mu)
+    c = np.dot(x_i - mu, y)
     return -0.5 * (a + b + c)
 
 
