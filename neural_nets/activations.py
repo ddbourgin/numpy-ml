@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 
-class Activation(ABC):
+class ActivationBase(ABC):
     def __init__(self, **kwargs):
         super().__init__()
 
@@ -15,7 +15,7 @@ class Activation(ABC):
         raise NotImplementedError
 
 
-class Sigmoid(Activation):
+class Sigmoid(ActivationBase):
     def __init__(self):
         super().__init__()
 
@@ -29,7 +29,7 @@ class Sigmoid(Activation):
         return self.fn(x) * (1 - self.fn(x))
 
 
-class ReLU(Activation):
+class ReLU(ActivationBase):
     """
     ReLU units can be fragile during training and can "die". For example, a
     large gradient flowing through a ReLU neuron could cause the weights to
@@ -60,7 +60,7 @@ class ReLU(Activation):
         return (x > 0).astype(int)
 
 
-class Tanh(Activation):
+class Tanh(ActivationBase):
     def __init__(self):
         super().__init__()
 
@@ -74,22 +74,23 @@ class Tanh(Activation):
         return 1 - np.tanh(x) ** 2
 
 
-class Linear(Activation):
-    def __init__(self, slope=1):
+class Affine(ActivationBase):
+    def __init__(self, slope=1, intercept=0):
         self.slope = slope
+        self.intercept = intercept
         super().__init__()
 
     def __str__(self):
-        return "Linear"
+        return "Affine(slope={}, intercept={})".format(self.slope, self.intercept)
 
     def fn(self, z):
-        return self.slope * z
+        return self.slope * z + self.intercept
 
     def grad(self, x):
         return self.slope * np.ones_like(x)
 
 
-class Softmax(Activation):
+class Softmax(ActivationBase):
     def __init__(self):
         super().__init__()
 

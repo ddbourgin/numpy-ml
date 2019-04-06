@@ -98,11 +98,10 @@ class CrossEntropyLoss(Objective):
 
         # prevent taking the log of 0
         eps = np.finfo(float).eps
-        y_pred = np.clip(y_pred, eps, 1 - eps)
 
         # each example is associated with a single class; sum the negative log
         # probability of the correct label over all samples in the batch
-        cross_entropy = np.sum(y * -np.log(y_pred))
+        cross_entropy = np.sum(y * -np.log(y_pred + eps))
         return cross_entropy
 
     @staticmethod

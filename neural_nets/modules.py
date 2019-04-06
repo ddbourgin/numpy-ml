@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 
+import re
 import numpy as np
 
 from utils import calc_pad_dims
-from activations import Tanh, Sigmoid, ReLU, Linear
-from layers import Conv2D, BatchNorm2D, Add, LSTMCell
+from activations import Tanh, Sigmoid, ReLU, Affine
+from layers import Conv1D, Conv2D, BatchNorm2D, Add, Multiply, LSTMCell
 
 
 class ModuleBase(ABC):
@@ -86,8 +87,10 @@ class ModuleBase(ABC):
                     self.hyperparameters[k] = Sigmoid()
                 elif v == "act_fn" and v == "Tanh":
                     self.hyperparameters[k] = Tanh()
-                elif v == "act_fn" and v == "Linear":
-                    self.hyperparameters[k] = Linear()
+                elif v == "act_fn" and "Affine" in v:
+                    r = r"Affine\(slope=(.*), intercept=(.*)\)"
+                    slope, intercept = re.match(r, v).groups()
+                    self.hyperparameters[k] = Affine(float(slope), float(intercept))
                 else:
                     self.hyperparameters[k] = v
 
@@ -99,11 +102,202 @@ class ModuleBase(ABC):
         }
 
 
+class WavenetResidualModule(ModuleBase):
+    def __init__(self, ch_residual, ch_dilation, dilation, kernel_width):
+        """
+        A WaveNet-like residual block with causal dilated convolutions.
+
+        *Skip path in* >-------------------------------------------> + --------> *Skip path out*
+                          Causal      |--> Tanh --|                  |
+        *Main    |--> Dilated Conv1D -|           * --> 1x1 Conv1D --|
+         path >--|                    |--> Sigm --|                  |
+         in*     |-------------------------------------------------> + --------> *Main path out*
+                                     *Residual path*
+
+        On the final block, the output of the skip path is further processed to
+        produce the network predictions.
+
+        See van den Oord et al. (2016) at https://arxiv.org/pdf/1609.03499.pdf
+        for further details.
+
+        Parameters
+        ----------
+        ch_residual : int
+            The number of output channels for the 1x1 Conv1D layer in the main path
+        ch_dilation : int
+            The number of output channels for the causal dilated Conv1D layer
+            in the main path
+        dilation : int
+            The dilation rate for the causal dilated Conv1D layer in the main
+            path
+        kernel_width : int
+            The width of the causal dilated Conv1D kernel in the main path
+        """
+        self.ch_residual = ch_residual
+        self.ch_dilation = ch_dilation
+
+        self.dilation = dilation
+        self.kernel_width = kernel_width
+
+        super().__init__()
+        self._init_params()
+
+    def _init_params(self):
+        self._dv = {}
+
+        self.conv_dilation = Conv1D(
+            stride=1,
+            dilation=self.dilation,
+            pad="causal",
+            kernel_width=2,
+            in_ch=self.ch_residual,
+            out_ch=self.ch_dilation,
+            act_fn=Affine(slope=1, intercept=0),
+        )
+
+        self.tanh = Tanh()
+        self.sigm = Sigmoid()
+
+        self.multiply_gate = Multiply(act_fn=Affine(slope=1, intercept=0))
+        self.conv_1x1 = Conv1D(
+            stride=1,
+            dilation=0,
+            pad="same",
+            kernel_width=1,
+            in_ch=self.ch_dilation,
+            out_ch=self.ch_residual,
+            act_fn=Affine(slope=1, intercept=0),
+        )
+        self.add_residual = Add(act_fn=Affine(slope=1, intercept=0))
+        self.add_skip = Add(act_fn=Affine(slope=1, intercept=0))
+
+    @property
+    def parameters(self):
+        return {
+            "components": {
+                "conv_dilation": self.conv_dilation.parameters,
+                "multiply_gate": self.multiply_gate.parameters,
+                "conv_1x1": self.conv_1x1.parameters,
+                "add_residual": self.add_residual.parameters,
+                "add_skip": self.add_skip.parameters,
+            }
+        }
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "WavenetResidualModule",
+            "ch_residual": self.ch_residual,
+            "ch_dilation": self.ch_dilation,
+            "kernel_width": self.kernel_width,
+            "dilation": self.dilation,
+            "component_ids": [
+                "conv_dilation",
+                "multiply_gate",
+                "conv_1x1",
+                "add_residual",
+                "add_skip",
+            ],
+            "components": {
+                "conv_dilation": self.conv_dilation.hyperparameters,
+                "multiply_gate": self.multiply_gate.hyperparameters,
+                "conv_1x1": self.conv_1x1.hyperparameters,
+                "add_residual": self.add_residual.hyperparameters,
+                "add_skip": self.add_skip.hyperparameters,
+            },
+        }
+
+    @property
+    def derived_variables(self):
+        dv = {
+            "conv_dilation_out": None,
+            "multiply_gate_out": None,
+            "conv_1x1_out": None,
+            "components": {
+                "conv_dilation": self.conv_dilation.derived_variables,
+                "multiply_gate": self.multiply_gate.derived_variables,
+                "conv_1x1": self.conv_1x1.derived_variables,
+                "add_residual": self.add_residual.derived_variables,
+                "add_skip": self.add_skip.derived_variables,
+            },
+        }
+        dv.update(self._dv)
+        return dv
+
+    @property
+    def gradients(self):
+        return {
+            "components": {
+                "conv_dilation": self.conv_dilation.gradients,
+                "multiply_gate": self.multiply_gate.gradients,
+                "conv_1x1": self.conv_1x1.gradients,
+                "add_residual": self.add_residual.gradients,
+                "add_skip": self.add_skip.gradients,
+            }
+        }
+
+    def forward(self, X_main, X_skip=None):
+        self.X_main = X_main
+        self.X_skip = X_skip
+        conv_dilation_out = self.conv_dilation.forward(X_main)
+
+        tanh_gate = self.tanh.fn(conv_dilation_out)
+        sigm_gate = self.sigm.fn(conv_dilation_out)
+
+        # regular wavenet
+        multiply_gate_out = self.multiply_gate.forward([tanh_gate, sigm_gate])
+
+        conv_1x1_out = self.conv_1x1.forward(multiply_gate_out)
+
+        # if this is the first wavenet block, initialize the "previous" skip
+        # connection sum to 0
+        self.X_skip = np.zeros_like(conv_1x1_out) if X_skip is None else X_skip
+
+        Y_skip = self.add_skip.forward([X_skip, conv_1x1_out])
+        Y_main = self.add_residual.forward([X_main, conv_1x1_out])
+
+        self._dv["tanh_out"] = tanh_gate
+        self._dv["sigm_out"] = sigm_gate
+        self._dv["conv_dilation_out"] = conv_dilation_out
+        self._dv["multiply_gate_out"] = multiply_gate_out
+        self._dv["conv_1x1_out"] = conv_1x1_out
+        return Y_main, Y_skip
+
+    def backward(self, dY_skip, dY_main=None):
+        dX_skip, dConv_1x1_out = self.add_skip.backward(dY_skip)
+
+        # if this is the last wavenet block, dY_main will be None. otherwise,
+        # calculate the error contribution from dY_main and add this to the
+        # gradient wrt dConv_1x1
+        dX_main = np.zeros_like(self.X_main)
+        if dY_main is not None:
+            dX_main, dConv_1x1_main = self.add_residual.backward(dY_main)
+            dConv_1x1_out += dConv_1x1_main
+
+        dMultiply_out = self.conv_1x1.backward(dConv_1x1_out)
+        dTanh_out, dSigm_out = self.multiply_gate.backward(dMultiply_out)
+
+        conv_dilation_out = self.derived_variables["conv_dilation_out"]
+        dTanh_in = dTanh_out * self.tanh.grad(conv_dilation_out)
+        dSigm_in = dSigm_out * self.sigm.grad(conv_dilation_out)
+        dDilation_out = dTanh_in + dSigm_in
+
+        conv_back = self.conv_dilation.backward(dDilation_out)
+        dX_main += conv_back
+
+        self._dv["dLdConv_1x1"] = dConv_1x1_out
+        self._dv["dLdMultiply"] = dMultiply_out
+        self._dv["dLdTanh"] = dTanh_out
+        self._dv["dLdSigmoid"] = dSigm_out
+        self._dv["dLdConv_dilation"] = dDilation_out
+        return dX_main, dX_skip
+
+
 class SkipConnectionIdentityModule(ModuleBase):
     def __init__(
         self,
-        in_channels,
-        out_channels,
+        in_ch,
+        out_ch,
         kernel_shape1,
         kernel_shape2,
         stride1=1,
@@ -120,11 +314,14 @@ class SkipConnectionIdentityModule(ModuleBase):
         X -> Conv2D -> Act_fn -> BatchNorm2D -> Conv2D -> BatchNorm2D -> + -> Act_fn
          \______________________________________________________________/
 
+        See He et al. (2015) at https://arxiv.org/pdf/1512.03385.pdf for
+        further details.
+
         Parameters
         ----------
-        in_channels : int
+        in_ch : int
             The number of channels (depth) in the input volume
-        out_channels : int
+        out_ch : int
             The number of filters/kernels to compute in the first convolutional
             layer
         kernel_shape1 : 2-tuple
@@ -138,8 +335,8 @@ class SkipConnectionIdentityModule(ModuleBase):
         stride2 : int (default: 1)
             The stride/hop of the convolution kernels in the second convolutional layer
         act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use Linear
-            activations by default
+            The activation function for computing Y[t]. If `None`, use the
+            identity f(x) = x by default
         epsilon : float (default : 1e-5)
             A small smoothing constant to use during BatchNorm2D computation to
             avoid divide-by-zero errors.
@@ -150,15 +347,15 @@ class SkipConnectionIdentityModule(ModuleBase):
             smoothing)
         """
         if act_fn is None:
-            act_fn = Linear()
+            act_fn = Affine(slope=1, intercept=0)
 
+        self.in_ch = in_ch
+        self.out_ch = out_ch
         self.act_fn = act_fn
         self.epsilon = epsilon
         self.stride1 = stride1
         self.stride2 = stride2
         self.momentum = momentum
-        self.in_channels = in_channels
-        self.out_channels = out_channels
         self.kernel_shape1 = kernel_shape1
         self.kernel_shape2 = kernel_shape2
 
@@ -169,26 +366,26 @@ class SkipConnectionIdentityModule(ModuleBase):
         self._dv = {}
 
         self.conv1 = Conv2D(
-            in_channels=self.in_channels,
-            out_channels=self.out_channels,
+            in_ch=self.in_ch,
+            out_ch=self.out_ch,
             kernel_shape=self.kernel_shape1,
             stride=self.stride1,
             pad="same",
             act_fn=self.act_fn,
         )
         self.conv2 = Conv2D(
-            in_channels=self.out_channels,
-            out_channels=self.in_channels,
+            in_ch=self.out_ch,
+            out_ch=self.in_ch,
             kernel_shape=self.kernel_shape2,
             stride=self.stride2,
             pad="same",
-            act_fn=Linear(),
+            act_fn=Affine(slope=1, intercept=0),
         )
         self.batchnorm1 = BatchNorm2D(
-            n_in=self.out_channels, epsilon=self.epsilon, momentum=self.momentum
+            in_ch=self.out_ch, epsilon=self.epsilon, momentum=self.momentum
         )
         self.batchnorm2 = BatchNorm2D(
-            n_in=self.out_channels, epsilon=self.epsilon, momentum=self.momentum
+            in_ch=self.out_ch, epsilon=self.epsilon, momentum=self.momentum
         )
         self.add3 = Add(self.act_fn)
 
@@ -213,8 +410,8 @@ class SkipConnectionIdentityModule(ModuleBase):
             "stride1": self.stride1,
             "stride2": self.stride2,
             "momentum": self.momentum,
-            "in_channels": self.in_channels,
-            "out_channels": self.out_channels,
+            "in_ch": self.in_ch,
+            "out_ch": self.out_ch,
             "kernel_shape1": self.kernel_shape1,
             "kernel_shape2": self.kernel_shape2,
             "component_ids": ["conv1", "batchnorm1", "conv2", "batchnorm2", "add3"],
@@ -288,9 +485,9 @@ class SkipConnectionIdentityModule(ModuleBase):
 class SkipConnectionConvModule(ModuleBase):
     def __init__(
         self,
-        in_channels,
-        out_channels1,
-        out_channels2,
+        in_ch,
+        out_ch1,
+        out_ch2,
         kernel_shape1,
         kernel_shape2,
         kernel_shape_skip,
@@ -312,14 +509,17 @@ class SkipConnectionConvModule(ModuleBase):
         X -> Conv2D -> Act_fn -> BatchNorm2D -> Conv2D -> BatchNorm2D -> + -> Act_fn
          \_____________________ Conv2D -> Batchnorm2D __________________/
 
+        See He et al. (2015) at https://arxiv.org/pdf/1512.03385.pdf for
+        further details.
+
         Parameters
         ----------
-        in_channels : int
+        in_ch : int
             The number of channels (depth) in the input volume
-        out_channels1 : int
+        out_ch1 : int
             The number of filters/kernels to compute in the first convolutional
             layer
-        out_channels2 : int
+        out_ch2 : int
             The number of filters/kernels to compute in the second
             convolutional layer
         kernel_shape1 : 2-tuple
@@ -344,8 +544,8 @@ class SkipConnectionConvModule(ModuleBase):
             The number of rows/columns of 0's to pad the input to the second
             convolutional layer with
         act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use Linear
-            activations by default
+            The activation function for computing Y[t]. If `None`, use the
+            identity f(x) = x by default
         epsilon : float (default : 1e-5)
             A small smoothing constant to use during BatchNorm2D computation to
             avoid divide-by-zero errors.
@@ -356,7 +556,7 @@ class SkipConnectionConvModule(ModuleBase):
             smoothing)
         """
         if act_fn is None:
-            act_fn = Linear()
+            act_fn = Affine(slope=1, intercept=0)
 
         self.pad1 = pad1
         self.pad2 = pad2
@@ -366,9 +566,9 @@ class SkipConnectionConvModule(ModuleBase):
         self.stride2 = stride2
         self.momentum = momentum
         self.stride_skip = stride_skip
-        self.in_channels = in_channels
-        self.out_channels1 = out_channels1
-        self.out_channels2 = out_channels2
+        self.in_ch = in_ch
+        self.out_ch1 = out_ch1
+        self.out_ch2 = out_ch2
         self.kernel_shape1 = kernel_shape1
         self.kernel_shape2 = kernel_shape2
         self.kernel_shape_skip = kernel_shape_skip
@@ -414,42 +614,42 @@ class SkipConnectionConvModule(ModuleBase):
     def _init_params(self, X=None):
         self._dv = {}
         self.conv1 = Conv2D(
-            in_channels=self.in_channels,
-            out_channels=self.out_channels1,
+            in_ch=self.in_ch,
+            out_ch=self.out_ch1,
             kernel_shape=self.kernel_shape1,
             stride=self.stride1,
             pad=self.pad1,
             act_fn=self.act_fn,
         )
         self.conv2 = Conv2D(
-            in_channels=self.out_channels1,
-            out_channels=self.out_channels2,
+            in_ch=self.out_ch1,
+            out_ch=self.out_ch2,
             kernel_shape=self.kernel_shape2,
             stride=self.stride2,
             pad=self.pad2,
-            act_fn=Linear(),
+            act_fn=Affine(slope=1, intercept=0),
         )
         # we can't initialize conv_skip without knowing X's dimensions
         self.batchnorm1 = BatchNorm2D(
-            n_in=self.out_channels1, epsilon=self.epsilon, momentum=self.momentum
+            in_ch=self.out_ch1, epsilon=self.epsilon, momentum=self.momentum
         )
         self.batchnorm2 = BatchNorm2D(
-            n_in=self.out_channels2, epsilon=self.epsilon, momentum=self.momentum
+            in_ch=self.out_ch2, epsilon=self.epsilon, momentum=self.momentum
         )
         self.batchnorm_skip = BatchNorm2D(
-            n_in=self.out_channels2, epsilon=self.epsilon, momentum=self.momentum
+            in_ch=self.out_ch2, epsilon=self.epsilon, momentum=self.momentum
         )
         self.add3 = Add(self.act_fn)
 
     def _init_conv_skip(self, X):
         self._calc_skip_padding(X)
         self.conv_skip = Conv2D(
-            in_channels=self.in_channels,
-            out_channels=self.out_channels2,
+            in_ch=self.in_ch,
+            out_ch=self.out_ch2,
             kernel_shape=self.kernel_shape_skip,
             stride=self.stride_skip,
             pad=self.pad_skip,
-            act_fn=Linear(),
+            act_fn=Affine(slope=1, intercept=0),
         )
 
     @property
@@ -481,9 +681,9 @@ class SkipConnectionConvModule(ModuleBase):
             "pad_skip": self.pad_skip if hasattr(self, "pad_skip") else None,
             "momentum": self.momentum,
             "stride_skip": self.stride_skip,
-            "in_channels": self.in_channels,
-            "out_channels1": self.out_channels1,
-            "out_channels2": self.out_channels2,
+            "in_ch": self.in_ch,
+            "out_ch1": self.out_ch1,
+            "out_ch2": self.out_ch2,
             "kernel_shape1": self.kernel_shape1,
             "kernel_shape2": self.kernel_shape2,
             "kernel_shape_skip": self.kernel_shape_skip,

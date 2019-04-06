@@ -1,20 +1,27 @@
 from abc import ABC, abstractmethod
 
+import re
 import numpy as np
 
-from utils import pad2D, conv2D
-from activations import Tanh, Sigmoid, ReLU, Linear
+from utils import (
+    pad1D,
+    pad2D,
+    conv1D,
+    conv2D,
+    deconv2D_naive,
+    im2col,
+    col2im,
+    calc_pad_dims,
+    dilate,
+)
+from activations import Tanh, Sigmoid, ReLU, Affine
 from wrappers import Dropout
 
 
 class LayerBase(ABC):
-    def __init__(self, n_in, n_out, act_fn):
+    def __init__(self):
         self.X = None
         self.trainable = True
-
-        self.n_in = n_in
-        self.n_out = n_out
-        self.act_fn = act_fn
 
         super().__init__()
 
@@ -68,8 +75,10 @@ class LayerBase(ABC):
                         self.act_fn = Sigmoid()
                     elif k == "act_fn" and v == "Tanh":
                         self.act_fn = Tanh()
-                    elif k == "act_fn" and v == "Linear":
-                        self.act_fn = Linear()
+                    elif k == "act_fn" and "Affine" in v:
+                        r = r"Affine\(slope=(.*), intercept=(.*)\)"
+                        slope, intercept = re.match(r, v).groups()
+                        self.act_fn = Affine(float(slope), float(intercept))
                     if k != "wrappers":
                         self.hyperparameters[k] = v
 
@@ -89,8 +98,10 @@ class LayerBase(ABC):
                         self.act_fn = Sigmoid()
                     elif k == "act_fn" and v == "Tanh":
                         self.act_fn = Tanh()
-                    elif k == "act_fn" and v == "Linear":
-                        self.act_fn = Linear()
+                    elif k == "act_fn" and "Affine" in v:
+                        r = r"Affine\(slope=(.*), intercept=(.*)\)"
+                        slope, intercept = re.match(r, v).groups()
+                        self.act_fn = Affine(float(slope), float(intercept))
                     if k != "wrappers":
                         self.hyperparameters[k] = v
                 if k in self.parameters:
@@ -105,17 +116,229 @@ class LayerBase(ABC):
         }
 
 
-class Add(LayerBase):
-    def __init__(self, act_fn=None):
-        if act_fn is None:
-            act_fn = Linear()
+class RestrictedBoltzmannMachine(LayerBase):
+    def __init__(self, n_in, n_out, K=1):
+        """
+        A Restricted Boltzmann machine with Bernoulli visible and hidden units.
 
-        super().__init__(None, None, act_fn)
+        Parameters
+        ----------
+        n_in : int
+            The number of input dimensions/units.
+        n_out : int
+            The number of output dimensions/units.
+        K : int (default: 1)
+            The number of contrastive divergence steps to run before computing
+            a single gradient update.
+        """
+        super().__init__()
+
+        self.K = K  # CD-K
+        self.n_in = n_in
+        self.n_out = n_out
+        self.act_fn_V = Sigmoid()
+        self.act_fn_H = Sigmoid()
+
         self._init_params()
 
     def _init_params(self):
-        self.parameters = {}
+        # TODO: use a flexible / sensible initialization strategy here
+        b_in = np.zeros((1, self.n_in))
+        b_out = np.zeros((1, self.n_out))
+        W = np.random.randn(self.n_in, self.n_out)
+
+        self.parameters = {"W": W, "b_in": b_in, "b_out": b_out}
+        self.derived_variables = {
+            "V": None,
+            "p_H": None,
+            "p_V_prime": None,
+            "p_H_prime": None,
+            "positive_grad": None,
+            "negative_grad": None,
+        }
+        self.gradients = {
+            "W": np.zeros_like(W),
+            "b_in": np.zeros_like(b_in),
+            "b_out": np.zeros_like(b_out),
+        }
+        self.hyperparameters = {
+            "layer": "RestrictedBoltzmannMachine",
+            "K": self.K,
+            "n_in": self.n_in,
+            "n_out": self.n_out,
+        }
+
+    def CD_update(self, X):
+        """
+        Perform a single contrastive divergence-k training update using the
+        visible inputs X as a starting point for the Gibbs sampler.
+
+        Parameters
+        ----------
+        X : numpy array of shape (n_ex, n_in)
+            Layer input, representing the `n_in`-dimensional features for a
+            minibatch of `n_ex` examples. Each feature in X should ideally be
+            binary-valued, although it is possible to also train on real-valued
+            features ranging between (0, 1) (e.g., grayscale images).
+        """
+        self.forward(X)
+        self.backward()
+
+    def forward(self, V, K=None):
+        """
+        Hinton recommends: http://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
+        Visible units:
+            Use real-valued probabilities for both the data and the
+            reconstructions
+        Hidden units:
+            For CD1: when the hidden units are being driven by data, always use
+            stochastic binary states. When they are being driven by
+            reconstructions, always use probabilities without sampling.
+            For CD-k: only the final update of the hidden units should use the
+            probability
+        Updates:
+            When collecting the pairwise statistics for learning weights or the
+            individual statistics for learning biases, use the probabilities,
+            not the binary states.
+
+        Parameters
+        ----------
+        V : numpy array of shape (n_ex, n_in)
+            Visible input, representing the `n_in`-dimensional features for a
+            minibatch of `n_ex` examples. Each feature in V should ideally be
+            binary-valued, although it is possible to also train on real-valued
+            features ranging between (0, 1) (e.g., grayscale images).
+        K : int (default: None)
+            The number of steps of contrastive divergence steps to run before
+            computing the gradient update. If `None`, use self.K
+        """
+        # override self.K if necessary
+        K = self.K if K is None else K
+
+        W = self.parameters["W"]
+        b_in = self.parameters["b_in"]
+        b_out = self.parameters["b_out"]
+
+        # compute hidden unit probabilities
+        Z_H = np.dot(V, W) + b_out
+        p_H = self.act_fn_H.fn(Z_H)
+
+        # sample hidden states (stochastic binary values)
+        H = np.random.rand(*p_H.shape) <= p_H
+        H = H.astype(float)
+
+        # always use probabilities when computing gradients
+        positive_grad = np.dot(V.T, p_H)
+
+        self.derived_variables["V"] = V
+        self.derived_variables["p_H"] = p_H
+        self.derived_variables["positive_grad"] = positive_grad
+
+        # perform CD-k
+        # TODO: use persistent CD-k
+        # https://www.cs.toronto.edu/~tijmen/pcd/pcd.pdf
+        H_prime = H.copy()
+        for k in range(K):
+            # resample v' given h (H_prime is binary for all but final step)
+            Z_V_prime = np.dot(H_prime, W.T) + b_in
+            p_V_prime = self.act_fn_V.fn(Z_V_prime)
+
+            # don't resample visual units - always use raw probabilities!
+            V_prime = p_V_prime
+
+            # compute p(h' | v')
+            Z_H_prime = np.dot(V_prime, W) + b_out
+            p_H_prime = self.act_fn_H.fn(Z_H_prime)
+
+            # if this is the final iteration of CD, keep hidden state
+            # probabilities (don't sample)
+            H_prime = p_H_prime
+            if k != self.K - 1:
+                H_prime = np.random.rand(*p_H_prime.shape) <= p_H_prime
+                H_prime = H_prime.astype(float)
+
+        negative_grad = np.dot(p_V_prime.T, p_H_prime)
+
+        self.derived_variables["p_V_prime"] = p_V_prime
+        self.derived_variables["p_H_prime"] = p_H_prime
+        self.derived_variables["negative_grad"] = negative_grad
+
+    def backward(self, *args):
+        V = self.derived_variables["V"]
+        p_H = self.derived_variables["p_H"]
+        p_V_prime = self.derived_variables["p_V_prime"]
+        p_H_prime = self.derived_variables["p_H_prime"]
+        positive_grad = self.derived_variables["positive_grad"]
+        negative_grad = self.derived_variables["negative_grad"]
+
+        self.gradients["b_in"] = V - p_V_prime
+        self.gradients["b_out"] = p_H - p_H_prime
+        self.gradients["W"] = positive_grad - negative_grad
+
+    def reconstruct(self, X, n_steps=10, return_prob=False):
+        """
+        Reconstruct an input X by running the trained Gibbs sampler for
+        `n_steps`-worth of CD-k.
+
+        Parameters
+        ----------
+        X : numpy array of shape (n_ex, n_in)
+            Layer input, representing the `n_in`-dimensional features for a
+            minibatch of `n_ex` examples. Each feature in X should ideally be
+            binary-valued, although it is possible to also train on real-valued
+            features ranging between (0, 1) (e.g., grayscale images). If X has
+            missing values, it may be sufficient to mark them with random
+            entries and allow the reconstruction to impute them.
+        n_steps : int (default: 10)
+            The number of Gibbs sampling steps to perform when generating the
+            reconstruction.
+        return_prob : bool (default: False)
+            Whether to return the real-valued feature probabilities for the
+            reconstruction or the binary samples.
+
+        Returns
+        -------
+        V : numpy array of shape (n_ex, in_ch)
+            The reconstruction (or feature probabilities if `return_prob` is
+            true) of the visual input X after running the Gibbs sampler for
+            `n_steps`.
+        """
+        self.forward(X, K=n_steps)
+        p_V_prime = self.derived_variables["p_V_prime"]
+
+        # ignore the gradients produced during this reconstruction
+        self.flush_gradients()
+
+        # sample V_prime reconstruction if return_prob is False
+        V = p_V_prime
+        if not return_prob:
+            V = (np.random.rand(*p_V_prime.shape) <= p_V_prime).astype(float)
+        return V
+
+
+class Add(LayerBase):
+    def __init__(self, act_fn=None):
+        """
+        An "addition" layer that returns the sum of its inputs, passed through
+        an optional nonlinearity.
+
+        Parameters
+        ----------
+        act_fn : `activations.Activation` instance (default: None)
+            The element-wise output nonlinearity used in computing the final
+            output. If `None`, use the identity function act_fn(x) = x.
+        """
+        super().__init__()
+
+        if act_fn is None:
+            act_fn = Affine(slope=1, intercept=0)
+
+        self.act_fn = act_fn
+        self._init_params()
+
+    def _init_params(self):
         self.gradients = {}
+        self.parameters = {}
         self.derived_variables = {"sum": None}
         self.hyperparameters = {"layer": "Sum", "act_fn": str(self.act_fn)}
 
@@ -130,8 +353,8 @@ class Add(LayerBase):
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_in)
-            Layer output for each of the `n_ex` examples
+        Y : numpy array of shape (n_ex, *dim)
+            The sum over the `n_ex` examples
         """
         self.X = X
         out = X[0].copy()
@@ -141,17 +364,94 @@ class Add(LayerBase):
         return self.act_fn.fn(out)
 
     def backward(self, dLdY):
+        """
+        Backprop from layer outputs to inputs
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, *dim)
+            The gradient of the loss wrt. the layer output Y
+
+        Returns
+        -------
+        dX : list of length `n_inputs`
+            The gradient of the loss wrt. each input in `X`
+        """
         _sum = self.derived_variables["sum"]
         grads = [dLdY * self.act_fn.grad(_sum) for z in self.X]
-        import ipdb
+        return grads
 
-        ipdb.set_trace()
 
+class Multiply(LayerBase):
+    def __init__(self, act_fn=None):
+        """
+        A multiplication layer that returns the *elementwise* product of its
+        inputs, passed through an optional nonlinearity.
+
+        Parameters
+        ----------
+        act_fn : `activations.Activation` instance (default: None)
+            The element-wise output nonlinearity used in computing the final
+            output. If `None`, use the identity function f(x) = x.
+        """
+        super().__init__()
+
+        if act_fn is None:
+            act_fn = Affine(slope=1, intercept=0)
+
+        self.act_fn = act_fn
+        self._init_params()
+
+    def _init_params(self):
+        self.gradients = {}
+        self.parameters = {}
+        self.derived_variables = {"product": None}
+        self.hyperparameters = {"layer": "Multiply", "act_fn": str(self.act_fn)}
+
+    def forward(self, X):
+        """
+        Compute the layer output on a single minibatch.
+
+        Parameters
+        ----------
+        X : list of length `n_inputs`
+            A list of tensors, all of the same shape.
+
+        Returns
+        -------
+        Y : numpy array of shape (n_ex, *dim)
+            The product over the `n_ex` examples
+        """
+        self.X = X
+        out = X[0].copy()
+        for i in range(1, len(self.X)):
+            out *= X[i]
+        self.derived_variables["product"] = out
+        return self.act_fn.fn(out)
+
+    def backward(self, dLdY):
+        """
+        Backprop from layer outputs to inputs
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, *dim)
+            The gradient of the loss wrt. the layer output Y
+
+        Returns
+        -------
+        dX : list of length `n_inputs`
+            The gradient of the loss wrt. each input in `X`
+        """
+        _prod = self.derived_variables["product"]
+        grads = [dLdY * self.act_fn.grad(_prod)] * len(self.X)
+        for i, x in enumerate(self.X):
+            grads = [g * x if j != i else g for j, g in enumerate(grads)]
         return grads
 
 
 class BatchNorm2D(LayerBase):
-    def __init__(self, n_in, momentum=0.9, epsilon=1e-5):
+    def __init__(self, in_ch, momentum=0.9, epsilon=1e-5):
         """
         A batch normalization layer for two-dimensional inputs with an
         additional channel dimension. This is sometimes known as "Spatial Batch
@@ -159,11 +459,11 @@ class BatchNorm2D(LayerBase):
 
         Equations:
             Y = scaler * norm(X) + intercept
-            norm(X) = (X - mean(X)) / (std(X) + epsilon)
+            norm(X) = (X - mean(X)) / std(X + epsilon)
 
         Parameters
         ----------
-        n_in : int
+        in_ch : int
             The number of channels in the input volume. The layer output will
             automatically have the same dimensionality as the input.
         momentum : float (default: 0.9)
@@ -174,25 +474,28 @@ class BatchNorm2D(LayerBase):
             A small smoothing constant to use during computation of norm(X) to
             avoid divide-by-zero errors.
         """
-        super().__init__(n_in, n_in, None)
+        super().__init__()
+
+        self.in_ch = in_ch
+        self.out_ch = in_ch
         self.momentum = momentum
         self.epsilon = epsilon
         self._init_params()
 
     def _init_params(self):
-        scaler = np.random.rand(self.n_in)
-        intercept = np.zeros(self.n_in)
+        scaler = np.random.rand(self.in_ch)
+        intercept = np.zeros(self.in_ch)
 
         # init running mean and std at 0 and 1, respectively
-        running_mean = np.zeros(self.n_in)
-        running_var = np.ones(self.n_in)
+        running_mean = np.zeros(self.in_ch)
+        running_var = np.ones(self.in_ch)
 
         self.derived_variables = {}
         self.parameters = {
             "scaler": scaler,
             "intercept": intercept,
-            "running_mean": running_mean,
             "running_var": running_var,
+            "running_mean": running_mean,
         }
 
         self.gradients = {
@@ -203,16 +506,16 @@ class BatchNorm2D(LayerBase):
         self.hyperparameters = {
             "layer": "BatchNorm2D",
             "act_fn": None,
-            "n_in": self.n_in,
-            "n_out": self.n_out,
+            "in_ch": self.in_ch,
+            "out_ch": self.out_ch,
             "epsilon": self.epsilon,
             "momentum": self.momentum,
         }
 
     def reset_running_stats(self):
         assert self.trainable, "Layer is frozen"
-        self.parameters["running_mean"] = np.zeros(self.n_in)
-        self.parameters["running_var"] = np.ones(self.n_in)
+        self.parameters["running_mean"] = np.zeros(self.in_ch)
+        self.parameters["running_var"] = np.ones(self.in_ch)
 
     def forward(self, X):
         """
@@ -224,13 +527,13 @@ class BatchNorm2D(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, in_rows, in_cols, n_in)
+        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
             Input volume containing the `in_rows` x `in_cols`-dimensional features for a
             minibatch of `n_ex` examples.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, in_rows, in_cols, n_in)
+        Y : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
             Layer output for each of the `n_ex` examples
         """
         self.X = X
@@ -262,12 +565,12 @@ class BatchNorm2D(LayerBase):
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, in_rows, in_cols, n_in)
+        dLdY : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
             The gradient of the loss wrt. the layer output Y
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, n_in)
+        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
             The gradient of the loss wrt. the layer input X
         """
         assert self.trainable, "Layer is frozen"
@@ -280,7 +583,7 @@ class BatchNorm2D(LayerBase):
         dLdy = np.reshape(dLdy, (-1, dLdy.shape[3]))
 
         # appy 1D batchnorm to reshaped array
-        n_ex, n_in = X.shape
+        n_ex, in_ch = X.shape
         X_mean, X_var = X.mean(axis=0), X.var(axis=0)  # , ddof=1)
 
         N = (X - X_mean) / np.sqrt(X_var + ep)
@@ -320,7 +623,10 @@ class BatchNorm1D(LayerBase):
             A small smoothing constant to use during computation of norm(X) to
             avoid divide-by-zero errors.
         """
-        super().__init__(n_in, n_in, None)
+        super().__init__()
+
+        self.n_in = n_in
+        self.n_out = n_in
         self.momentum = momentum
         self.epsilon = epsilon
         self._init_params()
@@ -439,7 +745,7 @@ class BatchNorm1D(LayerBase):
 
 
 class FullyConnected(LayerBase):
-    def __init__(self, n_in, n_out, act_fn):
+    def __init__(self, n_in, n_out, act_fn=None):
         """
         A fully-connected (dense) layer.
 
@@ -452,10 +758,18 @@ class FullyConnected(LayerBase):
             The dimensionality of the layer input
         n_out : int
             The dimensionality of the layer output
-        act_fn : `activations.Activation` instance
-            The element-wise output nonlinearity used in computing Y
+        act_fn : `activations.Activation` instance (default: None)
+            The element-wise output nonlinearity used in computing Y. If None,
+            use the identity function act_fn(X) = X
         """
-        super().__init__(n_in, n_out, act_fn)
+        super().__init__()
+
+        if act_fn is None:
+            act_fn = Affine(slope=1, intercept=0)
+
+        self.n_in = n_in
+        self.n_out = n_out
+        self.act_fn = act_fn
         self._init_params()
 
     def _init_params(self):
@@ -557,12 +871,15 @@ class RNNCell(LayerBase):
             The activation function for computing A[t]. If not specified, use
             Tanh by default.
         """
+        super().__init__()
+
         # use tanh as activation function by default
         if act_fn is None:
             act_fn = Tanh()
 
-        super().__init__(n_in, n_out, act_fn)
-
+        self.n_in = n_in
+        self.n_out = n_out
+        self.act_fn = act_fn
         self.n_timesteps = None
         self._init_params()
 
@@ -760,6 +1077,8 @@ class LSTMCell(LayerBase):
             The gate function for computing the update, forget, and output
             gates. If not specified, use Sigmoid by default.
         """
+        super().__init__()
+
         # use tanh as activation function by default
         if act_fn is None:
             act_fn = Tanh()
@@ -768,10 +1087,11 @@ class LSTMCell(LayerBase):
         if gate_fn is None:
             gate_fn = Sigmoid()
 
-        super().__init__(n_in, n_out, act_fn)
-
-        self.n_timesteps = None
+        self.n_in = n_in
+        self.n_out = n_out
+        self.act_fn = act_fn
         self.gate_fn = gate_fn
+        self.n_timesteps = None
         self._init_params()
 
     def _init_params(self):
@@ -1017,13 +1337,13 @@ class LSTMCell(LayerBase):
 
 
 class Pool2D(LayerBase):
-    def __init__(self, in_channels, kernel_shape, stride=1, pad=0, mode="max"):
+    def __init__(self, in_ch, kernel_shape, stride=1, pad=0, mode="max"):
         """
         A single two-dimensional pooling layer.
 
         Parameters
         ----------
-        in_channels : int
+        in_ch : int
             The number of channels (depth) in the input volume
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
@@ -1036,12 +1356,15 @@ class Pool2D(LayerBase):
             The pooling function to apply. Valid entries are {"max",
             "average"}.
         """
+        super().__init__()
+
         self.pad = pad
         self.mode = mode
+        self.in_ch = in_ch
+        self.out_ch = in_ch
         self.stride = stride
         self.kernel_shape = kernel_shape
 
-        super().__init__(in_channels, in_channels, None)
         self._init_params()
 
     def _init_params(self):
@@ -1053,6 +1376,8 @@ class Pool2D(LayerBase):
             "act_fn": None,
             "pad": self.pad,
             "mode": self.mode,
+            "in_ch": self.in_ch,
+            "out_ch": self.out_ch,
             "stride": self.stride,
             "kernel_shape": self.kernel_shape,
         }
@@ -1076,11 +1401,11 @@ class Pool2D(LayerBase):
         elif self.mode == "average":
             pool_fn = np.mean
 
-        Y = np.zeros((n_ex, out_rows, out_cols, self.n_out))
+        Y = np.zeros((n_ex, out_rows, out_cols, self.out_ch))
         for m in range(n_ex):
             for i in range(out_rows):
                 for j in range(out_cols):
-                    for c in range(self.n_out):
+                    for c in range(self.out_ch):
                         # calculate window boundaries, incorporating stride
                         i0, i1 = i * s, (i * s) + fr
                         j0, j1 = j * s, (j * s) + fc
@@ -1104,7 +1429,7 @@ class Pool2D(LayerBase):
         for m in range(n_ex):
             for i in range(out_rows):
                 for j in range(out_cols):
-                    for c in range(self.n_out):
+                    for c in range(self.out_ch):
                         # calculate window boundaries, incorporating stride
                         i0, i1 = i * s, (i * s) + fr
                         j0, j1 = j * s, (j * s) + fc
@@ -1144,8 +1469,9 @@ class Flatten(LayerBase):
             minibatch dimension. Valid entries are {'first', 'last', -1} If -1,
             flatten all dimensions.
         """
+        super().__init__()
+
         self.keep_dim = keep_dim
-        super().__init__(None, None, None)
         self._init_params()
 
     def _init_params(self):
@@ -1159,19 +1485,229 @@ class Flatten(LayerBase):
     def forward(self, X):
         self.in_dims = X.shape
         if self.keep_dim == -1:
-            flat = X.flatten().reshape(1, -1)
-        else:
-            rs = (X.shape[0], -1) if self.keep_dim == "first" else (-1, X.shape[-1])
-            flat = X.reshape(*rs)
-        return flat
+            return X.flatten().reshape(1, -1)
+        rs = (X.shape[0], -1) if self.keep_dim == "first" else (-1, X.shape[-1])
+        return X.reshape(*rs)
 
     def backward(self, dLdy):
         return dLdy.reshape(*self.in_dims)
 
 
+class Conv1D(LayerBase):
+    def __init__(
+        self, in_ch, out_ch, kernel_width, act_fn=None, pad=0, stride=1, dilation=0
+    ):
+        """
+        Apply a one-dimensional convolution kernel over an input volume.
+
+        Equations:
+            out = act_fn(pad(X) * W + b)
+            out_dim = floor(1 + (n_rows_in + pad_left + pad_right - kernel_width) / stride)
+
+            where '*' denotes the cross-correlation operation with stride `s` and dilation `d`
+
+        Parameters
+        ----------
+        in_ch : int
+            The number of channels (depth) in the input volume
+        out_ch : int
+            The number of filters/kernels to compute in the current layer
+        kernel_width : int
+            The width of a single 1D filter/kernel in the current layer
+        act_fn : `activations.Activation` instance (default: None)
+            The activation function for computing Y[t]. If `None`, use the
+            identity function f(x) = x by default
+        pad : int, tuple, or {'same', 'causal'} (default: 0)
+            The number of rows/columns to zero-pad the input with. If 'same',
+            calculate padding to ensure the output length matches in the input
+            length. If 'causal' compute padding such that the output both has
+            the same length as the input AND output[t] does not depend on
+            input[t + 1:].
+        stride : int (default: 1)
+            The stride/hop of the convolution kernels as they move over the
+            input volume
+        dilation : int (default: 0)
+            Number of pixels inserted between kernel elements. Effective kernel
+            shape after dilation is:
+                [kernel_rows * (d + 1) - d, kernel_cols * (d + 1) - d]
+        """
+        super().__init__()
+
+        if act_fn is None:
+            act_fn = Affine(slope=1, intercept=0)
+
+        self.pad = pad
+        self.in_ch = in_ch
+        self.out_ch = out_ch
+        self.act_fn = act_fn
+        self.stride = stride
+        self.dilation = dilation
+        self.kernel_width = kernel_width
+
+        self._init_params()
+
+    def _init_params(self):
+        self.X = []
+
+        # TODO: use a flexible / sensible initialization strategy here
+        fw = self.kernel_width
+        W = np.random.randn(fw, self.in_ch, self.out_ch)
+        b = np.zeros((1, 1, self.out_ch))
+
+        self.parameters = {"W": W, "b": b}
+
+        self.hyperparameters = {
+            "layer": "Conv1D",
+            "pad": self.pad,
+            "in_ch": self.in_ch,
+            "out_ch": self.out_ch,
+            "stride": self.stride,
+            "dilation": self.dilation,
+            "act_fn": str(self.act_fn),
+            "kernel_width": self.kernel_width,
+        }
+
+        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
+        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
+
+    def forward(self, X):
+        """
+        Compute the layer output given input volume `X`.
+
+        Parameters
+        ----------
+        X : numpy array of shape (n_ex, l_in, in_ch)
+            The input volume consisting of `n_ex` examples, each of length `l_in`
+            and with `in_ch` input channels
+
+        Returns
+        -------
+        Y : numpy array of shape (n_ex, l_out, out_ch)
+            The layer output
+        """
+        self.X = X
+
+        W = self.parameters["W"]
+        b = self.parameters["b"]
+
+        n_ex, l_in, in_ch = X.shape
+        s, p, d = self.stride, self.pad, self.dilation
+
+        # pad the input and perform the forward convolution
+        Z = conv1D(X, W, s, p, d) + b
+        Y = self.act_fn.fn(Z)
+
+        self.derived_variables["out_rows"] = Z.shape[1]
+        self.derived_variables["out_cols"] = Z.shape[2]
+        self.derived_variables["Z"] = Z
+
+        return Y
+
+    def backward(self, dLdY):
+        """
+        Compute the gradient of the loss with respect to the layer parameters.
+        Relies on `im2col` and `col2im` to vectorize the gradient calculation.
+        See the private method `_backward_naive` for a more straightforward
+        implementation.
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, l_out, out_ch)
+            The gradient of the loss with respect to the layer output.
+
+        Returns
+        -------
+        dX : numpy array of shape (n_ex, l_in, in_ch)
+            The gradient of the loss with respect to the layer input volume
+        """
+        X = self.X
+        W = self.parameters["W"]
+        Z = self.derived_variables["Z"]
+
+        # add a row dimension to X, W, and dZ to permit us to use im2col/col2im
+        X2D = np.expand_dims(X, axis=1)
+        W2D = np.expand_dims(W, axis=0)
+        dLdZ = np.expand_dims(dLdY * self.act_fn.grad(Z), axis=1)
+
+        d = self.dilation
+        fr, fc, in_ch, out_ch = W2D.shape
+        n_ex, l_out, out_ch = dLdY.shape
+        fr, fc, s = 1, self.kernel_width, self.stride
+
+        # use pad1D here in order to correctly handle self.pad = 'causal',
+        # which isn't defined for pad2D
+        _, p = pad1D(X, self.pad, self.kernel_width, s, d)
+        p2D = (0, 0, p[0], p[1])
+
+        # columnize W, X, and dLdY
+        dLdZ_col = dLdZ.transpose(3, 1, 2, 0).reshape(out_ch, -1)
+        W_col = W2D.transpose(3, 2, 0, 1).reshape(out_ch, -1).T
+        X_col, _ = im2col(X2D, W2D.shape, p2D, s, d)
+
+        # compute gradients via matrix multiplication and reshape
+        dB = dLdZ_col.sum(axis=1).reshape(1, 1, -1)
+        dW = dLdZ_col.dot(X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
+
+        # reshape columnized dX back into the same format as the input volume
+        dX_col = np.dot(W_col, dLdZ_col)
+        dX = col2im(dX_col, X2D.shape, W2D.shape, p2D, s, d).transpose(0, 2, 3, 1)
+
+        self.gradients["W"] = np.squeeze(dW, axis=0)
+        self.gradients["b"] = dB
+        return np.squeeze(dX, axis=1)
+
+    def _backward_naive(self, dLdY):
+        """
+        A slower (ie., non-vectorized) but more straightforward implementation
+        of the gradient computations for a 2D conv layer.
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, l_out, out_ch)
+            The gradient of the loss with respect to the layer output.
+
+        Returns
+        -------
+        dX : numpy array of shape (n_ex, l_in, in_ch)
+            The gradient of the loss with respect to the layer input volume
+        """
+        W = self.parameters["W"]
+        b = self.parameters["b"]
+        Z = self.derived_variables["Z"]
+
+        X, d = self.X, self.dilation
+        n_ex, l_out, out_ch = dLdY.shape
+        fw, s, p = self.kernel_width, self.stride, self.pad
+        X_pad, (pr1, pr2) = pad1D(X, p, self.kernel_width, s, d)
+
+        dZ = dLdY * self.act_fn.grad(Z)
+
+        dX = np.zeros_like(X_pad)
+        dW, dB = np.zeros_like(W), np.zeros_like(b)
+        for m in range(n_ex):
+            for i in range(l_out):
+                for c in range(out_ch):
+                    # compute window boundaries w. stride and dilation
+                    i0, i1 = i * s, (i * s) + fw * (d + 1) - d
+
+                    wc = W[:, :, c]
+                    kernel = dZ[m, i, c]
+                    window = X_pad[m, i0 : i1 : (d + 1), :]
+
+                    dB[:, :, c] += kernel
+                    dW[:, :, c] += window * kernel
+                    dX[m, i0 : i1 : (d + 1), :] += wc * kernel
+
+        self.gradients["W"] = dW
+        self.gradients["b"] = dB
+
+        pr2 = None if pr2 == 0 else -pr2
+        return dX[:, pr1:pr2, :]
+
+
 class Conv2D(LayerBase):
     def __init__(
-        self, in_channels, out_channels, kernel_shape, act_fn=None, pad=0, stride=1
+        self, in_ch, out_ch, kernel_shape, act_fn=None, pad=0, stride=1, dilation=0
     ):
         """
         Apply a two-dimensional convolution kernel over an input volume.
@@ -1181,34 +1717,42 @@ class Conv2D(LayerBase):
             n_rows_out = floor(1 + (n_rows_in + pad_left + pad_right - filter_rows) / stride)
             n_cols_out = floor(1 + (n_cols_in + pad_top + pad_bottom - filter_cols) / stride)
 
-            where '*' denotes the cross-correlation operation with stride `s`
+            where '*' denotes the cross-correlation operation with stride `s` and dilation `d`
 
         Parameters
         ----------
-        in_channels : int
+        in_ch : int
             The number of channels (depth) in the input volume
-        out_channels : int
+        out_ch : int
             The number of filters/kernels to compute in the current layer
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
         act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use Linear
+            The activation function for computing Y[t]. If `None`, use Affine
             activations by default
         pad : int, tuple, or 'same' (default: 0)
             The number of rows/columns to zero-pad the input with
         stride : int (default: 1)
             The stride/hop of the convolution kernels as they move over the
             input volume
+        dilation : int (default: 0)
+            Number of pixels inserted between kernel elements. Effective kernel
+            shape after dilation is:
+                [kernel_rows * (d + 1) - d, kernel_cols * (d + 1) - d]
         """
+        super().__init__()
+
         if act_fn is None:
-            act_fn = Linear()
+            act_fn = Affine(slope=1, intercept=0)
 
         self.pad = pad
+        self.in_ch = in_ch
+        self.out_ch = out_ch
         self.act_fn = act_fn
         self.stride = stride
+        self.dilation = dilation
         self.kernel_shape = kernel_shape
 
-        super().__init__(in_channels, out_channels, act_fn)
         self._init_params()
 
     def _init_params(self):
@@ -1216,16 +1760,209 @@ class Conv2D(LayerBase):
 
         # TODO: use a flexible / sensible initialization strategy here
         fr, fc = self.kernel_shape
-        W = np.random.randn(fr, fc, self.n_in, self.n_out)
-        b = np.zeros((1, 1, 1, self.n_out))
+        W = np.random.randn(fr, fc, self.in_ch, self.out_ch)
+        b = np.zeros((1, 1, 1, self.out_ch))
 
         self.parameters = {"W": W, "b": b}
 
         self.hyperparameters = {
             "layer": "Conv2D",
             "pad": self.pad,
-            "n_in": self.n_in,
-            "n_out": self.n_out,
+            "in_ch": self.in_ch,
+            "out_ch": self.out_ch,
+            "stride": self.stride,
+            "dilation": self.dilation,
+            "act_fn": str(self.act_fn),
+            "kernel_shape": self.kernel_shape,
+        }
+
+        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
+        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
+
+    def forward(self, X):
+        """
+        Compute the layer output given input volume `X`.
+
+        Parameters
+        ----------
+        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+            The input volume consisting of `n_ex` examples, each with dimension
+            (in_rows x in_cols x in_ch)
+
+        Returns
+        -------
+        Y : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
+            The layer output
+        """
+        self.X = X
+
+        W = self.parameters["W"]
+        b = self.parameters["b"]
+
+        n_ex, in_rows, in_cols, in_ch = X.shape
+        s, p, d = self.stride, self.pad, self.dilation
+
+        # pad the input and perform the forward convolution
+        Z = conv2D(X, W, s, p, d) + b
+        Y = self.act_fn.fn(Z)
+
+        self.derived_variables["out_rows"] = Z.shape[1]
+        self.derived_variables["out_cols"] = Z.shape[2]
+        self.derived_variables["Z"] = Z
+
+        return Y
+
+    def backward(self, dLdY):
+        """
+        Compute the gradient of the loss with respect to the layer parameters.
+        Relies on `im2col` and `col2im` to vectorize the gradient calculation.
+        See the private method `_backward_naive` for a more straightforward
+        implementation.
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
+            The gradient of the loss with respect to the layer output.
+
+        Returns
+        -------
+        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss with respect to the layer input volume
+        """
+        X = self.X
+        W = self.parameters["W"]
+        Z = self.derived_variables["Z"]
+
+        d = self.dilation
+        fr, fc, in_ch, out_ch = W.shape
+        n_ex, out_rows, out_cols, out_ch = dLdY.shape
+        (fr, fc), s, p = self.kernel_shape, self.stride, self.pad
+
+        # columnize W, X, and dLdY
+        dLdZ = dLdY * self.act_fn.grad(Z)
+        dLdZ_col = dLdZ.transpose(3, 1, 2, 0).reshape(out_ch, -1)
+        W_col = W.transpose(3, 2, 0, 1).reshape(out_ch, -1).T
+        X_col, p = im2col(X, W.shape, p, s, d)
+
+        # compute gradients via matrix multiplication and reshape
+        dB = dLdZ_col.sum(axis=1).reshape(1, 1, 1, -1)
+        dW = dLdZ_col.dot(X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
+
+        # reshape columnized dX back into the same format as the input volume
+        dX_col = np.dot(W_col, dLdZ_col)
+        dX = col2im(dX_col, X.shape, W.shape, p, s, d).transpose(0, 2, 3, 1)
+
+        self.gradients["W"] = dW
+        self.gradients["b"] = dB
+        return dX
+
+    def _backward_naive(self, dLdY):
+        """
+        A slower (ie., non-vectorized) but more straightforward implementation
+        of the gradient computations for a 2D conv layer.
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
+            The gradient of the loss with respect to the layer output.
+
+        Returns
+        -------
+        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss with respect to the layer input volume
+        """
+        W = self.parameters["W"]
+        b = self.parameters["b"]
+        Z = self.derived_variables["Z"]
+
+        X, d = self.X, self.dilation
+        n_ex, out_rows, out_cols, out_ch = dLdY.shape
+        (fr, fc), s, p = self.kernel_shape, self.stride, self.pad
+        X_pad, (pr1, pr2, pc1, pc2) = pad2D(X, p, self.kernel_shape, s, d)
+
+        dZ = dLdY * self.act_fn.grad(Z)
+
+        dX = np.zeros_like(X_pad)
+        dW, dB = np.zeros_like(W), np.zeros_like(b)
+        for m in range(n_ex):
+            for i in range(out_rows):
+                for j in range(out_cols):
+                    for c in range(out_ch):
+                        # compute window boundaries w. stride and dilation
+                        i0, i1 = i * s, (i * s) + fr * (d + 1) - d
+                        j0, j1 = j * s, (j * s) + fc * (d + 1) - d
+
+                        wc = W[:, :, :, c]
+                        kernel = dZ[m, i, j, c]
+                        window = X_pad[m, i0 : i1 : (d + 1), j0 : j1 : (d + 1), :]
+
+                        dB[:, :, :, c] += kernel
+                        dW[:, :, :, c] += window * kernel
+                        dX[m, i0 : i1 : (d + 1), j0 : j1 : (d + 1), :] += wc * kernel
+
+        self.gradients["W"] = dW
+        self.gradients["b"] = dB
+
+        pr2 = None if pr2 == 0 else -pr2
+        pc2 = None if pc2 == 0 else -pc2
+        dX = dX[:, pr1:pr2, pc1:pc2, :]
+        return dX
+
+
+class Deconv2D(LayerBase):
+    def __init__(
+        self, in_ch, out_ch, kernel_shape, act_fn=None, pad=0, stride=1, dilation=0
+    ):
+        """
+        Apply a two-dimensional "deconvolution" (more accurately, a transposed
+        convolution / fractionally-strided convolution) to an input volume.
+
+        Parameters
+        ----------
+        in_ch : int
+            The number of channels (depth) in the input volume
+        out_ch : int
+            The number of filters/kernels to compute in the current layer
+        kernel_shape : 2-tuple
+            The dimension of a single 2D filter/kernel in the current layer
+        act_fn : `activations.Activation` instance (default: None)
+            The activation function for computing Y[t]. If `None`, use Affine
+            activations by default
+        pad : int, tuple, or 'same' (default: 0)
+            The number of rows/columns to zero-pad the input with
+        stride : int (default: 1)
+            The stride/hop of the convolution kernels as they move over the
+            input volume
+        """
+        super().__init__()
+
+        if act_fn is None:
+            act_fn = Affine(slope=1, intercept=0)
+
+        self.pad = pad
+        self.in_ch = in_ch
+        self.out_ch = out_ch
+        self.act_fn = act_fn
+        self.stride = stride
+        self.kernel_shape = kernel_shape
+
+        self._init_params()
+
+    def _init_params(self):
+        self.X = []
+
+        # TODO: use a flexible / sensible initialization strategy here
+        fr, fc = self.kernel_shape
+        W = np.random.randn(fr, fc, self.in_ch, self.out_ch)
+        b = np.zeros((1, 1, 1, self.out_ch))
+
+        self.parameters = {"W": W, "b": b}
+
+        self.hyperparameters = {
+            "layer": "Deconv2D",
+            "pad": self.pad,
+            "in_ch": self.in_ch,
+            "out_ch": self.out_ch,
             "stride": self.stride,
             "act_fn": str(self.act_fn),
             "kernel_shape": self.kernel_shape,
@@ -1240,94 +1977,95 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, in_rows, in_cols, n_in)
+        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
             The input volume consisting of `n_ex` examples, each with dimension
-            (in_rows x in_cols x n_in)
+            (in_rows x in_cols x in_ch)
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, out_rows, out_cols, n_out)
+        Y : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
             The layer output
         """
         self.X = X
-
         W = self.parameters["W"]
         b = self.parameters["b"]
 
-        n_ex, in_rows, in_cols, n_in = X.shape
-        f, s, p = self.kernel_shape, self.stride, self.pad
+        s, p = self.stride, self.pad
+        n_ex, in_rows, in_cols, in_ch = X.shape
 
-        X_pad, p = pad2D(X, p, f, s)
-        (fr, fc), (pr1, pr2, pc1, pc2) = f, p
-
-        # compute the dimensions of the convolution output
-        out_rows = np.floor(1 + (in_rows + pr1 + pr2 - fr) / s).astype(int)
-        out_cols = np.floor(1 + (in_cols + pc1 + pc2 - fc) / s).astype(int)
-
-        self.derived_variables["out_rows"] = out_rows
-        self.derived_variables["out_cols"] = out_cols
-
-        # proceed with the forward convolution
-        Z = np.zeros((n_ex, out_rows, out_cols, self.n_out))
-        for m in range(n_ex):
-            for c in range(self.n_out):
-                xi, k, bias = X_pad[m, :, :, :], W[:, :, :, c], b[:, :, :, c]
-                Z[m, :, :, c] += conv2D(xi, k, s, p, bias)
-
-        self.derived_variables["Z"] = Z
+        # pad the input and perform the forward deconvolution
+        Z = deconv2D_naive(X, W, s, p, 0) + b
         Y = self.act_fn.fn(Z)
+
+        self.derived_variables["out_rows"] = Z.shape[1]
+        self.derived_variables["out_cols"] = Z.shape[2]
+        self.derived_variables["Z"] = Z
+
         return Y
 
     def backward(self, dLdY):
         """
         Compute the gradient of the loss with respect to the layer parameters.
+        Relies on `im2col` and `col2im` to vectorize the gradient calculations.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, out_rows, out_cols, n_out)
+        dLdY : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
             The gradient of the loss with respect to the layer output.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, n_in)
+        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
             The gradient of the loss with respect to the layer input volume
         """
-        W = self.parameters["W"]
-        b = self.parameters["b"]
-        Z = self.derived_variables["Z"]
-
         X = self.X
-        n_ex, out_rows, out_cols, n_out = dLdY.shape
-        (fr, fc), s, p = self.kernel_shape, self.stride, self.pad
-        X_pad, (pr1, pr2, pc1, pc2) = pad2D(X, p, self.kernel_shape, s)
+        Z = self.derived_variables["Z"]
+        W = np.rot90(self.parameters["W"], 2)
 
-        dZ = dLdY * self.act_fn.grad(Z)
+        s = self.stride
+        if self.stride > 1:
+            X = dilate(X, s - 1)
+            s = 1
 
-        dX = np.zeros_like(X_pad)
-        dW, dB = np.zeros_like(W), np.zeros_like(b)
-        for m in range(n_ex):
-            for i in range(0, out_rows):
-                for j in range(0, out_cols):
-                    for c in range(n_out):
-                        # compute window boundaries, incorporating stride
-                        i0, i1 = i * s, (i * s) + fr
-                        j0, j1 = j * s, (j * s) + fc
+        fr, fc, in_ch, out_ch = W.shape
+        (fr, fc), p = self.kernel_shape, self.pad
+        n_ex, out_rows, out_cols, out_ch = dLdY.shape
 
-                        wc = W[:, :, :, c]
-                        kernel = dZ[m, i, j, c]
-                        window = X_pad[m, i0:i1, j0:j1, :]
+        # pad X the first time
+        X_pad, p = pad2D(X, p, W.shape[:2], s)
+        n_ex, in_rows, in_cols, in_ch = X_pad.shape
+        pr1, pr2, pc1, pc2 = p
 
-                        dB[:, :, :, c] += kernel
-                        dW[:, :, :, c] += window * kernel
-                        dX[m, i0:i1, j0:j1, :] += wc * kernel
+        # compute padding for the deconvolution
+        out_rows = s * (in_rows - 1) - pr1 - pr2 + fr
+        out_cols = s * (in_cols - 1) - pc1 - pc2 + fc
+        out_dim = (out_rows, out_cols)
 
-        self.gradients["W"] = dW
+        _p = calc_pad_dims(X_pad.shape, out_dim, W.shape[:2], s, 0)
+        X_pad, _ = pad2D(X_pad, _p, W.shape[:2], s)
+
+        # columnize W, X, and dLdY
+        dLdZ = dLdY * self.act_fn.grad(Z)
+        dLdZ, _ = pad2D(dLdZ, p, W.shape[:2], s)
+
+        dLdZ_col = dLdZ.transpose(3, 1, 2, 0).reshape(out_ch, -1)
+        W_col = W.transpose(3, 2, 0, 1).reshape(out_ch, -1).T
+        X_col, _ = im2col(X_pad, W.shape, 0, s, 0)
+
+        # compute gradients via matrix multiplication and reshape
+        dB = dLdZ_col.sum(axis=1).reshape(1, 1, 1, -1)
+        dW = dLdZ_col.dot(X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
+
+        # reshape columnized dX back into the same format as the input volume
+        dX_col = np.dot(W_col, dLdZ_col)
+
+        total_pad = tuple(i + j for i, j in zip(p, _p))
+        dX = col2im(dX_col, X.shape, W.shape, total_pad, s, 0).transpose(0, 2, 3, 1)
+
+        # rotate gradient back
+        self.gradients["W"] = np.rot90(dW, 2)
         self.gradients["b"] = dB
-
-        pr2 = None if pr2 == 0 else -pr2
-        pc2 = None if pc2 == 0 else -pc2
-        dX = dX[:, pr1:pr2, pc1:pc2, :]
-        return dX
+        return dX[:, :: self.stride, :: self.stride, :]
 
 
 class RNN(LayerBase):
@@ -1345,11 +2083,15 @@ class RNN(LayerBase):
             The activation function for computing A[t]. If not specified, use
             Tanh by default.
         """
+        super().__init__()
+
         if act_fn is None:
             act_fn = Tanh()
 
+        self.n_in = n_in
+        self.n_out = n_out
+        self.act_fn = act_fn
         self.n_timesteps = None
-        super().__init__(n_in, n_out, act_fn)
         self._init_params()
 
     def _init_params(self):
@@ -1424,6 +2166,8 @@ class LSTM(LayerBase):
             The gate function for computing the update, forget, and output
             gates. If not specified, use Sigmoid by default.
         """
+        super().__init__()
+
         # use tanh as activation function by default
         if act_fn is None:
             act_fn = Tanh()
@@ -1432,9 +2176,11 @@ class LSTM(LayerBase):
         if gate_fn is None:
             gate_fn = Sigmoid()
 
+        self.n_in = n_in
+        self.n_out = n_out
+        self.act_fn = act_fn
         self.gate_fn = gate_fn
         self.n_timesteps = None
-        super().__init__(n_in, n_out, act_fn)
         self._init_params()
 
     def _init_params(self):

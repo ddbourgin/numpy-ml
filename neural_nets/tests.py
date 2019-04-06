@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils import calc_pad_dims
+from utils import calc_pad_dims, conv2D_naive, conv2D, pad2D, pad1D
 from torch_models import (
     torch_xe_grad,
     torch_mse_grad,
@@ -20,8 +20,12 @@ from torch_models import (
     TorchRNNCell,
     TorchLSTMCell,
     TorchAddLayer,
+    TorchConv1DLayer,
     TorchConv2DLayer,
     TorchPool2DLayer,
+    TorchWavenetModule,
+    TorchMultiplyLayer,
+    TorchDeconv2DLayer,
     TorchBatchNormLayer,
     TorchLinearActivation,
     TorchBidirectionalLSTM,
@@ -79,6 +83,11 @@ def random_tensor(shape, standardize=False):
     return X
 
 
+def random_binary_tensor(shape, sparsity=0.5):
+    X = (np.random.rand(*shape) >= (1 - sparsity)).astype(float)
+    return X
+
+
 #######################################################################
 #                           Debug Formatter                           #
 #######################################################################
@@ -88,9 +97,9 @@ def err_fmt(params, golds, ix):
     mine, label = params[ix]
     err_msg = "-" * 25 + " DEBUG " + "-" * 25 + "\n"
     prev_mine, prev_label = params[max(ix - 1, 0)]
-    #  err_msg += "Mine (prev) [{}]:\n{}\n\nTheirs (prev) [{}]:\n{}".format(
-    #      prev_label, prev_mine, prev_label, golds[prev_label]
-    #  )
+    err_msg += "Mine (prev) [{}]:\n{}\n\nTheirs (prev) [{}]:\n{}".format(
+        prev_label, prev_mine, prev_label, golds[prev_label]
+    )
     err_msg += "\n\nMine [{}]:\n{}\n\nTheirs [{}]:\n{}".format(
         label, mine, label, golds[label]
     )
@@ -302,13 +311,13 @@ def test_relu_grad():
 
 def test_FullyConnected():
     from layers import FullyConnected
-    from activations import Tanh, ReLU, Sigmoid, Linear
+    from activations import Tanh, ReLU, Sigmoid, Affine
 
     acts = [
         (Tanh(), nn.Tanh(), "Tanh"),
         (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
         (ReLU(), nn.ReLU(), "ReLU"),
-        (Linear(), TorchLinearActivation(), "Linear"),
+        (Affine(), TorchLinearActivation(), "Affine"),
     ]
 
     i = 1
@@ -404,9 +413,9 @@ def test_BatchNorm1D():
         i += 1
 
 
-def test_AddLayer():
-    from layers import Add
-    from activations import Tanh, ReLU, Sigmoid, Linear
+def test_MultiplyLayer():
+    from layers import Multiply
+    from activations import Tanh, ReLU, Sigmoid, Affine
 
     np.random.seed(12345)
 
@@ -414,7 +423,61 @@ def test_AddLayer():
         (Tanh(), nn.Tanh(), "Tanh"),
         (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
         (ReLU(), nn.ReLU(), "ReLU"),
-        (Linear(), TorchLinearActivation(), "Linear"),
+        (Affine(), TorchLinearActivation(), "Affine"),
+    ]
+
+    i = 1
+    while True:
+        Xs = []
+        n_ex = np.random.randint(1, 100)
+        n_in = np.random.randint(1, 100)
+        n_entries = np.random.randint(2, 5)
+        for _ in range(n_entries):
+            Xs.append(random_tensor((n_ex, n_in), standardize=True))
+
+        act_fn, torch_fn, act_fn_name = acts[np.random.randint(0, len(acts))]
+
+        # initialize Add layer
+        L1 = Multiply(act_fn)
+
+        # forward prop
+        y_pred = L1.forward(Xs)
+
+        # backprop
+        dLdy = np.ones_like(y_pred)
+        dLdXs = L1.backward(dLdy)
+
+        # get gold standard gradients
+        gold_mod = TorchMultiplyLayer(torch_fn)
+        golds = gold_mod.extract_grads(Xs)
+
+        params = [(Xs, "Xs"), (y_pred, "Y")]
+        params.extend(
+            [(dldxi, "dLdX{}".format(i + 1)) for i, dldxi in enumerate(dLdXs)]
+        )
+
+        print("\nTrial {}".format(i))
+        print("n_ex={}, n_in={}".format(n_ex, n_in))
+        print("n_entries={}, act_fn={}".format(n_entries, str(act_fn)))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=1
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_AddLayer():
+    from layers import Add
+    from activations import Tanh, ReLU, Sigmoid, Affine
+
+    np.random.seed(12345)
+
+    acts = [
+        (Tanh(), nn.Tanh(), "Tanh"),
+        (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
+        (ReLU(), nn.ReLU(), "ReLU"),
+        (Affine(), TorchLinearActivation(), "Affine"),
     ]
 
     i = 1
@@ -460,7 +523,7 @@ def test_AddLayer():
 
 def test_SkipConnectionIdentityModule():
     from modules import SkipConnectionIdentityModule
-    from activations import Tanh, ReLU, Sigmoid, Linear
+    from activations import Tanh, ReLU, Sigmoid, Affine
 
     np.random.seed(12345)
 
@@ -468,7 +531,7 @@ def test_SkipConnectionIdentityModule():
         (Tanh(), nn.Tanh(), "Tanh"),
         (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
         (ReLU(), nn.ReLU(), "ReLU"),
-        (Linear(), TorchLinearActivation(), "Linear"),
+        (Affine(), TorchLinearActivation(), "Affine"),
     ]
 
     i = 1
@@ -507,8 +570,8 @@ def test_SkipConnectionIdentityModule():
 
         # initialize SkipConnectionIdentity module
         L1 = SkipConnectionIdentityModule(
-            in_channels=n_in,
-            out_channels=n_out,
+            in_ch=n_in,
+            out_ch=n_out,
             kernel_shape1=f_shape1,
             kernel_shape2=f_shape2,
             stride1=s1,
@@ -589,7 +652,7 @@ def test_SkipConnectionIdentityModule():
 
 def test_SkipConnectionConvModule():
     from modules import SkipConnectionConvModule
-    from activations import Tanh, ReLU, Sigmoid, Linear
+    from activations import Tanh, ReLU, Sigmoid, Affine
 
     np.random.seed(12345)
 
@@ -597,7 +660,7 @@ def test_SkipConnectionConvModule():
         (Tanh(), nn.Tanh(), "Tanh"),
         (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
         (ReLU(), nn.ReLU(), "ReLU"),
-        (Linear(), TorchLinearActivation(), "Linear"),
+        (Affine(), TorchLinearActivation(), "Affine"),
     ]
 
     i = 1
@@ -635,9 +698,9 @@ def test_SkipConnectionConvModule():
 
         # initialize SkipConnectionConv module
         L1 = SkipConnectionConvModule(
-            in_channels=n_in,
-            out_channels1=n_out1,
-            out_channels2=n_out2,
+            in_ch=n_in,
+            out_ch1=n_out1,
+            out_ch2=n_out2,
             kernel_shape1=f_shape1,
             kernel_shape2=f_shape2,
             kernel_shape_skip=f_shape_skip,
@@ -746,8 +809,6 @@ def test_SkipConnectionConvModule():
 
 
 def test_BatchNorm2D():
-    from losses import SquaredErrorLoss
-    from activations import Linear
     from layers import BatchNorm2D
 
     np.random.seed(12345)
@@ -761,21 +822,12 @@ def test_BatchNorm2D():
 
         # initialize BatchNorm2D layer
         X = random_tensor((n_ex, in_rows, in_cols, n_in), standardize=True)
-        L1 = BatchNorm2D(n_in=n_in)
+        L1 = BatchNorm2D(in_ch=n_in)
 
         # forward prop
         y_pred = L1.forward(X)
 
-        # backprop
-
-        # squared error loss
-        #  y_true = np.random.randint(2, size=y_pred.shape)
-        #  loss = SquaredErrorLoss()
-        #  dLdy = loss.grad(y_true, y_pred, y_pred, Linear())
-        #  dLdX = L1.backward(dLdy)
-
         # standard sum loss
-        y_true = None
         dLdy = np.ones_like(X)
         dLdX = L1.backward(dLdy)
 
@@ -783,10 +835,9 @@ def test_BatchNorm2D():
         gold_mod = TorchBatchNormLayer(
             n_in, L1.parameters, mode="2D", epsilon=L1.epsilon, momentum=L1.momentum
         )
-        golds = gold_mod.extract_grads(X, Y_true=y_true)
+        golds = gold_mod.extract_grads(X, Y_true=None)
 
         params = [
-            #  (y_true, "Y_true"),
             (L1.X, "X"),
             (L1.hyperparameters["momentum"], "momentum"),
             (L1.hyperparameters["epsilon"], "epsilon"),
@@ -868,9 +919,34 @@ def test_RNNCell():
         i += 1
 
 
+def test_conv():
+    while True:
+        n_ex = np.random.randint(2, 15)
+        in_rows = np.random.randint(2, 15)
+        in_cols = np.random.randint(2, 15)
+        in_ch = np.random.randint(2, 15)
+        out_ch = np.random.randint(2, 15)
+        f_shape = (
+            min(in_rows, np.random.randint(2, 10)),
+            min(in_cols, np.random.randint(2, 10)),
+        )
+        s = np.random.randint(1, 3)
+        p = np.random.randint(0, 5)
+
+        X = np.random.rand(n_ex, in_rows, in_cols, in_ch)
+        X_pad, p = pad2D(X, p)
+        W = np.random.randn(f_shape[0], f_shape[1], in_ch, out_ch)
+
+        gold = conv2D_naive(X, W, s, p)
+        mine = conv2D(X, W, s, p)
+
+        np.testing.assert_almost_equal(mine, gold)
+        print("PASSED")
+
+
 def test_Conv2D():
     from layers import Conv2D
-    from activations import Tanh, ReLU, Sigmoid, Linear
+    from activations import Tanh, ReLU, Sigmoid, Affine
 
     np.random.seed(12345)
 
@@ -878,7 +954,7 @@ def test_Conv2D():
         (Tanh(), nn.Tanh(), "Tanh"),
         (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
         (ReLU(), nn.ReLU(), "ReLU"),
-        (Linear(), TorchLinearActivation(), "Linear"),
+        (Affine(), TorchLinearActivation(), "Affine"),
     ]
 
     i = 1
@@ -892,8 +968,14 @@ def test_Conv2D():
             min(in_cols, np.random.randint(1, 5)),
         )
         p, s = np.random.randint(0, 5), np.random.randint(1, 3)
-        out_rows = int(1 + (in_rows + 2 * p - f_shape[0]) / s)
-        out_cols = int(1 + (in_cols + 2 * p - f_shape[1]) / s)
+        d = np.random.randint(0, 5)
+
+        fr, fc = f_shape[0] * (d + 1) - d, f_shape[1] * (d + 1) - d
+        out_rows = int(1 + (in_rows + 2 * p - fr) / s)
+        out_cols = int(1 + (in_cols + 2 * p - fc) / s)
+
+        if out_rows <= 0 or out_cols <= 0:
+            continue
 
         X = random_tensor((n_ex, in_rows, in_cols, n_in), standardize=True)
 
@@ -902,12 +984,13 @@ def test_Conv2D():
 
         # initialize Conv2D layer
         L1 = Conv2D(
-            in_channels=n_in,
-            out_channels=n_out,
+            in_ch=n_in,
+            out_ch=n_out,
             kernel_shape=f_shape,
             act_fn=act_fn,
             pad=p,
             stride=s,
+            dilation=d,
         )
 
         # forward prop
@@ -928,6 +1011,364 @@ def test_Conv2D():
             (y_pred, "y"),
             (L1.parameters["W"], "W"),
             (L1.parameters["b"], "b"),
+            (L1.gradients["W"], "dLdW"),
+            (L1.gradients["b"], "dLdB"),
+            (dLdX, "dLdX"),
+        ]
+
+        print("\nTrial {}".format(i))
+        print("pad={}, stride={}, f_shape={}, n_ex={}".format(p, s, f_shape, n_ex))
+        print("in_rows={}, in_cols={}, n_in={}".format(in_rows, in_cols, n_in))
+        print("out_rows={}, out_cols={}, n_out={}".format(out_rows, out_cols, n_out))
+        print("dilation={}".format(d))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=4
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_Conv1D():
+    from layers import Conv1D
+    from activations import Tanh, ReLU, Sigmoid, Affine
+
+    np.random.seed(12345)
+
+    acts = [
+        (Tanh(), nn.Tanh(), "Tanh"),
+        (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
+        (ReLU(), nn.ReLU(), "ReLU"),
+        (Affine(), TorchLinearActivation(), "Affine"),
+    ]
+
+    i = 1
+    while True:
+        n_ex = np.random.randint(1, 10)
+        l_in = np.random.randint(1, 10)
+        n_in, n_out = np.random.randint(1, 3), np.random.randint(1, 3)
+        f_width = min(l_in, np.random.randint(1, 5))
+        p, s = np.random.randint(0, 5), np.random.randint(1, 3)
+        d = np.random.randint(0, 5)
+
+        fc = f_width * (d + 1) - d
+        l_out = int(1 + (l_in + 2 * p - fc) / s)
+
+        if l_out <= 0:
+            continue
+
+        X = random_tensor((n_ex, l_in, n_in), standardize=True)
+
+        # randomly select an activation function
+        act_fn, torch_fn, act_fn_name = acts[np.random.randint(0, len(acts))]
+
+        # initialize Conv2D layer
+        L1 = Conv1D(
+            in_ch=n_in,
+            out_ch=n_out,
+            kernel_width=f_width,
+            act_fn=act_fn,
+            pad=p,
+            stride=s,
+            dilation=d,
+        )
+
+        # forward prop
+        y_pred = L1.forward(X)
+
+        # backprop
+        dLdy = np.ones_like(y_pred)
+        dLdX = L1.backward(dLdy)
+
+        # get gold standard gradients
+        gold_mod = TorchConv1DLayer(
+            n_in, n_out, torch_fn, L1.parameters, L1.hyperparameters
+        )
+        golds = gold_mod.extract_grads(X)
+
+        params = [
+            (L1.X, "X"),
+            (y_pred, "y"),
+            (L1.parameters["W"], "W"),
+            (L1.parameters["b"], "b"),
+            (L1.gradients["W"], "dLdW"),
+            (L1.gradients["b"], "dLdB"),
+            (dLdX, "dLdX"),
+        ]
+
+        print("\nTrial {}".format(i))
+        print("pad={}, stride={}, f_width={}, n_ex={}".format(p, s, f_width, n_ex))
+        print("l_in={}, n_in={}".format(l_in, n_in))
+        print("l_out={}, n_out={}".format(l_out, n_out))
+        print("dilation={}".format(d))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=4
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_pad1D():
+    from layers import Conv1D
+    from torch_models import TorchCausalConv1d, torchify
+
+    i = 1
+    while True:
+        p = np.random.choice(["same", "causal"])
+        n_ex = np.random.randint(1, 10)
+        l_in = np.random.randint(1, 10)
+        n_in, n_out = np.random.randint(1, 3), np.random.randint(1, 3)
+        f_width = min(l_in, np.random.randint(1, 5))
+        s = np.random.randint(1, 3)
+        d = np.random.randint(0, 5)
+
+        X = random_tensor((n_ex, l_in, n_in), standardize=True)
+        X_pad, _ = pad1D(X, p, kernel_width=f_width, stride=s, dilation=d)
+
+        # initialize Conv2D layer
+        L1 = Conv1D(
+            in_ch=n_in, out_ch=n_out, kernel_width=f_width, pad=0, stride=s, dilation=d
+        )
+
+        # forward prop
+        try:
+            y_pred = L1.forward(X_pad)
+        except ValueError:
+            continue
+
+        # ignore n. output channels
+        print("Trial {}".format(i))
+        print("p={} d={} s={} l_in={} f_width={}".format(p, d, s, l_in, f_width))
+        print("n_ex={} n_in={} n_out={}".format(n_ex, n_in, n_out))
+        assert y_pred.shape[:2] == X.shape[:2], print(
+            "y_pred.shape={} X.shape={}".format(y_pred.shape, X.shape)
+        )
+
+        if p == "causal":
+            gold = TorchCausalConv1d(
+                in_channels=n_in,
+                out_channels=n_out,
+                kernel_size=f_width,
+                stride=s,
+                dilation=d + 1,
+                bias=True,
+            )
+            if s != 1:
+                print(
+                    "TorchCausalConv1D does not do same padding for stride > 1. Skipping"
+                )
+                continue
+
+            XT = torchify(np.moveaxis(X, [0, 1, 2], [0, -1, -2]))
+        else:
+            gold = nn.Conv1d(
+                in_channels=n_in,
+                out_channels=n_out,
+                kernel_size=f_width,
+                padding=0,
+                stride=s,
+                dilation=d + 1,
+                bias=True,
+            )
+            XT = torchify(np.moveaxis(X_pad, [0, 1, 2], [0, -1, -2]))
+
+        # import weights and biases
+        # (f[0], n_in, n_out) -> (n_out, n_in, f[0])
+        b = L1.parameters["b"]
+        W = np.moveaxis(L1.parameters["W"], [0, 1, 2], [-1, -2, -3])
+        assert gold.weight.shape == W.shape
+        assert gold.bias.shape == b.flatten().shape
+
+        gold.weight = nn.Parameter(torch.FloatTensor(W))
+        gold.bias = nn.Parameter(torch.FloatTensor(b.flatten()))
+
+        outT = gold(XT)
+        if outT.ndimension() == 2:
+            import ipdb
+
+            ipdb.set_trace()
+
+        gold_out = np.moveaxis(outT.detach().numpy(), [0, 1, 2], [0, -1, -2])
+        assert gold_out.shape[:2] == X.shape[:2]
+
+        np.testing.assert_almost_equal(
+            y_pred,
+            gold_out,
+            err_msg=err_fmt(
+                [(y_pred.shape, "out.shape"), (y_pred, "out")],
+                {"out.shape": gold_out.shape, "out": gold_out},
+                1,
+            ),
+            decimal=4,
+        )
+        print("PASSED\n")
+        i += 1
+
+
+def test_WaveNetModule():
+    from modules import WavenetResidualModule
+
+    np.random.seed(12345)
+
+    i = 1
+    while True:
+        n_ex = np.random.randint(1, 10)
+        l_in = np.random.randint(1, 10)
+        ch_residual, ch_dilation = np.random.randint(1, 5), np.random.randint(1, 5)
+        f_width = min(l_in, np.random.randint(1, 5))
+        d = np.random.randint(0, 5)
+
+        X_main = np.zeros_like(
+            random_tensor((n_ex, l_in, ch_residual), standardize=True)
+        )
+        X_main[0][0][0] = 1.0
+        X_skip = np.zeros_like(
+            random_tensor((n_ex, l_in, ch_residual), standardize=True)
+        )
+
+        # initialize Conv2D layer
+        L1 = WavenetResidualModule(
+            ch_residual=ch_residual,
+            ch_dilation=ch_dilation,
+            kernel_width=f_width,
+            dilation=d,
+        )
+
+        # forward prop
+        Y_main, Y_skip = L1.forward(X_main, X_skip)
+
+        # backprop
+        dLdY_skip = np.ones_like(Y_skip)
+        dLdY_main = np.ones_like(Y_main)
+        dLdX_main, dLdX_skip = L1.backward(dLdY_skip, dLdY_main)
+
+        _, conv_1x1_pad = pad1D(
+            L1._dv["multiply_gate_out"], "same", kernel_width=1, stride=1, dilation=0
+        )
+        if conv_1x1_pad[0] != conv_1x1_pad[1]:
+            print("Skipping")
+            continue
+
+        conv_1x1_pad = conv_1x1_pad[0]
+
+        # get gold standard gradients
+        gold_mod = TorchWavenetModule(L1.parameters, L1.hyperparameters, conv_1x1_pad)
+        golds = gold_mod.extract_grads(X_main, X_skip)
+
+        dv = L1.derived_variables
+        pc = L1.parameters["components"]
+        gr = L1.gradients["components"]
+
+        params = [
+            (L1.X_main, "X_main"),
+            (L1.X_skip, "X_skip"),
+            (pc["conv_dilation"]["W"], "conv_dilation_W"),
+            (pc["conv_dilation"]["b"], "conv_dilation_b"),
+            (pc["conv_1x1"]["W"], "conv_1x1_W"),
+            (pc["conv_1x1"]["b"], "conv_1x1_b"),
+            (dv["conv_dilation_out"], "conv_dilation_out"),
+            (dv["tanh_out"], "tanh_out"),
+            (dv["sigm_out"], "sigm_out"),
+            (dv["multiply_gate_out"], "multiply_gate_out"),
+            (dv["conv_1x1_out"], "conv_1x1_out"),
+            (Y_main, "Y_main"),
+            (Y_skip, "Y_skip"),
+            (dLdY_skip, "dLdY_skip"),
+            (dLdY_main, "dLdY_main"),
+            (dv["dLdConv_1x1"], "dLdConv_1x1_out"),
+            (gr["conv_1x1"]["W"], "dLdConv_1x1_W"),
+            (gr["conv_1x1"]["b"], "dLdConv_1x1_b"),
+            (dv["dLdMultiply"], "dLdMultiply_out"),
+            (dv["dLdTanh"], "dLdTanh_out"),
+            (dv["dLdSigmoid"], "dLdSigm_out"),
+            (dv["dLdConv_dilation"], "dLdConv_dilation_out"),
+            (gr["conv_dilation"]["W"], "dLdConv_dilation_W"),
+            (gr["conv_dilation"]["b"], "dLdConv_dilation_b"),
+            (dLdX_main, "dLdX_main"),
+            (dLdX_skip, "dLdX_skip"),
+        ]
+
+        print("\nTrial {}".format(i))
+        print("f_width={}, n_ex={}".format(f_width, n_ex))
+        print("l_in={}, ch_residual={}".format(l_in, ch_residual))
+        print("ch_dilation={} dilation={}".format(ch_dilation, d))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=4
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_Deconv2D():
+    from layers import Deconv2D
+    from activations import Tanh, ReLU, Sigmoid, Affine
+
+    np.random.seed(12345)
+
+    acts = [
+        (Tanh(), nn.Tanh(), "Tanh"),
+        (Sigmoid(), nn.Sigmoid(), "Sigmoid"),
+        (ReLU(), nn.ReLU(), "ReLU"),
+        (Affine(), TorchLinearActivation(), "Affine"),
+    ]
+
+    i = 1
+    while True:
+        n_ex = np.random.randint(1, 10)
+        in_rows = np.random.randint(1, 10)
+        in_cols = np.random.randint(1, 10)
+        n_in, n_out = np.random.randint(1, 3), np.random.randint(1, 3)
+        f_shape = (
+            min(in_rows, np.random.randint(1, 5)),
+            min(in_cols, np.random.randint(1, 5)),
+        )
+        p, s = np.random.randint(0, 5), np.random.randint(1, 3)
+
+        out_rows = s * (in_rows - 1) - 2 * p + f_shape[0]
+        out_cols = s * (in_cols - 1) - 2 * p + f_shape[1]
+
+        if out_rows <= 0 or out_cols <= 0:
+            continue
+
+        X = random_tensor((n_ex, in_rows, in_cols, n_in), standardize=True)
+
+        # randomly select an activation function
+        act_fn, torch_fn, act_fn_name = acts[np.random.randint(0, len(acts))]
+
+        # initialize Deconv2D layer
+        L1 = Deconv2D(
+            in_ch=n_in,
+            out_ch=n_out,
+            kernel_shape=f_shape,
+            act_fn=act_fn,
+            pad=p,
+            stride=s,
+        )
+
+        # forward prop
+        try:
+            y_pred = L1.forward(X)
+        except ValueError:
+            print("Improper dimensions; retrying")
+            continue
+
+        # backprop
+        dLdy = np.ones_like(y_pred)
+        dLdX = L1.backward(dLdy)
+
+        # get gold standard gradients
+        gold_mod = TorchDeconv2DLayer(
+            n_in, n_out, torch_fn, L1.parameters, L1.hyperparameters
+        )
+        golds = gold_mod.extract_grads(X)
+
+        params = [
+            (L1.X, "X"),
+            (L1.parameters["W"], "W"),
+            (L1.parameters["b"], "b"),
+            (y_pred, "y"),
             (L1.gradients["W"], "dLdW"),
             (L1.gradients["b"], "dLdB"),
             (dLdX, "dLdX"),
@@ -973,7 +1414,7 @@ def test_Pool2D():
         print("out_rows={}, out_cols={}, n_out={}".format(out_rows, out_cols, n_in))
 
         # initialize Pool2D layer
-        L1 = Pool2D(in_channels=n_in, kernel_shape=f_shape, pad=p, stride=s, mode=mode)
+        L1 = Pool2D(in_ch=n_in, kernel_shape=f_shape, pad=p, stride=s, mode=mode)
 
         # forward prop
         y_pred = L1.forward(X)

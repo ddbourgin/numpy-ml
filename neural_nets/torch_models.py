@@ -182,13 +182,59 @@ class TorchAddLayer(nn.Module):
         return grads
 
 
+class TorchMultiplyLayer(nn.Module):
+    def __init__(self, act_fn, **kwargs):
+        super(TorchMultiplyLayer, self).__init__()
+        self.act_fn = act_fn
+
+    def forward(self, Xs):
+        self.Xs = []
+        x = Xs[0].copy()
+        if not isinstance(x, torch.Tensor):
+            x = torchify(x)
+
+        self.prod = x.clone()
+        x.retain_grad()
+        self.Xs.append(x)
+
+        for i in range(1, len(Xs)):
+            x = Xs[i]
+            if not isinstance(x, torch.Tensor):
+                x = torchify(x)
+
+            x.retain_grad()
+            self.Xs.append(x)
+            self.prod *= x
+
+        self.prod.retain_grad()
+        self.Y = self.act_fn(self.prod)
+        self.Y.retain_grad()
+        return self.Y
+
+    def extract_grads(self, X):
+        self.forward(X)
+        self.loss = self.Y.sum()
+        self.loss.backward()
+        grads = {
+            "Xs": X,
+            "Prod": self.prod.detach().numpy(),
+            "Y": self.Y.detach().numpy(),
+            "dLdY": self.Y.grad.numpy(),
+            "dLdProd": self.prod.grad.numpy(),
+        }
+        grads.update(
+            {"dLdX{}".format(i + 1): xi.grad.numpy() for i, xi in enumerate(self.Xs)}
+        )
+        return grads
+
+
 class TorchSkipConnectionIdentity(nn.Module):
     def __init__(self, act_fn, pad1, pad2, params, hparams, momentum=0.9, epsilon=1e-5):
         super(TorchSkipConnectionIdentity, self).__init__()
 
         self.conv1 = nn.Conv2d(
-            hparams["in_channels"],
-            hparams["out_channels"],
+            hparams["in_ch"],
+            hparams["out_ch"],
             hparams["kernel_shape1"],
             padding=pad1,
             stride=hparams["stride1"],
@@ -198,15 +244,15 @@ class TorchSkipConnectionIdentity(nn.Module):
         self.act_fn = act_fn
 
         self.batchnorm1 = nn.BatchNorm2d(
-            num_features=hparams["out_channels"],
+            num_features=hparams["out_ch"],
             momentum=1 - momentum,
             eps=epsilon,
             affine=True,
         )
 
         self.conv2 = nn.Conv2d(
-            hparams["out_channels"],
-            hparams["out_channels"],
+            hparams["out_ch"],
+            hparams["out_ch"],
             hparams["kernel_shape2"],
             padding=pad2,
             stride=hparams["stride2"],
@@ -214,7 +260,7 @@ class TorchSkipConnectionIdentity(nn.Module):
         )
 
         self.batchnorm2 = nn.BatchNorm2d(
-            num_features=hparams["out_channels"],
+            num_features=hparams["out_ch"],
             momentum=1 - momentum,
             eps=epsilon,
             affine=True,
@@ -330,6 +376,180 @@ class TorchSkipConnectionIdentity(nn.Module):
         return grads
 
 
+class TorchCausalConv1d(torch.nn.Conv1d):
+    """https://github.com/pytorch/pytorch/issues/1333
+
+    NB: this is only ensures that the convolution out length is the same as
+    the input length IFF stride = 1. Otherwise, in/out lengths will differ.
+    """
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        dilation=1,
+        groups=1,
+        bias=True,
+    ):
+        self.__padding = (kernel_size - 1) * dilation
+
+        super(TorchCausalConv1d, self).__init__(
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=self.__padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+        )
+
+    def forward(self, input):
+        result = super(TorchCausalConv1d, self).forward(input)
+        if self.__padding != 0:
+            return result[:, :, : -self.__padding]
+        return result
+
+
+class TorchWavenetModule(nn.Module):
+    def __init__(self, params, hparams, conv_1x1_pad):
+        super(TorchWavenetModule, self).__init__()
+        self.conv_dilation = TorchCausalConv1d(
+            in_channels=hparams["components"]["conv_dilation"]["in_ch"],
+            out_channels=hparams["components"]["conv_dilation"]["out_ch"],
+            kernel_size=hparams["components"]["conv_dilation"]["kernel_width"],
+            stride=hparams["components"]["conv_dilation"]["stride"],
+            dilation=hparams["components"]["conv_dilation"]["dilation"] + 1,
+            bias=True,
+        )
+
+        self.conv_1x1 = nn.Conv1d(
+            in_channels=hparams["components"]["conv_1x1"]["in_ch"],
+            out_channels=hparams["components"]["conv_1x1"]["out_ch"],
+            kernel_size=hparams["components"]["conv_1x1"]["kernel_width"],
+            stride=hparams["components"]["conv_1x1"]["stride"],
+            padding=conv_1x1_pad,
+            dilation=hparams["components"]["conv_1x1"]["dilation"] + 1,
+            bias=True,
+        )
+
+        W = params["components"]["conv_dilation"]["W"]
+        b = params["components"]["conv_dilation"]["b"]
+        # (f[0], n_in, n_out) -> (n_out, n_in, f[0])
+        W = np.moveaxis(W, [0, 1, 2], [-1, -2, -3])
+        self.conv_dilation.weight = nn.Parameter(torch.FloatTensor(W))
+        self.conv_dilation.bias = nn.Parameter(torch.FloatTensor(b.flatten()))
+        assert self.conv_dilation.weight.shape == W.shape
+        assert self.conv_dilation.bias.shape == b.flatten().shape
+
+        W = params["components"]["conv_1x1"]["W"]
+        b = params["components"]["conv_1x1"]["b"]
+        # (f[0], n_in, n_out) -> (n_out, n_in, f[0])
+        W = np.moveaxis(W, [0, 1, 2], [-1, -2, -3])
+        self.conv_1x1.weight = nn.Parameter(torch.FloatTensor(W))
+        self.conv_1x1.bias = nn.Parameter(torch.FloatTensor(b.flatten()))
+        assert self.conv_1x1.weight.shape == W.shape
+        assert self.conv_1x1.bias.shape == b.flatten().shape
+
+    def forward(self, X_main, X_skip):
+        # (N, W, C) -> (N, C, W)
+        self.X_main = np.moveaxis(X_main, [0, 1, 2], [0, -1, -2])
+        self.X_main = torchify(self.X_main)
+        self.X_main.retain_grad()
+
+        self.conv_dilation_out = self.conv_dilation(self.X_main)
+        self.conv_dilation_out.retain_grad()
+
+        self.tanh_out = F.tanh(self.conv_dilation_out)
+        self.sigm_out = F.sigmoid(self.conv_dilation_out)
+
+        self.tanh_out.retain_grad()
+        self.sigm_out.retain_grad()
+
+        self.multiply_gate_out = self.tanh_out * self.sigm_out
+        self.multiply_gate_out.retain_grad()
+
+        self.conv_1x1_out = self.conv_1x1(self.multiply_gate_out)
+        self.conv_1x1_out.retain_grad()
+
+        self.X_skip = torch.zeros_like(self.conv_1x1_out)
+        if X_skip is not None:
+            self.X_skip = torchify(np.moveaxis(X_skip, [0, 1, 2], [0, -1, -2]))
+        self.X_skip.retain_grad()
+
+        self.Y_skip = self.X_skip + self.conv_1x1_out
+        self.Y_main = self.X_main + self.conv_1x1_out
+
+        self.Y_skip.retain_grad()
+        self.Y_main.retain_grad()
+
+    def extract_grads(self, X_main, X_skip):
+        self.forward(X_main, X_skip)
+        self.loss = (self.Y_skip + self.Y_main).sum()
+        self.loss.backward()
+
+        # W (theirs): (n_out, n_in, f[0]) -> W (mine): (f[0], n_in, n_out)
+        # X (theirs): (N, C, W)              -> X (mine): (N, W, C)
+        # Y (theirs): (N, C, W)              -> Y (mine): (N, W, C)
+        orig, X_swap, W_swap = [0, 1, 2], [0, -1, -2], [-1, -2, -3]
+        grads = {
+            "X_main": np.moveaxis(self.X_main.detach().numpy(), orig, X_swap),
+            "X_skip": np.moveaxis(self.X_skip.detach().numpy(), orig, X_swap),
+            "conv_dilation_W": np.moveaxis(
+                self.conv_dilation.weight.detach().numpy(), orig, W_swap
+            ),
+            "conv_dilation_b": self.conv_dilation.bias.detach()
+            .numpy()
+            .reshape(1, 1, -1),
+            "conv_1x1_W": np.moveaxis(
+                self.conv_1x1.weight.detach().numpy(), orig, W_swap
+            ),
+            "conv_1x1_b": self.conv_1x1.bias.detach().numpy().reshape(1, 1, -1),
+            "conv_dilation_out": np.moveaxis(
+                self.conv_dilation_out.detach().numpy(), orig, X_swap
+            ),
+            "tanh_out": np.moveaxis(self.tanh_out.detach().numpy(), orig, X_swap),
+            "sigm_out": np.moveaxis(self.sigm_out.detach().numpy(), orig, X_swap),
+            "multiply_gate_out": np.moveaxis(
+                self.multiply_gate_out.detach().numpy(), orig, X_swap
+            ),
+            "conv_1x1_out": np.moveaxis(
+                self.conv_1x1_out.detach().numpy(), orig, X_swap
+            ),
+            "Y_main": np.moveaxis(self.Y_main.detach().numpy(), orig, X_swap),
+            "Y_skip": np.moveaxis(self.Y_skip.detach().numpy(), orig, X_swap),
+            "dLdY_skip": np.moveaxis(self.Y_skip.grad.numpy(), orig, X_swap),
+            "dLdY_main": np.moveaxis(self.Y_main.grad.numpy(), orig, X_swap),
+            "dLdConv_1x1_out": np.moveaxis(
+                self.conv_1x1_out.grad.numpy(), orig, X_swap
+            ),
+            "dLdConv_1x1_W": np.moveaxis(
+                self.conv_1x1.weight.grad.numpy(), orig, W_swap
+            ),
+            "dLdConv_1x1_b": self.conv_1x1.bias.grad.numpy().reshape(1, 1, -1),
+            "dLdMultiply_out": np.moveaxis(
+                self.multiply_gate_out.grad.numpy(), orig, X_swap
+            ),
+            "dLdTanh_out": np.moveaxis(self.tanh_out.grad.numpy(), orig, X_swap),
+            "dLdSigm_out": np.moveaxis(self.sigm_out.grad.numpy(), orig, X_swap),
+            "dLdConv_dilation_out": np.moveaxis(
+                self.conv_dilation_out.grad.numpy(), orig, X_swap
+            ),
+            "dLdConv_dilation_W": np.moveaxis(
+                self.conv_dilation.weight.grad.numpy(), orig, W_swap
+            ),
+            "dLdConv_dilation_b": self.conv_dilation.bias.grad.numpy().reshape(
+                1, 1, -1
+            ),
+            "dLdX_main": np.moveaxis(self.X_main.grad.numpy(), orig, X_swap),
+            "dLdX_skip": np.moveaxis(self.X_skip.grad.numpy(), orig, X_swap),
+        }
+
+        return grads
+
+
 class TorchSkipConnectionConv(nn.Module):
     def __init__(
         self, act_fn, pad1, pad2, pad_skip, params, hparams, momentum=0.9, epsilon=1e-5
@@ -337,8 +557,8 @@ class TorchSkipConnectionConv(nn.Module):
         super(TorchSkipConnectionConv, self).__init__()
 
         self.conv1 = nn.Conv2d(
-            hparams["in_channels"],
-            hparams["out_channels1"],
+            hparams["in_ch"],
+            hparams["out_ch1"],
             hparams["kernel_shape1"],
             padding=pad1,
             stride=hparams["stride1"],
@@ -348,15 +568,15 @@ class TorchSkipConnectionConv(nn.Module):
         self.act_fn = act_fn
 
         self.batchnorm1 = nn.BatchNorm2d(
-            num_features=hparams["out_channels1"],
+            num_features=hparams["out_ch1"],
             momentum=1 - momentum,
             eps=epsilon,
             affine=True,
         )
 
         self.conv2 = nn.Conv2d(
-            hparams["out_channels1"],
-            hparams["out_channels2"],
+            hparams["out_ch1"],
+            hparams["out_ch2"],
             hparams["kernel_shape2"],
             padding=pad2,
             stride=hparams["stride2"],
@@ -364,15 +584,15 @@ class TorchSkipConnectionConv(nn.Module):
         )
 
         self.batchnorm2 = nn.BatchNorm2d(
-            num_features=hparams["out_channels2"],
+            num_features=hparams["out_ch2"],
             momentum=1 - momentum,
             eps=epsilon,
             affine=True,
         )
 
         self.conv_skip = nn.Conv2d(
-            hparams["in_channels"],
-            hparams["out_channels2"],
+            hparams["in_ch"],
+            hparams["out_ch2"],
             hparams["kernel_shape_skip"],
             padding=pad_skip,
             stride=hparams["stride_skip"],
@@ -380,7 +600,7 @@ class TorchSkipConnectionConv(nn.Module):
         )
 
         self.batchnorm_skip = nn.BatchNorm2d(
-            num_features=hparams["out_channels2"],
+            num_features=hparams["out_ch2"],
             momentum=1 - momentum,
             eps=epsilon,
             affine=True,
@@ -778,6 +998,7 @@ class TorchConv2DLayer(nn.Module):
             hparams["kernel_shape"],
             padding=hparams["pad"],
             stride=hparams["stride"],
+            dilation=hparams["dilation"] + 1,
             bias=True,
         )
 
@@ -813,6 +1034,134 @@ class TorchConv2DLayer(nn.Module):
         # X (theirs): (N, C, H, W)              -> X (mine): (N, H, W, C)
         # Y (theirs): (N, C, H, W)              -> Y (mine): (N, H, W, C)
         orig, X_swap, W_swap = [0, 1, 2, 3], [0, -1, -3, -2], [-1, -2, -4, -3]
+        grads = {
+            "X": np.moveaxis(self.X.detach().numpy(), orig, X_swap),
+            "W": np.moveaxis(self.layer1.weight.detach().numpy(), orig, W_swap),
+            "b": self.layer1.bias.detach().numpy().reshape(1, 1, 1, -1),
+            "y": np.moveaxis(self.Y.detach().numpy(), orig, X_swap),
+            "dLdY": np.moveaxis(self.Y.grad.numpy(), orig, X_swap),
+            "dLdZ": np.moveaxis(self.Z.grad.numpy(), orig, X_swap),
+            "dLdW": np.moveaxis(self.layer1.weight.grad.numpy(), orig, W_swap),
+            "dLdB": self.layer1.bias.grad.numpy().reshape(1, 1, 1, -1),
+            "dLdX": np.moveaxis(self.X.grad.numpy(), orig, X_swap),
+        }
+        return grads
+
+
+class TorchConv1DLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, act_fn, params, hparams, **kwargs):
+        super(TorchConv1DLayer, self).__init__()
+
+        W = params["W"]
+        b = params["b"]
+        self.act_fn = act_fn
+
+        self.layer1 = nn.Conv1d(
+            in_channels,
+            out_channels,
+            hparams["kernel_width"],
+            padding=hparams["pad"],
+            stride=hparams["stride"],
+            dilation=hparams["dilation"] + 1,
+            bias=True,
+        )
+
+        # (f[0], n_in, n_out) -> (n_out, n_in, f[0])
+        W = np.moveaxis(W, [0, 1, 2], [-1, -2, -3])
+        assert self.layer1.weight.shape == W.shape
+        assert self.layer1.bias.shape == b.flatten().shape
+
+        self.layer1.weight = nn.Parameter(torch.FloatTensor(W))
+        self.layer1.bias = nn.Parameter(torch.FloatTensor(b.flatten()))
+
+    def forward(self, X):
+        # (N, W, C) -> (N, C, W)
+        self.X = np.moveaxis(X, [0, 1, 2], [0, -1, -2])
+        if not isinstance(self.X, torch.Tensor):
+            self.X = torchify(self.X)
+
+        self.X.retain_grad()
+
+        self.Z = self.layer1(self.X)
+        self.Z.retain_grad()
+
+        self.Y = self.act_fn(self.Z)
+        self.Y.retain_grad()
+        return self.Y
+
+    def extract_grads(self, X):
+        self.forward(X)
+        self.loss = self.Y.sum()
+        self.loss.backward()
+
+        # W (theirs): (n_out, n_in, f[0]) -> W (mine): (f[0], n_in, n_out)
+        # X (theirs): (N, C, W)              -> X (mine): (N, W, C)
+        # Y (theirs): (N, C, W)              -> Y (mine): (N, W, C)
+        orig, X_swap, W_swap = [0, 1, 2], [0, -1, -2], [-1, -2, -3]
+        grads = {
+            "X": np.moveaxis(self.X.detach().numpy(), orig, X_swap),
+            "W": np.moveaxis(self.layer1.weight.detach().numpy(), orig, W_swap),
+            "b": self.layer1.bias.detach().numpy().reshape(1, 1, -1),
+            "y": np.moveaxis(self.Y.detach().numpy(), orig, X_swap),
+            "dLdY": np.moveaxis(self.Y.grad.numpy(), orig, X_swap),
+            "dLdZ": np.moveaxis(self.Z.grad.numpy(), orig, X_swap),
+            "dLdW": np.moveaxis(self.layer1.weight.grad.numpy(), orig, W_swap),
+            "dLdB": self.layer1.bias.grad.numpy().reshape(1, 1, -1),
+            "dLdX": np.moveaxis(self.X.grad.numpy(), orig, X_swap),
+        }
+        return grads
+
+
+class TorchDeconv2DLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, act_fn, params, hparams, **kwargs):
+        super(TorchDeconv2DLayer, self).__init__()
+
+        W = params["W"]
+        b = params["b"]
+        self.act_fn = act_fn
+
+        self.layer1 = nn.ConvTranspose2d(
+            in_channels,
+            out_channels,
+            hparams["kernel_shape"],
+            padding=hparams["pad"],
+            stride=hparams["stride"],
+            dilation=1,
+            bias=True,
+        )
+
+        # (f[0], f[1], n_in, n_out) -> (n_in, n_out, f[0], f[1])
+        W = np.moveaxis(W, [0, 1, 2, 3], [-2, -1, -4, -3])
+        assert self.layer1.weight.shape == W.shape
+        assert self.layer1.bias.shape == b.flatten().shape
+
+        self.layer1.weight = nn.Parameter(torch.FloatTensor(W))
+        self.layer1.bias = nn.Parameter(torch.FloatTensor(b.flatten()))
+
+    def forward(self, X):
+        # (N, H, W, C) -> (N, C, H, W)
+        self.X = np.moveaxis(X, [0, 1, 2, 3], [0, -2, -1, -3])
+        if not isinstance(self.X, torch.Tensor):
+            self.X = torchify(self.X)
+
+        self.X.retain_grad()
+
+        self.Z = self.layer1(self.X)
+        self.Z.retain_grad()
+
+        self.Y = self.act_fn(self.Z)
+        self.Y.retain_grad()
+        return self.Y
+
+    def extract_grads(self, X):
+        self.forward(X)
+        self.loss = self.Y.sum()
+        self.loss.backward()
+
+        # W (theirs): (n_in, n_out, f[0], f[1]) -> W (mine): (f[0], f[1], n_in, n_out)
+        # X (theirs): (N, C, H, W)              -> X (mine): (N, H, W, C)
+        # Y (theirs): (N, C, H, W)              -> Y (mine): (N, H, W, C)
+        orig, X_swap, W_swap = [0, 1, 2, 3], [0, -1, -3, -2], [-2, -1, -4, -3]
         grads = {
             "X": np.moveaxis(self.X.detach().numpy(), orig, X_swap),
             "W": np.moveaxis(self.layer1.weight.detach().numpy(), orig, W_swap),
@@ -956,7 +1305,7 @@ class TorchRNNCell(nn.Module):
 
         # set weights and bias to match those of RNNCell
         # NB: we pass the *transpose* of the RNNCell weights and biases to
-        # pytorch, meaning wee need to check against the *transpose* of our
+        # pytorch, meaning we need to check against the *transpose* of our
         # outputs for any function of the weights
         self.layer1.weight_ih = nn.Parameter(torch.FloatTensor(params["Wax"].T))
         self.layer1.weight_hh = nn.Parameter(torch.FloatTensor(params["Waa"].T))

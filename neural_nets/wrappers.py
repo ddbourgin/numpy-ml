@@ -112,8 +112,8 @@ class Dropout(WrapperBase):
         if self.trainable:
             dropout_mask = np.random.rand(*X.shape) >= self.p
             X = dropout_mask * X
-        return self._wrapped_layer.forward(X)
+        return self._base_layer.forward(X)
 
     def backward(self, dLdy):
         assert self.trainable, "Layer is frozen"
-        return self._wrapped_layer.backward(dLdy)
+        return self._base_layer.backward(dLdy)
