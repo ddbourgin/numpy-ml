@@ -56,9 +56,9 @@ class SmoothedLDA(object):
 
     def train(self, texts, tokens, n_gibbs=2000):
         """
-        Trains a topic model on the documents in texts. Assumes texts is
-        an array of subarrays, where each subarray corresponds to a
-        separate document.
+        Trains a topic model on the documents in texts. Assumes `texts` is an
+        array of subarrays, where each subarray corresponds to a separate
+        document.
         """
         self._init_params(texts, tokens)
         C_wt, C_dt, assignments = self._gibbs_sampler(n_gibbs, texts)
@@ -67,7 +67,7 @@ class SmoothedLDA(object):
 
     def what_did_you_learn(self, top_n=10):
         """
-        Prints the top n most probable words for each topic
+        Prints the `top_n` most probable words for each topic
         """
         for tt in range(self.T):
             top_idx = np.argsort(self.phi[:, tt])[::-1][:top_n]
@@ -78,7 +78,7 @@ class SmoothedLDA(object):
 
     def fit_params(self, C_wt, C_dt):
         """
-        Estimate phi, the word-topic distribution, and theta, the
+        Estimate `phi`, the word-topic distribution, and `theta`, the
         topic-document distribution from the current count matrices
         """
         self.phi = np.zeros([self.V, self.T])
@@ -116,7 +116,7 @@ class SmoothedLDA(object):
 
     def _gibbs_sampler(self, n_gibbs, texts):
         """
-        Gibbs sampling procedure for estimating the posterior distribution over
+        Collapsed Gibbs sampler for estimating the posterior distribution over
         topic assignments.
         """
         # Initialize count matrices
@@ -133,6 +133,7 @@ class SmoothedLDA(object):
             C_dt[doc, assignments[ii, 0]] += 1
             C_wt[token_idx, assignments[ii, 0]] += 1
 
+        # run collapsed Gibbs sampler
         for gg in range(n_gibbs):
             print("Gibbs iteration {} of {}".format(gg + 1, n_gibbs))
             for jj in range(self.N):
