@@ -167,3 +167,6 @@ tags
 
 # Persistent undo
 [._]*.un~
+
+# No pdfs
+*.pdf
