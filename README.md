@@ -1,7 +1,6 @@
 # numpy-ml
 Ever wish you had an inefficient but somewhat legible collection of machine
-learning algorithms implemented exclusively in numpy? No? Well here you
-go anyway.
+learning algorithms implemented exclusively in numpy? No? 
 
 ## Models
 This repo includes code for the following models:
