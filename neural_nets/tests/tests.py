@@ -12,10 +12,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils import calc_pad_dims, conv2D_naive, conv2D, pad2D, pad1D
-from torch_models import (
+from utils import calc_pad_dims_2D, conv2D_naive, conv2D, pad2D, pad1D
+from .torch_models import (
     torch_xe_grad,
     torch_mse_grad,
+    TorchVAELoss,
     TorchFCLayer,
     TorchRNNCell,
     TorchLSTMCell,
@@ -113,9 +114,9 @@ def err_fmt(params, golds, ix):
 
 
 def test_squared_error():
-    from losses import SquaredErrorLoss
+    from losses import SquaredError
 
-    mine = SquaredErrorLoss()
+    mine = SquaredError()
     gold = (
         lambda y, y_pred: mean_squared_error(y, y_pred)
         * y_pred.shape[0]
@@ -140,9 +141,9 @@ def test_squared_error():
 
 
 def test_cross_entropy():
-    from losses import CrossEntropyLoss
+    from losses import CrossEntropy
 
-    mine = CrossEntropyLoss()
+    mine = CrossEntropy()
     gold = log_loss
 
     # ensure we get 0 when the two arrays are equal
@@ -163,16 +164,53 @@ def test_cross_entropy():
         print("PASSED")
 
 
+def test_VAE_loss():
+    from losses import VAELoss
+
+    i = 1
+    while True:
+        n_ex = np.random.randint(1, 10)
+        t_dim = np.random.randint(2, 10)
+        t_mean = random_tensor([n_ex, t_dim], standardize=True)
+        t_log_var = np.log(np.abs(random_tensor([n_ex, t_dim], standardize=True)))
+        im_cols, im_rows = np.random.randint(2, 40), np.random.randint(2, 40)
+        X = np.random.rand(n_ex, im_rows * im_cols)
+        X_recon = np.random.rand(n_ex, im_rows * im_cols)
+
+        mine = VAELoss()
+        mine_loss = mine(X, X_recon, t_mean, t_log_var)
+        dX_recon, dLogVar, dMean = mine.grad(X, X_recon, t_mean, t_log_var)
+        golds = TorchVAELoss().extract_grads(X, X_recon, t_mean, t_log_var)
+
+        params = [
+            (mine_loss, "loss"),
+            (dX_recon, "dX_recon"),
+            (dLogVar, "dt_log_var"),
+            (dMean, "dt_mean"),
+        ]
+        print("\nTrial {}".format(i))
+        for ix, (mine, label) in enumerate(params):
+            np.testing.assert_allclose(
+                mine,
+                golds[label],
+                err_msg=err_fmt(params, golds, ix),
+                rtol=0.1,
+                atol=1e-2,
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
 #######################################################################
 #                       Loss Function Gradients                       #
 #######################################################################
 
 
 def test_squared_error_grad():
-    from losses import SquaredErrorLoss
+    from losses import SquaredError
     from activations import Tanh
 
-    mine = SquaredErrorLoss()
+    mine = SquaredError()
     gold = torch_mse_grad
     act = Tanh()
 
@@ -192,10 +230,10 @@ def test_squared_error_grad():
 
 
 def test_cross_entropy_grad():
-    from losses import CrossEntropyLoss
+    from losses import CrossEntropy
     from activations import Softmax
 
-    mine = CrossEntropyLoss()
+    mine = CrossEntropy()
     gold = torch_xe_grad
     sm = Softmax()
 
@@ -331,7 +369,7 @@ def test_FullyConnected():
         act_fn, torch_fn, act_fn_name = acts[np.random.randint(0, len(acts))]
 
         # initialize FC layer
-        L1 = FullyConnected(n_in=n_in, n_out=n_out, act_fn=act_fn)
+        L1 = FullyConnected(n_out=n_out, act_fn=act_fn)
 
         # forward prop
         y_pred = L1.forward(X)
@@ -377,7 +415,7 @@ def test_BatchNorm1D():
         X = random_tensor((n_ex, n_in), standardize=True)
 
         # initialize BatchNorm1D layer
-        L1 = BatchNorm1D(n_in=n_in)
+        L1 = BatchNorm1D()
 
         # forward prop
         y_pred = L1.forward(X)
@@ -557,11 +595,11 @@ def test_SkipConnectionIdentityModule():
 
         X = random_tensor((n_ex, in_rows, in_cols, n_in), standardize=True)
 
-        p1 = calc_pad_dims(X.shape, X.shape[1:3], f_shape1, s1)
+        p1 = calc_pad_dims_2D(X.shape, X.shape[1:3], f_shape1, s1)
         if p1[0] != p1[1] or p1[2] != p1[3]:
             continue
 
-        p2 = calc_pad_dims(X.shape, X.shape[1:3], f_shape2, s2)
+        p2 = calc_pad_dims_2D(X.shape, X.shape[1:3], f_shape2, s2)
         if p2[0] != p2[1] or p2[2] != p2[3]:
             continue
 
@@ -570,7 +608,6 @@ def test_SkipConnectionIdentityModule():
 
         # initialize SkipConnectionIdentity module
         L1 = SkipConnectionIdentityModule(
-            in_ch=n_in,
             out_ch=n_out,
             kernel_shape1=f_shape1,
             kernel_shape2=f_shape2,
@@ -665,9 +702,9 @@ def test_SkipConnectionConvModule():
 
     i = 1
     while True:
-        n_ex = np.random.randint(2, 15)
-        in_rows = np.random.randint(2, 25)
-        in_cols = np.random.randint(2, 25)
+        n_ex = np.random.randint(2, 10)
+        in_rows = np.random.randint(2, 10)
+        in_cols = np.random.randint(2, 10)
         n_in = np.random.randint(2, 5)
         n_out1 = np.random.randint(2, 5)
         n_out2 = np.random.randint(2, 5)
@@ -698,7 +735,6 @@ def test_SkipConnectionConvModule():
 
         # initialize SkipConnectionConv module
         L1 = SkipConnectionConvModule(
-            in_ch=n_in,
             out_ch1=n_out1,
             out_ch2=n_out2,
             kernel_shape1=f_shape1,
@@ -822,7 +858,7 @@ def test_BatchNorm2D():
 
         # initialize BatchNorm2D layer
         X = random_tensor((n_ex, in_rows, in_cols, n_in), standardize=True)
-        L1 = BatchNorm2D(in_ch=n_in)
+        L1 = BatchNorm2D()
 
         # forward prop
         y_pred = L1.forward(X)
@@ -876,7 +912,7 @@ def test_RNNCell():
         X = random_tensor((n_ex, n_in, n_t), standardize=True)
 
         # initialize RNN layer
-        L1 = RNNCell(n_in=n_in, n_out=n_out)
+        L1 = RNNCell(n_out=n_out)
 
         # forward prop
         y_preds = []
@@ -912,8 +948,12 @@ def test_RNNCell():
 
         print("Trial {}".format(i))
         for ix, (mine, label) in enumerate(params):
-            assert_almost_equal(
-                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=3
+            np.testing.assert_allclose(
+                mine,
+                golds[label],
+                err_msg=err_fmt(params, golds, ix),
+                atol=1e-3,
+                rtol=1e-3,
             )
             print("\tPASSED {}".format(label))
         i += 1
@@ -984,7 +1024,6 @@ def test_Conv2D():
 
         # initialize Conv2D layer
         L1 = Conv2D(
-            in_ch=n_in,
             out_ch=n_out,
             kernel_shape=f_shape,
             act_fn=act_fn,
@@ -1064,7 +1103,6 @@ def test_Conv1D():
 
         # initialize Conv2D layer
         L1 = Conv1D(
-            in_ch=n_in,
             out_ch=n_out,
             kernel_width=f_width,
             act_fn=act_fn,
@@ -1127,9 +1165,7 @@ def test_pad1D():
         X_pad, _ = pad1D(X, p, kernel_width=f_width, stride=s, dilation=d)
 
         # initialize Conv2D layer
-        L1 = Conv1D(
-            in_ch=n_in, out_ch=n_out, kernel_width=f_width, pad=0, stride=s, dilation=d
-        )
+        L1 = Conv1D(out_ch=n_out, kernel_width=f_width, pad=0, stride=s, dilation=d)
 
         # forward prop
         try:
@@ -1339,12 +1375,7 @@ def test_Deconv2D():
 
         # initialize Deconv2D layer
         L1 = Deconv2D(
-            in_ch=n_in,
-            out_ch=n_out,
-            kernel_shape=f_shape,
-            act_fn=act_fn,
-            pad=p,
-            stride=s,
+            out_ch=n_out, kernel_shape=f_shape, act_fn=act_fn, pad=p, stride=s
         )
 
         # forward prop
@@ -1414,7 +1445,7 @@ def test_Pool2D():
         print("out_rows={}, out_cols={}, n_out={}".format(out_rows, out_cols, n_in))
 
         # initialize Pool2D layer
-        L1 = Pool2D(in_ch=n_in, kernel_shape=f_shape, pad=p, stride=s, mode=mode)
+        L1 = Pool2D(kernel_shape=f_shape, pad=p, stride=s, mode=mode)
 
         # forward prop
         y_pred = L1.forward(X)
@@ -1450,7 +1481,7 @@ def test_LSTMCell():
         X = random_tensor((n_ex, n_in, n_t), standardize=True)
 
         # initialize LSTM layer
-        L1 = LSTMCell(n_in=n_in, n_out=n_out)
+        L1 = LSTMCell(n_out=n_out)
 
         # forward prop
         Cs = []
@@ -1499,8 +1530,12 @@ def test_LSTMCell():
 
         print("Case {}".format(i))
         for ix, (mine, label) in enumerate(params):
-            assert_almost_equal(
-                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=5
+            np.testing.assert_allclose(
+                mine,
+                golds[label],
+                err_msg=err_fmt(params, golds, ix),
+                atol=1e-4,
+                rtol=1e-4,
             )
 
             print("\tPASSED {}".format(label))
@@ -1521,7 +1556,7 @@ def test_BidirectionalLSTM():
         X = random_tensor((n_ex, n_in, n_t), standardize=True)
 
         # initialize LSTM layer
-        L1 = BidirectionalLSTM(n_in=n_in, n_out=n_out)
+        L1 = BidirectionalLSTM(n_out=n_out)
 
         # forward prop
         y_pred = L1.forward(X)
@@ -1538,49 +1573,70 @@ def test_BidirectionalLSTM():
         params = [
             (X, "X"),
             (y_pred, "y"),
-            (pms["forward"]["bo"].T, "bo_f"),
-            (pms["forward"]["bu"].T, "bu_f"),
-            (pms["forward"]["bf"].T, "bf_f"),
-            (pms["forward"]["bc"].T, "bc_f"),
-            (pms["forward"]["Wo"], "Wo_f"),
-            (pms["forward"]["Wu"], "Wu_f"),
-            (pms["forward"]["Wf"], "Wf_f"),
-            (pms["forward"]["Wc"], "Wc_f"),
-            (pms["backward"]["bo"].T, "bo_b"),
-            (pms["backward"]["bu"].T, "bu_b"),
-            (pms["backward"]["bf"].T, "bf_b"),
-            (pms["backward"]["bc"].T, "bc_b"),
-            (pms["backward"]["Wo"], "Wo_b"),
-            (pms["backward"]["Wu"], "Wu_b"),
-            (pms["backward"]["Wf"], "Wf_b"),
-            (pms["backward"]["Wc"], "Wc_b"),
-            (grads["forward"]["bo"].T, "dLdBo_f"),
-            (grads["forward"]["bu"].T, "dLdBu_f"),
-            (grads["forward"]["bf"].T, "dLdBf_f"),
-            (grads["forward"]["bc"].T, "dLdBc_f"),
-            (grads["forward"]["Wo"], "dLdWo_f"),
-            (grads["forward"]["Wu"], "dLdWu_f"),
-            (grads["forward"]["Wf"], "dLdWf_f"),
-            (grads["forward"]["Wc"], "dLdWc_f"),
-            (grads["backward"]["bo"].T, "dLdBo_b"),
-            (grads["backward"]["bu"].T, "dLdBu_b"),
-            (grads["backward"]["bf"].T, "dLdBf_b"),
-            (grads["backward"]["bc"].T, "dLdBc_b"),
-            (grads["backward"]["Wo"], "dLdWo_b"),
-            (grads["backward"]["Wu"], "dLdWu_b"),
-            (grads["backward"]["Wf"], "dLdWf_b"),
-            (grads["backward"]["Wc"], "dLdWc_b"),
+            (pms["cell_fwd"]["bo"].T, "bo_f"),
+            (pms["cell_fwd"]["bu"].T, "bu_f"),
+            (pms["cell_fwd"]["bf"].T, "bf_f"),
+            (pms["cell_fwd"]["bc"].T, "bc_f"),
+            (pms["cell_fwd"]["Wo"], "Wo_f"),
+            (pms["cell_fwd"]["Wu"], "Wu_f"),
+            (pms["cell_fwd"]["Wf"], "Wf_f"),
+            (pms["cell_fwd"]["Wc"], "Wc_f"),
+            (pms["cell_bwd"]["bo"].T, "bo_b"),
+            (pms["cell_bwd"]["bu"].T, "bu_b"),
+            (pms["cell_bwd"]["bf"].T, "bf_b"),
+            (pms["cell_bwd"]["bc"].T, "bc_b"),
+            (pms["cell_bwd"]["Wo"], "Wo_b"),
+            (pms["cell_bwd"]["Wu"], "Wu_b"),
+            (pms["cell_bwd"]["Wf"], "Wf_b"),
+            (pms["cell_bwd"]["Wc"], "Wc_b"),
+            (grads["cell_fwd"]["bo"].T, "dLdBo_f"),
+            (grads["cell_fwd"]["bu"].T, "dLdBu_f"),
+            (grads["cell_fwd"]["bf"].T, "dLdBf_f"),
+            (grads["cell_fwd"]["bc"].T, "dLdBc_f"),
+            (grads["cell_fwd"]["Wo"], "dLdWo_f"),
+            (grads["cell_fwd"]["Wu"], "dLdWu_f"),
+            (grads["cell_fwd"]["Wf"], "dLdWf_f"),
+            (grads["cell_fwd"]["Wc"], "dLdWc_f"),
+            (grads["cell_bwd"]["bo"].T, "dLdBo_b"),
+            (grads["cell_bwd"]["bu"].T, "dLdBu_b"),
+            (grads["cell_bwd"]["bf"].T, "dLdBf_b"),
+            (grads["cell_bwd"]["bc"].T, "dLdBc_b"),
+            (grads["cell_bwd"]["Wo"], "dLdWo_b"),
+            (grads["cell_bwd"]["Wu"], "dLdWu_b"),
+            (grads["cell_bwd"]["Wf"], "dLdWf_b"),
+            (grads["cell_bwd"]["Wc"], "dLdWc_b"),
             (dLdX, "dLdX"),
         ]
 
         print("Case {}".format(i))
         for ix, (mine, label) in enumerate(params):
-            assert_almost_equal(
-                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=5
+            np.testing.assert_allclose(
+                mine,
+                golds[label],
+                err_msg=err_fmt(params, golds, ix),
+                atol=1e-4,
+                rtol=1e-4,
             )
 
             print("\tPASSED {}".format(label))
         i += 1
+
+
+def test_VAE():
+    # for testing
+    from keras.datasets import mnist
+    from models.vae import BernoulliVAE
+
+    (X_train, y_train), (X_test, y_test) = mnist.load_data()
+
+    # scale pixel intensities to [0, 1]
+    X_train = np.expand_dims(X_train.astype("float32") / 255.0, 3)
+    X_test = np.expand_dims(X_test.astype("float32") / 255.0, 3)
+
+    X_train = X_train[: 128 * 10]
+
+    BV = BernoulliVAE()
+    BV.fit(X_train)
 
 
 def grad_check_RNN(model, loss_func, param_name, n_t, X, epsilon=1e-7):

@@ -100,6 +100,22 @@ class WrapperBase(ABC):
 
 class Dropout(WrapperBase):
     def __init__(self, wrapped_layer, p):
+        """
+        A dropout regularization wrapper.
+
+        During training, independently zeroes each element of the layer input
+        with probability p and scales the activation by 1 / (1 - p) (to reflect
+        the fact that on average only (1 - p) * N units are active on any
+        training pass). At test time, does not adjust elements of the input at
+        all (ie., simply computes the identity function).
+
+        Parameters
+        ----------
+        wrapped_layer : `layers.LayerBase` instance
+            The layer to apply dropout to.
+        p : float in [0, 1)
+            The dropout propbability during training
+        """
         super().__init__(wrapped_layer)
         self.p = p
         self._init_wrapper_params()
@@ -109,11 +125,23 @@ class Dropout(WrapperBase):
         self._wrapper_hyperparameters = {"wrapper": "Dropout", "p": self.p}
 
     def forward(self, X):
+        scaler = 1.0
         if self.trainable:
+            scaler = 1.0 / (1.0 - self.p)
             dropout_mask = np.random.rand(*X.shape) >= self.p
             X = dropout_mask * X
-        return self._base_layer.forward(X)
+        return scaler * self._base_layer.forward(X)
 
     def backward(self, dLdy):
         assert self.trainable, "Layer is frozen"
+        dLdy *= 1.0 / (1.0 - self.p)
         return self._base_layer.backward(dLdy)
+
+
+def init_wrappers(layer, wrappers_list):
+    for wr in wrappers_list:
+        if wr["wrapper"] == "Dropout":
+            layer = Dropout(layer, 1)._set_wrapper_params(wr)
+        else:
+            raise NotImplementedError("{}".format(wr["wrapper"]))
+    return layer

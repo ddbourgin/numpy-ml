@@ -1,10 +1,15 @@
+import re
 from abc import ABC, abstractmethod
+
 import numpy as np
 
 
 class ActivationBase(ABC):
     def __init__(self, **kwargs):
         super().__init__()
+
+    def __call__(self, z):
+        return self.fn(z)
 
     @abstractmethod
     def fn(self, z):
@@ -57,7 +62,27 @@ class ReLU(ActivationBase):
         return np.clip(z, 0, np.inf)
 
     def grad(self, x):
-        return (x > 0).astype(int)
+        with np.errstate(invalid="raise"):
+            return (x > 0).astype(int)
+
+
+class LeakyReLU(ActivationBase):
+    def __init__(self, alpha=0.3):
+        self.alpha = alpha
+        super().__init__()
+
+    def __str__(self):
+        return "Leaky ReLU(alpha={})".format(self.alpha)
+
+    def fn(self, z):
+        _z = z.copy()
+        _z[z < 0] = _z[z < 0] * self.alpha
+        return _z
+
+    def grad(self, x):
+        out = np.ones_like(x)
+        out[x < 0] *= self.alpha
+        return out
 
 
 class Tanh(ActivationBase):

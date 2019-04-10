@@ -1,27 +1,32 @@
 from abc import ABC, abstractmethod
 
-import re
 import numpy as np
+
+from initializers import WeightInitializer, OptimizerInitializer, ActivationInitializer
+from wrappers import init_wrappers
 
 from utils import (
     pad1D,
     pad2D,
     conv1D,
     conv2D,
-    deconv2D_naive,
     im2col,
     col2im,
-    calc_pad_dims,
     dilate,
+    deconv2D_naive,
+    calc_pad_dims_2D,
 )
-from activations import Tanh, Sigmoid, ReLU, Affine
-from wrappers import Dropout
 
 
 class LayerBase(ABC):
-    def __init__(self):
+    def __init__(self, optimizer=None):
         self.X = None
         self.trainable = True
+        self.optimizer = OptimizerInitializer(optimizer)()
+
+        self.gradients = {}
+        self.parameters = {}
+        self.derived_variables = {}
 
         super().__init__()
 
@@ -52,60 +57,37 @@ class LayerBase(ABC):
         for k, v in self.gradients.items():
             self.gradients[k] = np.zeros_like(v)
 
-    def update(self, lr):
+    def update(self):
         assert self.trainable, "Layer is frozen"
         for k, v in self.gradients.items():
             if k in self.parameters:
-                self.parameters[k] -= lr * v
+                self.parameters[k] = self.optimizer(self.parameters[k], v, k)
         self.flush_gradients()
 
     def set_params(self, summary_dict):
-        layer = self
-        if "parameters" in summary_dict:
-            for k, v in summary_dict["parameters"].items():
-                if k in self.parameters:
-                    self.parameters[k] = v
+        layer, sd = self, summary_dict
 
-        if "hyperparameters" in summary_dict:
-            for k, v in summary_dict["hyperparameters"].items():
-                if k in self.hyperparameters:
-                    if k == "act_fn" and v == "ReLU":
-                        self.act_fn = ReLU()
-                    elif k == "act_fn" and v == "Sigmoid":
-                        self.act_fn = Sigmoid()
-                    elif k == "act_fn" and v == "Tanh":
-                        self.act_fn = Tanh()
-                    elif k == "act_fn" and "Affine" in v:
-                        r = r"Affine\(slope=(.*), intercept=(.*)\)"
-                        slope, intercept = re.match(r, v).groups()
-                        self.act_fn = Affine(float(slope), float(intercept))
-                    if k != "wrappers":
-                        self.hyperparameters[k] = v
+        # collapse `parameters` and `hyperparameters` nested dicts into a single
+        # merged dictionary
+        flatten_keys = ["parameters", "hyperparameters"]
+        for k in flatten_keys:
+            if k in sd:
+                entry = sd[k]
+                sd.update(entry)
+                del sd[k]
 
-            if "wrappers" in summary_dict["hyperparameters"]:
-                for wr in summary_dict["hyperparameters"]["wrappers"]:
-                    if wr["wrapper"] == "Dropout":
-                        layer = Dropout(self, 1)._set_wrapper_params(wr)
-                    else:
-                        raise NotImplementedError
-
-        if "hyperparameters" not in summary_dict and "parameters" not in summary_dict:
-            for k, v in summary_dict.items():
-                if k in self.hyperparameters:
-                    if k == "act_fn" and v == "ReLU":
-                        self.act_fn = ReLU()
-                    elif k == "act_fn" and v == "Sigmoid":
-                        self.act_fn = Sigmoid()
-                    elif k == "act_fn" and v == "Tanh":
-                        self.act_fn = Tanh()
-                    elif k == "act_fn" and "Affine" in v:
-                        r = r"Affine\(slope=(.*), intercept=(.*)\)"
-                        slope, intercept = re.match(r, v).groups()
-                        self.act_fn = Affine(float(slope), float(intercept))
-                    if k != "wrappers":
-                        self.hyperparameters[k] = v
-                if k in self.parameters:
-                    self.parameters[k] = v
+        for k, v in sd.items():
+            if k in self.parameters:
+                layer.parameters[k] = v
+            if k in self.hyperparameters:
+                if k == "act_fn":
+                    layer.act_fn = ActivationInitializer(v)()
+                if k == "optimizer":
+                    layer.optimizer = OptimizerInitializer(sd[k])()
+                if k not in ["wrappers", "optimizer"]:
+                    setattr(layer, k, v)
+                if k == "wrappers":
+                    layer = init_wrappers(layer, sd[k])
         return layer
 
     def summary(self):
@@ -117,37 +99,53 @@ class LayerBase(ABC):
 
 
 class RestrictedBoltzmannMachine(LayerBase):
-    def __init__(self, n_in, n_out, K=1):
+    def __init__(self, n_out, K=1, init="glorot_uniform", optimizer=None):
         """
         A Restricted Boltzmann machine with Bernoulli visible and hidden units.
 
         Parameters
         ----------
-        n_in : int
-            The number of input dimensions/units.
         n_out : int
             The number of output dimensions/units.
         K : int (default: 1)
             The number of contrastive divergence steps to run before computing
             a single gradient update.
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
         self.K = K  # CD-K
-        self.n_in = n_in
+        self.init = init
+        self.n_in = None
         self.n_out = n_out
-        self.act_fn_V = Sigmoid()
-        self.act_fn_H = Sigmoid()
+        self.act_fn_V = ActivationInitializer("Sigmoid")()
+        self.act_fn_H = ActivationInitializer("Sigmoid")()
+        self.is_initialized = False
+        self.parameters = {"W": None, "b_in": None, "b_out": None}
 
         self._init_params()
 
     def _init_params(self):
-        # TODO: use a flexible / sensible initialization strategy here
+        init_weights = WeightInitializer(str(self.act_fn_V), mode=self.init)
+
         b_in = np.zeros((1, self.n_in))
         b_out = np.zeros((1, self.n_out))
-        W = np.random.randn(self.n_in, self.n_out)
+        W = init_weights((self.n_in, self.n_out))
 
         self.parameters = {"W": W, "b_in": b_in, "b_out": b_out}
+
+        self.gradients = {
+            "W": np.zeros_like(W),
+            "b_in": np.zeros_like(b_in),
+            "b_out": np.zeros_like(b_out),
+        }
+
         self.derived_variables = {
             "V": None,
             "p_H": None,
@@ -156,16 +154,20 @@ class RestrictedBoltzmannMachine(LayerBase):
             "positive_grad": None,
             "negative_grad": None,
         }
-        self.gradients = {
-            "W": np.zeros_like(W),
-            "b_in": np.zeros_like(b_in),
-            "b_out": np.zeros_like(b_out),
-        }
-        self.hyperparameters = {
+        self.is_initialized = True
+
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "RestrictedBoltzmannMachine",
             "K": self.K,
             "n_in": self.n_in,
             "n_out": self.n_out,
+            "init": self.init,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
 
     def CD_update(self, X):
@@ -212,6 +214,10 @@ class RestrictedBoltzmannMachine(LayerBase):
             The number of steps of contrastive divergence steps to run before
             computing the gradient update. If `None`, use self.K
         """
+        if not self.is_initialized:
+            self.n_in = V.shape[1]
+            self._init_params()
+
         # override self.K if necessary
         K = self.K if K is None else K
 
@@ -317,30 +323,38 @@ class RestrictedBoltzmannMachine(LayerBase):
 
 
 class Add(LayerBase):
-    def __init__(self, act_fn=None):
+    def __init__(self, act_fn=None, optimizer=None):
         """
         An "addition" layer that returns the sum of its inputs, passed through
         an optional nonlinearity.
 
         Parameters
         ----------
-        act_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: None)
             The element-wise output nonlinearity used in computing the final
             output. If `None`, use the identity function act_fn(x) = x.
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
-
-        if act_fn is None:
-            act_fn = Affine(slope=1, intercept=0)
-
-        self.act_fn = act_fn
+        super().__init__(optimizer)
+        self.act_fn = ActivationInitializer(act_fn)()
         self._init_params()
 
     def _init_params(self):
-        self.gradients = {}
-        self.parameters = {}
         self.derived_variables = {"sum": None}
-        self.hyperparameters = {"layer": "Sum", "act_fn": str(self.act_fn)}
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "Sum",
+            "act_fn": str(self.act_fn),
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
+        }
 
     def forward(self, X):
         """
@@ -383,30 +397,38 @@ class Add(LayerBase):
 
 
 class Multiply(LayerBase):
-    def __init__(self, act_fn=None):
+    def __init__(self, act_fn=None, optimizer=None):
         """
         A multiplication layer that returns the *elementwise* product of its
         inputs, passed through an optional nonlinearity.
 
         Parameters
         ----------
-        act_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: None)
             The element-wise output nonlinearity used in computing the final
             output. If `None`, use the identity function f(x) = x.
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
-
-        if act_fn is None:
-            act_fn = Affine(slope=1, intercept=0)
-
-        self.act_fn = act_fn
+        super().__init__(optimizer)
+        self.act_fn = ActivationInitializer(act_fn)()
         self._init_params()
 
     def _init_params(self):
-        self.gradients = {}
-        self.parameters = {}
         self.derived_variables = {"product": None}
-        self.hyperparameters = {"layer": "Multiply", "act_fn": str(self.act_fn)}
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "Multiply",
+            "act_fn": str(self.act_fn),
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
+        }
 
     def forward(self, X):
         """
@@ -451,21 +473,22 @@ class Multiply(LayerBase):
 
 
 class BatchNorm2D(LayerBase):
-    def __init__(self, in_ch, momentum=0.9, epsilon=1e-5):
+    def __init__(self, momentum=0.9, epsilon=1e-5, optimizer=None):
         """
         A batch normalization layer for two-dimensional inputs with an
         additional channel dimension. This is sometimes known as "Spatial Batch
         Normalization" in the literature.
 
-        Equations:
+        Equations [train]:
             Y = scaler * norm(X) + intercept
-            norm(X) = (X - mean(X)) / std(X + epsilon)
+            norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
+
+        Equations [test]:
+            Y = scaler * running_norm(X) + intercept
+            running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
 
         Parameters
         ----------
-        in_ch : int
-            The number of channels in the input volume. The layer output will
-            automatically have the same dimensionality as the input.
         momentum : float (default: 0.9)
             The momentum term for the running mean/running std calculations.
             The closer this is to 1, the less weight will be given to the
@@ -473,14 +496,24 @@ class BatchNorm2D(LayerBase):
         epsilon : float (default : 1e-5)
             A small smoothing constant to use during computation of norm(X) to
             avoid divide-by-zero errors.
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
-        self.in_ch = in_ch
-        self.out_ch = in_ch
-        self.momentum = momentum
+        self.in_ch = None
+        self.out_ch = None
         self.epsilon = epsilon
-        self._init_params()
+        self.momentum = momentum
+        self.parameters = {
+            "scaler": None,
+            "intercept": None,
+            "running_var": None,
+            "running_mean": None,
+        }
+        self.is_initialized = False
 
     def _init_params(self):
         scaler = np.random.rand(self.in_ch)
@@ -490,7 +523,6 @@ class BatchNorm2D(LayerBase):
         running_mean = np.zeros(self.in_ch)
         running_var = np.ones(self.in_ch)
 
-        self.derived_variables = {}
         self.parameters = {
             "scaler": scaler,
             "intercept": intercept,
@@ -503,13 +535,21 @@ class BatchNorm2D(LayerBase):
             "intercept": np.zeros_like(intercept),
         }
 
-        self.hyperparameters = {
+        self.is_initialized = True
+
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "BatchNorm2D",
             "act_fn": None,
             "in_ch": self.in_ch,
             "out_ch": self.out_ch,
             "epsilon": self.epsilon,
             "momentum": self.momentum,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
 
     def reset_running_stats(self):
@@ -521,21 +561,29 @@ class BatchNorm2D(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations:
+        Equations [train]:
             Y = scaler * norm(X) + intercept
-            norm(X) = (X - mean(X)) / std(X + epsilon)
+            norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
+
+        Equations [test]:
+            Y = scaler * running_norm(X) + intercept
+            running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
 
         Parameters
         ----------
         X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            Input volume containing the `in_rows` x `in_cols`-dimensional features for a
-            minibatch of `n_ex` examples.
+            Input volume containing the `in_rows` x `in_cols`-dimensional
+            features for a minibatch of `n_ex` examples.
 
         Returns
         -------
         Y : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
             Layer output for each of the `n_ex` examples
         """
+        if not self.is_initialized:
+            self.in_ch = self.out_ch = X.shape[3]
+            self._init_params()
+
         self.X = X
         ep = self.hyperparameters["epsilon"]
         mm = self.hyperparameters["momentum"]
@@ -602,19 +650,20 @@ class BatchNorm2D(LayerBase):
 
 
 class BatchNorm1D(LayerBase):
-    def __init__(self, n_in, momentum=0.9, epsilon=1e-5):
+    def __init__(self, momentum=0.9, epsilon=1e-5, optimizer=None):
         """
         A batch normalization layer for vector inputs.
 
-        Equations:
+        Equations [train]:
             Y = scaler * norm(X) + intercept
             norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
 
+        Equations [test]:
+            Y = scaler * running_norm(X) + intercept
+            running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
+
         Parameters
         ----------
-        n_in : int
-            The dimensionality of the layer input. The layer output will
-            automatically have the same dimensionality.
         momentum : float (default: 0.9)
             The momentum term for the running mean/running std calculations.
             The closer this is to 1, the less weight will be given to the
@@ -622,14 +671,24 @@ class BatchNorm1D(LayerBase):
         epsilon : float (default : 1e-5)
             A small smoothing constant to use during computation of norm(X) to
             avoid divide-by-zero errors.
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
-        self.n_in = n_in
-        self.n_out = n_in
-        self.momentum = momentum
+        self.n_in = None
+        self.n_out = None
         self.epsilon = epsilon
-        self._init_params()
+        self.momentum = momentum
+        self.parameters = {
+            "scaler": None,
+            "intercept": None,
+            "running_var": None,
+            "running_mean": None,
+        }
+        self.is_initialized = False
 
     def _init_params(self):
         scaler = np.random.rand(self.n_in)
@@ -639,7 +698,6 @@ class BatchNorm1D(LayerBase):
         running_mean = np.zeros(self.n_in)
         running_var = np.ones(self.n_in)
 
-        self.derived_variables = {}
         self.parameters = {
             "scaler": scaler,
             "intercept": intercept,
@@ -651,7 +709,10 @@ class BatchNorm1D(LayerBase):
             "scaler": np.zeros_like(scaler),
             "intercept": np.zeros_like(intercept),
         }
+        self.is_initialized = True
 
+    @property
+    def hyperparameters(self):
         self.hyperparameters = {
             "layer": "BatchNorm1D",
             "act_fn": None,
@@ -659,6 +720,10 @@ class BatchNorm1D(LayerBase):
             "n_out": self.n_out,
             "epsilon": self.epsilon,
             "momentum": self.momentum,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
 
     def reset_running_stats(self):
@@ -670,9 +735,13 @@ class BatchNorm1D(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations:
+        Equations [train]:
             Y = scaler * norm(X) + intercept
-            norm(X) = (X - mean(X)) / std(X + epsilon)
+            norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
+
+        Equations [test]:
+            Y = scaler * running_norm(X) + intercept
+            running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
 
         Parameters
         ----------
@@ -685,6 +754,10 @@ class BatchNorm1D(LayerBase):
         Y : numpy array of shape (n_ex, n_in)
             Layer output for each of the `n_ex` examples
         """
+        if not self.is_initialized:
+            self.n_in = self.n_out = X.shape[1]
+            self._init_params()
+
         self.X = X
         ep = self.hyperparameters["epsilon"]
         mm = self.hyperparameters["momentum"]
@@ -745,7 +818,7 @@ class BatchNorm1D(LayerBase):
 
 
 class FullyConnected(LayerBase):
-    def __init__(self, n_in, n_out, act_fn=None):
+    def __init__(self, n_out, act_fn=None, init="glorot_uniform", optimizer=None):
         """
         A fully-connected (dense) layer.
 
@@ -754,38 +827,51 @@ class FullyConnected(LayerBase):
 
         Parameters
         ----------
-        n_in : int
-            The dimensionality of the layer input
         n_out : int
             The dimensionality of the layer output
-        act_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: None)
             The element-wise output nonlinearity used in computing Y. If None,
             use the identity function act_fn(X) = X
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
-        if act_fn is None:
-            act_fn = Affine(slope=1, intercept=0)
-
-        self.n_in = n_in
+        self.init = init
+        self.n_in = None
         self.n_out = n_out
-        self.act_fn = act_fn
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.parameters = {"W": None, "b": None}
+        self.is_initialized = False
 
     def _init_params(self):
-        # TODO: use a flexible / sensible initialization strategy here
+        init_weights = WeightInitializer(str(self.act_fn), mode=self.init)
+
         b = np.zeros((1, self.n_out))
-        W = np.random.randn(self.n_in, self.n_out)
+        W = init_weights((self.n_in, self.n_out))
 
         self.parameters = {"W": W, "b": b}
         self.derived_variables = {"Z": None, "Y": None}
         self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
+        self.is_initialized = True
 
-        self.hyperparameters = {
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "FullyConnected",
+            "init": self.init,
             "n_in": self.n_in,
             "n_out": self.n_out,
             "act_fn": str(self.act_fn),
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
 
     def forward(self, X):
@@ -806,6 +892,10 @@ class FullyConnected(LayerBase):
         Y : numpy array of shape (n_ex, n_out)
             Layer output for each of the `n_ex` examples
         """
+        if not self.is_initialized:
+            self.n_in = X.shape[1]
+            self._init_params()
+
         # save input for gradient calc during backward pass
         self.X = X
 
@@ -851,7 +941,7 @@ class FullyConnected(LayerBase):
 
 
 class RNNCell(LayerBase):
-    def __init__(self, n_in, n_out, act_fn=None):
+    def __init__(self, n_out, act_fn="Tanh", init="glorot_uniform", optimizer=None):
         """
         A single step of a vanilla (Elman) RNN.
 
@@ -863,43 +953,39 @@ class RNNCell(LayerBase):
 
         Parameters
         ----------
-        n_in : int
-            The dimension of a single input example on a given timestep
         n_out : int
             The dimension of a single hidden state / output on a given timestep
-        act_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: None)
             The activation function for computing A[t]. If not specified, use
             Tanh by default.
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
-        # use tanh as activation function by default
-        if act_fn is None:
-            act_fn = Tanh()
-
-        self.n_in = n_in
+        self.init = init
+        self.n_in = None
         self.n_out = n_out
-        self.act_fn = act_fn
         self.n_timesteps = None
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.parameters = {"Waa": None, "Wax": None, "ba": None, "bx": None}
+        self.is_initialized = False
 
     def _init_params(self):
         self.X = []
+        init_weights = WeightInitializer(str(self.act_fn), mode=self.init)
 
-        # TODO: use a flexible / sensible initialization strategy here
-        Wax = np.random.randn(self.n_in, self.n_out)
-        Waa = np.random.randn(self.n_out, self.n_out)
+        Wax = init_weights((self.n_in, self.n_out))
+        Waa = init_weights((self.n_out, self.n_out))
         ba = np.zeros((self.n_out, 1))
         bx = np.zeros((self.n_out, 1))
 
         self.parameters = {"Waa": Waa, "Wax": Wax, "ba": ba, "bx": bx}
-
-        self.hyperparameters = {
-            "layer": "RNNCell",
-            "n_in": self.n_in,
-            "n_out": self.n_out,
-            "act_fn": str(self.act_fn),
-        }
 
         self.gradients = {
             "Waa": np.zeros_like(Waa),
@@ -914,6 +1000,22 @@ class RNNCell(LayerBase):
             "n_timesteps": 0,
             "current_step": 0,
             "dLdA_accumulator": None,
+        }
+
+        self.is_initialized = True
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "RNNCell",
+            "init": self.init,
+            "n_in": self.n_in,
+            "n_out": self.n_out,
+            "act_fn": str(self.act_fn),
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
 
     def forward(self, Xt):
@@ -938,6 +1040,10 @@ class RNNCell(LayerBase):
             The value of the hidden state at timestep t for each of the `n_ex`
             examples
         """
+        if not self.is_initialized:
+            self.n_in = Xt.shape[1]
+            self._init_params()
+
         # increment timestep
         self.derived_variables["n_timesteps"] += 1
         self.derived_variables["current_step"] += 1
@@ -1036,7 +1142,14 @@ class RNNCell(LayerBase):
 
 
 class LSTMCell(LayerBase):
-    def __init__(self, n_in, n_out, act_fn=None, gate_fn=None):
+    def __init__(
+        self,
+        n_out,
+        act_fn="Tanh",
+        gate_fn="Sigmoid",
+        init="glorot_uniform",
+        optimizer=None,
+    ):
         """
         A single step of a long short-term memory (LSTM) RNN.
 
@@ -1066,42 +1179,50 @@ class LSTMCell(LayerBase):
 
         Parameters
         ----------
-        n_in : int
-            The dimension of a single input example on a given timestep
         n_out : int
             The dimension of a single hidden state / output on a given timestep
-        act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing A[t]. If not specified, use
-            Tanh by default.
-        gate_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: 'Tanh')
+            The activation function for computing A[t].
+        gate_fn : str or `activations.Activation` instance (default: 'Sigmoid')
             The gate function for computing the update, forget, and output
-            gates. If not specified, use Sigmoid by default.
+            gates.
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
-        # use tanh as activation function by default
-        if act_fn is None:
-            act_fn = Tanh()
-
-        # use sigmoid as gating function by default
-        if gate_fn is None:
-            gate_fn = Sigmoid()
-
-        self.n_in = n_in
+        self.init = init
+        self.n_in = None
         self.n_out = n_out
-        self.act_fn = act_fn
-        self.gate_fn = gate_fn
         self.n_timesteps = None
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.gate_fn = ActivationInitializer(gate_fn)()
+        self.parameters = {
+            "Wf": None,
+            "Wu": None,
+            "Wc": None,
+            "Wo": None,
+            "bf": None,
+            "bu": None,
+            "bc": None,
+            "bo": None,
+        }
+        self.is_initialized = False
 
     def _init_params(self):
         self.X = []
+        init_weights_gate = WeightInitializer(str(self.gate_fn), mode=self.init)
+        init_weights_act = WeightInitializer(str(self.act_fn), mode=self.init)
 
-        # TODO: use a flexible / sensible initialization strategy here
-        Wf = np.random.randn(self.n_in + self.n_out, self.n_out)
-        Wu = np.random.randn(self.n_in + self.n_out, self.n_out)
-        Wc = np.random.randn(self.n_in + self.n_out, self.n_out)
-        Wo = np.random.randn(self.n_in + self.n_out, self.n_out)
+        Wf = init_weights_gate((self.n_in + self.n_out, self.n_out))
+        Wu = init_weights_gate((self.n_in + self.n_out, self.n_out))
+        Wc = init_weights_act((self.n_in + self.n_out, self.n_out))
+        Wo = init_weights_gate((self.n_in + self.n_out, self.n_out))
 
         bf = np.zeros((1, self.n_out))
         bu = np.zeros((1, self.n_out))
@@ -1117,14 +1238,6 @@ class LSTMCell(LayerBase):
             "bu": bu,
             "bc": bc,
             "bo": bo,
-        }
-
-        self.hyperparameters = {
-            "layer": "LSTMCell",
-            "n_in": self.n_in,
-            "n_out": self.n_out,
-            "act_fn": str(self.act_fn),
-            "gate_fn": str(self.gate_fn),
         }
 
         self.gradients = {
@@ -1152,6 +1265,8 @@ class LSTMCell(LayerBase):
             "dLdC_accumulator": None,
         }
 
+        self.is_initialized = True
+
     def _get_params(self):
         Wf = self.parameters["Wf"]
         Wu = self.parameters["Wu"]
@@ -1162,6 +1277,21 @@ class LSTMCell(LayerBase):
         bc = self.parameters["bc"]
         bo = self.parameters["bo"]
         return Wf, Wu, Wc, Wo, bf, bu, bc, bo
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "LSTMCell",
+            "init": self.init,
+            "n_in": self.n_in,
+            "n_out": self.n_out,
+            "act_fn": str(self.act_fn),
+            "gate_fn": str(self.gate_fn),
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
+        }
 
     def forward(self, Xt):
         """
@@ -1203,6 +1333,10 @@ class LSTMCell(LayerBase):
             The value of the cell/memory state at timestep t for each of the
             `n_ex` examples
         """
+        if not self.is_initialized:
+            self.n_in = Xt.shape[1]
+            self._init_params()
+
         Wf, Wu, Wc, Wo, bf, bu, bc, bo = self._get_params()
 
         self.derived_variables["n_timesteps"] += 1
@@ -1337,14 +1471,12 @@ class LSTMCell(LayerBase):
 
 
 class Pool2D(LayerBase):
-    def __init__(self, in_ch, kernel_shape, stride=1, pad=0, mode="max"):
+    def __init__(self, kernel_shape, stride=1, pad=0, mode="max", optimizer=None):
         """
         A single two-dimensional pooling layer.
 
         Parameters
         ----------
-        in_ch : int
-            The number of channels (depth) in the input volume
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
         stride : int (default: 1)
@@ -1355,24 +1487,29 @@ class Pool2D(LayerBase):
         mode : str (default: 'max')
             The pooling function to apply. Valid entries are {"max",
             "average"}.
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
         self.pad = pad
         self.mode = mode
-        self.in_ch = in_ch
-        self.out_ch = in_ch
+        self.in_ch = None
+        self.out_ch = None
         self.stride = stride
         self.kernel_shape = kernel_shape
-
-        self._init_params()
+        self.is_initialized = False
 
     def _init_params(self):
-        self.X = None
-        self.gradients = {}
-        self.parameters = {}
-        self.hyperparameters = {
-            "layer": "Pool",
+        self.derived_variables = {"out_rows": None, "out_cols": None, "masks": []}
+        self.is_initialized = True
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "Pool2D",
             "act_fn": None,
             "pad": self.pad,
             "mode": self.mode,
@@ -1380,11 +1517,30 @@ class Pool2D(LayerBase):
             "out_ch": self.out_ch,
             "stride": self.stride,
             "kernel_shape": self.kernel_shape,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
 
-        self.derived_variables = {"out_rows": None, "out_cols": None, "masks": []}
-
     def forward(self, X):
+        """
+        Backprop from layer outputs to inputs
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss wrt. the layer output Y
+
+        Returns
+        -------
+        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss wrt. the layer input X
+        """
+        if not self.is_initialized:
+            self.in_ch = self.out_ch = X.shape[3]
+            self._init_params()
+
         self.X = X
         n_ex, in_rows, in_cols, nc_in = X.shape
         (fr, fc), s, p = self.kernel_shape, self.stride, self.pad
@@ -1458,29 +1614,43 @@ class Pool2D(LayerBase):
 
 
 class Flatten(LayerBase):
-    def __init__(self, keep_dim="first"):
+    def __init__(self, keep_dim="first", optimizer=None):
         """
         Flatten a multidimensional input into a 2D matrix.
 
         Parameters
         ----------
         keep_dim : str, int (default : 'first')
-            The dimension of the original input to retain. Typically used the
-            minibatch dimension. Valid entries are {'first', 'last', -1} If -1,
-            flatten all dimensions.
+            The dimension of the original input to retain. Typically used for
+            retaining the minibatch dimension. Valid entries are {'first',
+            'last', -1} If -1, flatten all dimensions.
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
         self.keep_dim = keep_dim
         self._init_params()
 
     def _init_params(self):
         self.X = None
-        self.hyperparameters = {"layer": "Flatten", "keep_dim": self.keep_dim}
 
         self.gradients = {}
         self.parameters = {}
         self.derived_variables = {}
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "Flatten",
+            "keep_dim": self.keep_dim,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
+        }
 
     def forward(self, X):
         self.in_dims = X.shape
@@ -1495,7 +1665,15 @@ class Flatten(LayerBase):
 
 class Conv1D(LayerBase):
     def __init__(
-        self, in_ch, out_ch, kernel_width, act_fn=None, pad=0, stride=1, dilation=0
+        self,
+        out_ch,
+        kernel_width,
+        pad=0,
+        stride=1,
+        dilation=0,
+        act_fn=None,
+        init="glorot_uniform",
+        optimizer=None,
     ):
         """
         Apply a one-dimensional convolution kernel over an input volume.
@@ -1508,13 +1686,11 @@ class Conv1D(LayerBase):
 
         Parameters
         ----------
-        in_ch : int
-            The number of channels (depth) in the input volume
         out_ch : int
             The number of filters/kernels to compute in the current layer
         kernel_width : int
             The width of a single 1D filter/kernel in the current layer
-        act_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: None)
             The activation function for computing Y[t]. If `None`, use the
             identity function f(x) = x by default
         pad : int, tuple, or {'same', 'causal'} (default: 0)
@@ -1530,45 +1706,56 @@ class Conv1D(LayerBase):
             Number of pixels inserted between kernel elements. Effective kernel
             shape after dilation is:
                 [kernel_rows * (d + 1) - d, kernel_cols * (d + 1) - d]
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
-
-        if act_fn is None:
-            act_fn = Affine(slope=1, intercept=0)
+        super().__init__(optimizer)
 
         self.pad = pad
-        self.in_ch = in_ch
+        self.init = init
+        self.in_ch = None
         self.out_ch = out_ch
-        self.act_fn = act_fn
         self.stride = stride
         self.dilation = dilation
         self.kernel_width = kernel_width
-
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.parameters = {"W": None, "b": None}
+        self.is_initialized = False
 
     def _init_params(self):
-        self.X = []
+        init_weights = WeightInitializer(str(self.act_fn), mode=self.init)
 
-        # TODO: use a flexible / sensible initialization strategy here
-        fw = self.kernel_width
-        W = np.random.randn(fw, self.in_ch, self.out_ch)
+        W = init_weights((self.kernel_width, self.in_ch, self.out_ch))
         b = np.zeros((1, 1, self.out_ch))
 
         self.parameters = {"W": W, "b": b}
 
-        self.hyperparameters = {
+        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
+        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
+        self.is_initialized = True
+
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "Conv1D",
             "pad": self.pad,
+            "init": self.init,
             "in_ch": self.in_ch,
             "out_ch": self.out_ch,
             "stride": self.stride,
             "dilation": self.dilation,
             "act_fn": str(self.act_fn),
             "kernel_width": self.kernel_width,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
-
-        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
-        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
 
     def forward(self, X):
         """
@@ -1577,16 +1764,19 @@ class Conv1D(LayerBase):
         Parameters
         ----------
         X : numpy array of shape (n_ex, l_in, in_ch)
-            The input volume consisting of `n_ex` examples, each of length `l_in`
-            and with `in_ch` input channels
+            The input volume consisting of `n_ex` examples, each of length
+            `l_in` and with `in_ch` input channels
 
         Returns
         -------
         Y : numpy array of shape (n_ex, l_out, out_ch)
             The layer output
         """
-        self.X = X
+        if not self.is_initialized:
+            self.in_ch = X.shape[2]
+            self._init_params()
 
+        self.X = X
         W = self.parameters["W"]
         b = self.parameters["b"]
 
@@ -1707,7 +1897,15 @@ class Conv1D(LayerBase):
 
 class Conv2D(LayerBase):
     def __init__(
-        self, in_ch, out_ch, kernel_shape, act_fn=None, pad=0, stride=1, dilation=0
+        self,
+        out_ch,
+        kernel_shape,
+        pad=0,
+        stride=1,
+        dilation=0,
+        act_fn=None,
+        init="glorot_uniform",
+        optimizer=None,
     ):
         """
         Apply a two-dimensional convolution kernel over an input volume.
@@ -1721,15 +1919,13 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        in_ch : int
-            The number of channels (depth) in the input volume
         out_ch : int
             The number of filters/kernels to compute in the current layer
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
-        act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use Affine
-            activations by default
+        act_fn : str or `activations.ActivationBase` instance (default: None)
+            The activation function for computing Y[t]. If `None`, use the
+            identity function f(X) = X by default
         pad : int, tuple, or 'same' (default: 0)
             The number of rows/columns to zero-pad the input with
         stride : int (default: 1)
@@ -1739,45 +1935,56 @@ class Conv2D(LayerBase):
             Number of pixels inserted between kernel elements. Effective kernel
             shape after dilation is:
                 [kernel_rows * (d + 1) - d, kernel_cols * (d + 1) - d]
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
-
-        if act_fn is None:
-            act_fn = Affine(slope=1, intercept=0)
+        super().__init__(optimizer)
 
         self.pad = pad
-        self.in_ch = in_ch
+        self.init = init
+        self.in_ch = None
         self.out_ch = out_ch
-        self.act_fn = act_fn
         self.stride = stride
         self.dilation = dilation
         self.kernel_shape = kernel_shape
-
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.parameters = {"W": None, "b": None}
+        self.is_initialized = False
 
     def _init_params(self):
-        self.X = []
+        init_weights = WeightInitializer(str(self.act_fn), mode=self.init)
 
-        # TODO: use a flexible / sensible initialization strategy here
         fr, fc = self.kernel_shape
-        W = np.random.randn(fr, fc, self.in_ch, self.out_ch)
+        W = init_weights((fr, fc, self.in_ch, self.out_ch))
         b = np.zeros((1, 1, 1, self.out_ch))
 
         self.parameters = {"W": W, "b": b}
+        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
+        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
+        self.is_initialized = True
 
-        self.hyperparameters = {
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "Conv2D",
             "pad": self.pad,
+            "init": self.init,
             "in_ch": self.in_ch,
             "out_ch": self.out_ch,
             "stride": self.stride,
             "dilation": self.dilation,
             "act_fn": str(self.act_fn),
             "kernel_shape": self.kernel_shape,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
-
-        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
-        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
 
     def forward(self, X):
         """
@@ -1794,6 +2001,10 @@ class Conv2D(LayerBase):
         Y : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
             The layer output
         """
+        if not self.is_initialized:
+            self.in_ch = X.shape[3]
+            self._init_params()
+
         self.X = X
 
         W = self.parameters["W"]
@@ -1911,7 +2122,14 @@ class Conv2D(LayerBase):
 
 class Deconv2D(LayerBase):
     def __init__(
-        self, in_ch, out_ch, kernel_shape, act_fn=None, pad=0, stride=1, dilation=0
+        self,
+        out_ch,
+        kernel_shape,
+        pad=0,
+        stride=1,
+        act_fn=None,
+        optimizer=None,
+        init="glorot_uniform",
     ):
         """
         Apply a two-dimensional "deconvolution" (more accurately, a transposed
@@ -1919,13 +2137,11 @@ class Deconv2D(LayerBase):
 
         Parameters
         ----------
-        in_ch : int
-            The number of channels (depth) in the input volume
         out_ch : int
             The number of filters/kernels to compute in the current layer
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
-        act_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: None)
             The activation function for computing Y[t]. If `None`, use Affine
             activations by default
         pad : int, tuple, or 'same' (default: 0)
@@ -1933,43 +2149,54 @@ class Deconv2D(LayerBase):
         stride : int (default: 1)
             The stride/hop of the convolution kernels as they move over the
             input volume
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
-
-        if act_fn is None:
-            act_fn = Affine(slope=1, intercept=0)
+        super().__init__(optimizer)
 
         self.pad = pad
-        self.in_ch = in_ch
-        self.out_ch = out_ch
-        self.act_fn = act_fn
+        self.init = init
+        self.in_ch = None
         self.stride = stride
+        self.out_ch = out_ch
         self.kernel_shape = kernel_shape
-
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.parameters = {"W": None, "b": None}
+        self.is_initialized = False
 
     def _init_params(self):
-        self.X = []
+        init_weights = WeightInitializer(str(self.act_fn), mode=self.init)
 
-        # TODO: use a flexible / sensible initialization strategy here
         fr, fc = self.kernel_shape
-        W = np.random.randn(fr, fc, self.in_ch, self.out_ch)
+        W = init_weights((fr, fc, self.in_ch, self.out_ch))
         b = np.zeros((1, 1, 1, self.out_ch))
 
         self.parameters = {"W": W, "b": b}
+        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
+        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
+        self.is_initialized = True
 
-        self.hyperparameters = {
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "Deconv2D",
             "pad": self.pad,
+            "init": self.init,
             "in_ch": self.in_ch,
             "out_ch": self.out_ch,
             "stride": self.stride,
             "act_fn": str(self.act_fn),
             "kernel_shape": self.kernel_shape,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
         }
-
-        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
-        self.derived_variables = {"Z": None, "out_rows": None, "out_cols": None}
 
     def forward(self, X):
         """
@@ -1986,6 +2213,10 @@ class Deconv2D(LayerBase):
         Y : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
             The layer output
         """
+        if not self.is_initialized:
+            self.in_ch = X.shape[3]
+            self._init_params()
+
         self.X = X
         W = self.parameters["W"]
         b = self.parameters["b"]
@@ -2041,7 +2272,7 @@ class Deconv2D(LayerBase):
         out_cols = s * (in_cols - 1) - pc1 - pc2 + fc
         out_dim = (out_rows, out_cols)
 
-        _p = calc_pad_dims(X_pad.shape, out_dim, W.shape[:2], s, 0)
+        _p = calc_pad_dims_2D(X_pad.shape, out_dim, W.shape[:2], s, 0)
         X_pad, _ = pad2D(X_pad, _p, W.shape[:2], s)
 
         # columnize W, X, and dLdY
@@ -2069,42 +2300,59 @@ class Deconv2D(LayerBase):
 
 
 class RNN(LayerBase):
-    def __init__(self, n_in, n_out, act_fn=None):
+    def __init__(self, n_out, act_fn="Tanh", init="glorot_uniform", optimizer=None):
         """
         A single vanilla (Elman)-RNN layer.
 
         Parameters
         ----------
-        n_in : int
-            The dimension of a single input example on a given timestep
         n_out : int
             The dimension of a single hidden state / output on a given timestep
-        act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing A[t]. If not specified, use
-            Tanh by default.
+        act_fn : str or `activations.ActivationBase` instance (default: 'Tanh')
+            The activation function for computing A[t].
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
-        if act_fn is None:
-            act_fn = Tanh()
-
-        self.n_in = n_in
+        self.init = init
+        self.n_in = None
         self.n_out = n_out
-        self.act_fn = act_fn
         self.n_timesteps = None
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.is_initialized = False
 
     def _init_params(self):
-        self.cell = RNNCell(n_in=self.n_in, n_out=self.n_out, act_fn=self.act_fn)
+        self.cell = RNNCell(
+            n_in=self.n_in,
+            n_out=self.n_out,
+            act_fn=self.act_fn,
+            init=self.init,
+            optimizer=self.optimizer,
+        )
+        self.is_initialized = True
 
-        self.hyperparameters = {
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "RNN",
+            "init": self.init,
             "n_in": self.n_in,
             "n_out": self.n_out,
             "act_fn": str(self.act_fn),
+            "optimizer": self.cell.hyperparameters["optimizer"],
         }
 
     def forward(self, X):
+        if not self.is_initialized:
+            self.n_in = X.shape[1]
+            self._init_params()
+
         Y = []
         n_ex, n_in, n_t = X.shape
         for t in range(n_t):
@@ -2134,6 +2382,10 @@ class RNN(LayerBase):
     def parameters(self):
         return self.cell.parameters
 
+    def set_params(self, summary_dict):
+        self = super().set_params(summary_dict)
+        return self.cell.set_parameters(summary_dict)
+
     def freeze(self):
         self.cell.freeze()
 
@@ -2143,56 +2395,70 @@ class RNN(LayerBase):
     def flush_gradients(self):
         self.cell.flush_gradients()
 
-    def update(self, lr):
-        self.cell.update(lr)
+    def update(self):
+        self.cell.update()
         self.flush_gradients()
 
 
 class LSTM(LayerBase):
-    def __init__(self, n_in, n_out, act_fn=None, gate_fn=None):
+    def __init__(
+        self,
+        n_out,
+        act_fn="Tanh",
+        gate_fn="Sigmoid",
+        init="glorot_uniform",
+        optimizer=None,
+    ):
         """
         A single long short-term memory (LSTM) RNN layer.
 
         Parameters
         ----------
-        n_in : int
-            The dimension of a single input example on a given timestep
         n_out : int
             The dimension of a single hidden state / output on a given timestep
-        act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing A[t]. If not specified, use
-            Tanh by default.
-        gate_fn : `activations.Activation` instance (default: None)
+        act_fn : str or `activations.ActivationBase` instance (default: 'Tanh')
+            The activation function for computing A[t].
+        gate_fn : str or `activations.Activation` instance (default: 'Sigmoid')
             The gate function for computing the update, forget, and output
-            gates. If not specified, use Sigmoid by default.
+            gates.
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
-        super().__init__()
+        super().__init__(optimizer)
 
-        # use tanh as activation function by default
-        if act_fn is None:
-            act_fn = Tanh()
-
-        # use sigmoid as gate function by default
-        if gate_fn is None:
-            gate_fn = Sigmoid()
-
-        self.n_in = n_in
+        self.init = init
+        self.n_in = None
         self.n_out = n_out
-        self.act_fn = act_fn
-        self.gate_fn = gate_fn
         self.n_timesteps = None
-        self._init_params()
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.gate_fn = ActivationInitializer(gate_fn)()
+        self.is_initialized = False
 
     def _init_params(self):
         self.cell = LSTMCell(
-            n_in=self.n_in, n_out=self.n_out, act_fn=self.act_fn, gate_fn=self.gate_fn
+            n_in=self.n_in,
+            n_out=self.n_out,
+            act_fn=self.act_fn,
+            gate_fn=self.gate_fn,
+            init=self.init,
         )
+        self.is_initialized = True
 
-        self.hyperparameters = {
+    @property
+    def hyperparameters(self):
+        return {
             "layer": "LSTM",
+            "init": self.init,
             "n_in": self.n_in,
             "n_out": self.n_out,
             "act_fn": str(self.act_fn),
+            "gate_fn": str(self.gate_fn),
+            "optimizer": self.cell.hyperparameters["optimizer"],
         }
 
     def forward(self, X):
@@ -2211,6 +2477,10 @@ class LSTM(LayerBase):
             The value of the hidden state for each of the `n_ex` examples
             across each of the `n_t` timesteps
         """
+        if not self.is_initialized:
+            self.n_in = X.shape[1]
+            self._init_params()
+
         Y = []
         n_ex, n_in, n_t = X.shape
         for t in range(n_t):
@@ -2261,9 +2531,13 @@ class LSTM(LayerBase):
     def unfreeze(self):
         self.cell.unfreeze()
 
+    def set_params(self, summary_dict):
+        self = super().set_params(summary_dict)
+        return self.cell.set_parameters(summary_dict)
+
     def flush_gradients(self):
         self.cell.flush_gradients()
 
-    def update(self, lr):
-        self.cell.update(lr)
+    def update(self):
+        self.cell.update()
         self.flush_gradients()

@@ -44,6 +44,37 @@ def torch_mse_grad(y, z, act_fn):
     return grad
 
 
+class TorchVAELoss(nn.Module):
+    def __init__(self):
+        pass
+
+    def extract_grads(self, X, X_recon, t_mean, t_log_var):
+        eps = np.finfo(float).eps
+        X = torchify(X, requires_grad=False)
+        X_recon = torchify(np.clip(X_recon, eps, 1 - eps))
+        t_mean = torchify(t_mean)
+        t_log_var = torchify(t_log_var)
+
+        BCE = torch.sum(F.binary_cross_entropy(X_recon, X, reduce=False), dim=1)
+
+        # see Appendix B from VAE paper:
+        # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+        # https://arxiv.org/abs/1312.6114
+        # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+        KLD = -0.5 * torch.sum(1 + t_log_var - t_mean.pow(2) - t_log_var.exp(), dim=1)
+
+        loss = torch.mean(BCE + KLD)
+        loss.backward()
+
+        grads = {
+            "loss": loss.detach().numpy(),
+            "dX_recon": X_recon.grad.numpy(),
+            "dt_mean": t_mean.grad.numpy(),
+            "dt_log_var": t_log_var.grad.numpy(),
+        }
+        return grads
+
+
 class TorchLinearActivation(nn.Module):
     def __init__(self):
         super(TorchLinearActivation, self).__init__()
@@ -767,16 +798,16 @@ class TorchBidirectionalLSTM(nn.Module):
             bias=True,
         )
 
-        Wiu = params["components"]["forward"]["Wu"][n_out:, :].T
-        Wif = params["components"]["forward"]["Wf"][n_out:, :].T
-        Wic = params["components"]["forward"]["Wc"][n_out:, :].T
-        Wio = params["components"]["forward"]["Wo"][n_out:, :].T
+        Wiu = params["components"]["cell_fwd"]["Wu"][n_out:, :].T
+        Wif = params["components"]["cell_fwd"]["Wf"][n_out:, :].T
+        Wic = params["components"]["cell_fwd"]["Wc"][n_out:, :].T
+        Wio = params["components"]["cell_fwd"]["Wo"][n_out:, :].T
         W_ih_f = np.vstack([Wiu, Wif, Wic, Wio])
 
-        Whu = params["components"]["forward"]["Wu"][:n_out, :].T
-        Whf = params["components"]["forward"]["Wf"][:n_out, :].T
-        Whc = params["components"]["forward"]["Wc"][:n_out, :].T
-        Who = params["components"]["forward"]["Wo"][:n_out, :].T
+        Whu = params["components"]["cell_fwd"]["Wu"][:n_out, :].T
+        Whf = params["components"]["cell_fwd"]["Wf"][:n_out, :].T
+        Whc = params["components"]["cell_fwd"]["Wc"][:n_out, :].T
+        Who = params["components"]["cell_fwd"]["Wo"][:n_out, :].T
         W_hh_f = np.vstack([Whu, Whf, Whc, Who])
 
         assert self.layer1.weight_ih_l0.shape == W_ih_f.shape
@@ -785,16 +816,16 @@ class TorchBidirectionalLSTM(nn.Module):
         self.layer1.weight_ih_l0 = nn.Parameter(torch.FloatTensor(W_ih_f))
         self.layer1.weight_hh_l0 = nn.Parameter(torch.FloatTensor(W_hh_f))
 
-        Wiu = params["components"]["backward"]["Wu"][n_out:, :].T
-        Wif = params["components"]["backward"]["Wf"][n_out:, :].T
-        Wic = params["components"]["backward"]["Wc"][n_out:, :].T
-        Wio = params["components"]["backward"]["Wo"][n_out:, :].T
+        Wiu = params["components"]["cell_bwd"]["Wu"][n_out:, :].T
+        Wif = params["components"]["cell_bwd"]["Wf"][n_out:, :].T
+        Wic = params["components"]["cell_bwd"]["Wc"][n_out:, :].T
+        Wio = params["components"]["cell_bwd"]["Wo"][n_out:, :].T
         W_ih_b = np.vstack([Wiu, Wif, Wic, Wio])
 
-        Whu = params["components"]["backward"]["Wu"][:n_out, :].T
-        Whf = params["components"]["backward"]["Wf"][:n_out, :].T
-        Whc = params["components"]["backward"]["Wc"][:n_out, :].T
-        Who = params["components"]["backward"]["Wo"][:n_out, :].T
+        Whu = params["components"]["cell_bwd"]["Wu"][:n_out, :].T
+        Whf = params["components"]["cell_bwd"]["Wf"][:n_out, :].T
+        Whc = params["components"]["cell_bwd"]["Wc"][:n_out, :].T
+        Who = params["components"]["cell_bwd"]["Wo"][:n_out, :].T
         W_hh_b = np.vstack([Whu, Whf, Whc, Who])
 
         assert self.layer1.weight_ih_l0_reverse.shape == W_ih_b.shape
@@ -805,10 +836,10 @@ class TorchBidirectionalLSTM(nn.Module):
 
         b_f = np.concatenate(
             [
-                params["components"]["forward"]["bu"],
-                params["components"]["forward"]["bf"],
-                params["components"]["forward"]["bc"],
-                params["components"]["forward"]["bo"],
+                params["components"]["cell_fwd"]["bu"],
+                params["components"]["cell_fwd"]["bf"],
+                params["components"]["cell_fwd"]["bc"],
+                params["components"]["cell_fwd"]["bo"],
             ],
             axis=-1,
         ).flatten()
@@ -821,10 +852,10 @@ class TorchBidirectionalLSTM(nn.Module):
 
         b_b = np.concatenate(
             [
-                params["components"]["backward"]["bu"],
-                params["components"]["backward"]["bf"],
-                params["components"]["backward"]["bc"],
-                params["components"]["backward"]["bo"],
+                params["components"]["cell_bwd"]["bu"],
+                params["components"]["cell_bwd"]["bf"],
+                params["components"]["cell_bwd"]["bc"],
+                params["components"]["cell_bwd"]["bo"],
             ],
             axis=-1,
         ).flatten()

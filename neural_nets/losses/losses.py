@@ -4,7 +4,7 @@ import numpy as np
 from tests import assert_is_binary, assert_is_stochastic
 
 
-class Objective(ABC):
+class ObjectiveBase(ABC):
     def __init__(self):
         super().__init__()
 
@@ -17,9 +17,15 @@ class Objective(ABC):
         pass
 
 
-class SquaredErrorLoss(Objective):
+class SquaredError(ObjectiveBase):
     def __init__(self):
         super().__init__()
+
+    def __call__(self, y, y_pred):
+        return self.loss(y, y_pred)
+
+    def __str__(self):
+        return "SquaredError"
 
     @staticmethod
     def loss(y, y_pred):
@@ -71,9 +77,15 @@ class SquaredErrorLoss(Objective):
         return (y_pred - y) * act_fn.grad(z)
 
 
-class CrossEntropyLoss(Objective):
+class CrossEntropy(ObjectiveBase):
     def __init__(self):
         super().__init__()
+
+    def __call__(self, y, y_pred):
+        return self.loss(y, y_pred)
+
+    def __str__(self):
+        return "CrossEntropy"
 
     @staticmethod
     def loss(y, y_pred):
@@ -100,8 +112,10 @@ class CrossEntropyLoss(Objective):
         eps = np.finfo(float).eps
 
         # each example is associated with a single class; sum the negative log
-        # probability of the correct label over all samples in the batch
-        cross_entropy = np.sum(y * -np.log(y_pred + eps))
+        # probability of the correct label over all samples in the batch.
+        # observe that we are taking advantage of the fact that y is one-hot
+        # encoded!
+        cross_entropy = -np.sum(y * np.log(y_pred + eps))
         return cross_entropy
 
     @staticmethod
@@ -140,3 +154,59 @@ class CrossEntropyLoss(Objective):
         # n, m = y.shape
         # grad /= n
         return grad
+
+
+class VAELoss(ObjectiveBase):
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, y, y_pred, t_mean, t_log_var):
+        return self.loss(y, y_pred, t_mean, t_log_var)
+
+    def __str__(self):
+        return "VAELoss"
+
+    @staticmethod
+    def loss(y, y_pred, t_mean, t_log_var):
+        """
+        Variational lower bound for a Bernoulli VAE
+
+        Parameters
+        ----------
+        y : numpy array of shape (n_ex, N)
+            The original images
+        y_pred : numpy array of shape (n_ex, N)
+            The VAE reconstruction of the images
+        t_mean: numpy array of shape (n_ex, T)
+            Mean vector of the distribution q(t | x)
+        t_log_var: numpy array of shape (n_ex, T)
+            Log of the variance vector of the distribution q(t | x)
+
+        Returns
+        -------
+        loss : float
+            The VLB, averaged across the batch
+        """
+        # prevent nan on log(0)
+        eps = np.finfo(float).eps
+        y_pred = np.clip(y_pred, eps, 1 - eps)
+
+        # reconstruction loss: binary cross-entropy
+        rec_loss = -np.sum(y * np.log(y_pred) + (1 - y) * np.log(1 - y_pred), axis=1)
+
+        # KL divergence between the variational distribution q and the prior p,
+        # a unit gaussian
+        kl_loss = -0.5 * np.sum(1 + t_log_var - t_mean ** 2 - np.exp(t_log_var), axis=1)
+        loss = np.mean(kl_loss + rec_loss)
+        return loss
+
+    @staticmethod
+    def grad(y, y_pred, t_mean, t_log_var):
+        N = y.shape[0]
+        eps = np.finfo(float).eps
+        y_pred = np.clip(y_pred, eps, 1 - eps)
+
+        dY_pred = -y / (N * y_pred) - (y - 1) / (N - N * y_pred)
+        dLogVar = (np.exp(t_log_var) - 1) / (2 * N)
+        dMean = t_mean / N
+        return dY_pred, dLogVar, dMean

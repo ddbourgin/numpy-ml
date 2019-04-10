@@ -1,34 +1,54 @@
 import numpy as np
 
+#######################################################################
+#                           Training Utils                            #
+#######################################################################
 
-def dilate(X, d):
+
+def minibatch(X, batchsize=256, shuffle=True):
     """
-    Dilate the 4D volume X by d. For a visual depiction, refer to:
-    https://arxiv.org/pdf/1603.07285v1.pdf
+    Compute the minibatch indices for a training dataset.
 
     Parameters
     ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-        Input volume
-    d : int
-        The number of 0-rows to insert between each adjacent row + column in X
+    X : numpy array of shape (N, ...)
+        The dataset to divide into minibatches. Assumes the first dimension
+        specifies the number of training examples.
+    batchsize : int (default: 256)
+        The desired size of each minibatch. Note, however, that if X.shape[0] %
+        batchsize > 0 then the final batch will contain fewer than batchsize
+        entries.
+    shuffle : bool (default: True)
+        Whether to shuffle the entries in the dataset before dividing into
+        minibatches
 
     Returns
     -------
-    Xd : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-        The dilated array.
-            out_rows = in_rows + d * (in_rows - 1)
-            out_cols = in_cols + d * (in_cols - 1)
+    mb_generator : generator
+        A generator which yields the indices into X for each batch
+    n_batches: int
+        The number of batches
     """
-    n_ex, in_rows, in_cols, n_in = X.shape
-    r_ix = np.repeat(np.arange(1, in_rows), d)
-    c_ix = np.repeat(np.arange(1, in_cols), d)
-    Xd = np.insert(X, r_ix, 0, axis=1)
-    Xd = np.insert(Xd, c_ix, 0, axis=2)
-    return Xd
+    N = X.shape[0]
+    ix = np.arange(N)
+    n_batches = int(np.ceil(N / batchsize))
+
+    if shuffle:
+        np.random.shuffle(ix)
+
+    def mb_generator():
+        for i in range(n_batches):
+            yield ix[i * batchsize : (i + 1) * batchsize]
+
+    return mb_generator(), n_batches
 
 
-def calc_pad_dims(X_shape, out_dim, kernel_shape, stride, dilation=0):
+#######################################################################
+#                            Padding Utils                            #
+#######################################################################
+
+
+def calc_pad_dims_2D(X_shape, out_dim, kernel_shape, stride, dilation=0):
     """
     Compute the padding necessary to ensure that convolving X with a 2D kernel
     of shape `kernel_shape` and stride `stride` produces outputs with dimension
@@ -172,7 +192,7 @@ def calc_pad_dims_1D(X_shape, l_out, kernel_width, stride, dilation=0, causal=Fa
     return (pw1, pw2)
 
 
-def pad1D(X, p, kernel_width=None, stride=None, dilation=0):
+def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
     """
     One-dimensional zero-padding utility.
 
@@ -180,7 +200,7 @@ def pad1D(X, p, kernel_width=None, stride=None, dilation=0):
     ----------
     X : numpy array of shape (n_ex, l_in, in_ch)
         Input volume. Padding is applied to `l_in`
-    p : tuple, int, or {'same', 'causal'}
+    pad : tuple, int, or {'same', 'causal'}
         The padding amount. If 'same', add padding to ensure that the output
         length of a 1D convolution with a kernel of `kernel_shape` and stride
         `stride` is the same as the input length.  If 'causal' compute padding
@@ -205,6 +225,7 @@ def pad1D(X, p, kernel_width=None, stride=None, dilation=0):
         The number of 0-padded columns added to the (left, right) of the sequences
         in X
     """
+    p = pad
     if isinstance(p, int):
         p = (p, p)
 
@@ -227,7 +248,7 @@ def pad1D(X, p, kernel_width=None, stride=None, dilation=0):
     return X_pad, p
 
 
-def pad2D(X, p, kernel_shape=None, stride=None, dilation=0):
+def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
     """
     Two-dimensional zero-padding utility.
 
@@ -235,7 +256,7 @@ def pad2D(X, p, kernel_shape=None, stride=None, dilation=0):
     ----------
     X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
         Input volume. Padding is applied to `in_rows` and `in_cols`.
-    p : tuple, int, or 'same'
+    pad : tuple, int, or 'same'
         The padding amount. If 'same', add padding to ensure that the output of
         a 2D convolution with a kernel of `kernel_shape` and stride `stride`
         has the same dimensions as the input.  If 2-tuple, specifies the number
@@ -258,6 +279,7 @@ def pad2D(X, p, kernel_shape=None, stride=None, dilation=0):
         The number of 0-padded rows added to the (top, bottom, left, right) of
         X
     """
+    p = pad
     if isinstance(p, int):
         p = (p, p, p, p)
 
@@ -274,11 +296,136 @@ def pad2D(X, p, kernel_shape=None, stride=None, dilation=0):
 
     # compute the correct padding dims for a 'same' convolution
     if p == "same" and kernel_shape and stride is not None:
-        p = calc_pad_dims(
+        p = calc_pad_dims_2D(
             X.shape, X.shape[1:3], kernel_shape, stride, dilation=dilation
         )
         X_pad, p = pad2D(X, p)
     return X_pad, p
+
+
+def dilate(X, d):
+    """
+    Dilate the 4D volume X by d. For a visual depiction, refer to:
+    https://arxiv.org/pdf/1603.07285v1.pdf
+
+    Parameters
+    ----------
+    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+        Input volume
+    d : int
+        The number of 0-rows to insert between each adjacent row + column in X
+
+    Returns
+    -------
+    Xd : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
+        The dilated array.
+            out_rows = in_rows + d * (in_rows - 1)
+            out_cols = in_cols + d * (in_cols - 1)
+    """
+    n_ex, in_rows, in_cols, n_in = X.shape
+    r_ix = np.repeat(np.arange(1, in_rows), d)
+    c_ix = np.repeat(np.arange(1, in_cols), d)
+    Xd = np.insert(X, r_ix, 0, axis=1)
+    Xd = np.insert(Xd, c_ix, 0, axis=2)
+    return Xd
+
+
+#######################################################################
+#                     Convolution Arithmetic                          #
+#######################################################################
+
+
+def calc_fan(weight_shape):
+    """
+    Compute the fan-in and fan-out for a weight matrix/volume.
+
+    Parameters
+    ----------
+    weight_shape : tuple
+        The dimensions of the weight matrix/volume. The final 2 entries must be
+        in_ch, out_ch.
+
+    Returns
+    -------
+    fan_in : int
+        The number of input units in the weight tensor
+    fan_out : int
+        The number of output units in the weight tensor
+    """
+    if len(weight_shape) == 2:
+        fan_in, fan_out = weight_shape
+    elif len(weight_shape) in [3, 4]:
+        in_ch, out_ch = weight_shape[-2:]
+        kernel_size = np.prod(weight_shape[:-2])
+        fan_in, fan_out = in_ch * kernel_size, out_ch * kernel_size
+    else:
+        raise ValueError("Unrecognized weight dimension: {}".format(weight_shape))
+    return fan_in, fan_out
+
+
+def calc_conv_out_dims(X_shape, W_shape, stride=1, pad=0, dilation=0):
+    """
+    Compute the dimension of the output volume for the specified convolution
+
+    Parameters
+    ----------
+    X_shape : 3-tuple or 4-tuple
+        The dimensions of the input volume to the convolution. If 3-tuple,
+        entries are expected to be (n_ex, in_length, in_ch). If 4-tuple,
+        entries are expected to be (n_ex, in_rows, in_cols, in_ch).
+    weight_shape : 3-tuple or 4-tuple
+        The dimensions of the weight volume for the convolution. If 3-tuple,
+        entries are expected to be (f_len, in_ch, out_ch). If 4-tuple, entries
+        are expected to be (fr, fc, in_ch, out_ch).
+    pad : tuple, int, or {'same', 'causal'} (default: 0)
+        The padding amount. If 'same', add padding to ensure that the output
+        length of a 1D convolution with a kernel of `kernel_shape` and stride
+        `stride` is the same as the input length.  If 'causal' compute padding
+        such that the output both has the same length as the input AND
+        output[t] does not depend on input[t + 1:]. If 2-tuple, specifies the
+        number of padding columns to add on each side of the sequence
+    stride : int (default: 1)
+        The stride for the convolution kernel.
+    dilation : int (default: 0)
+        The dilation of the convolution kernel.
+
+    Returns
+    -------
+    out_dims : 3-tuple or 4-tuple
+        The dimensions of the output volume. If 3-tuple, entries are (n_ex,
+        out_length, out_ch). If 4-tuple, entries are (n_ex, out_rows, out_cols,
+        out_ch).
+    """
+    dummy = np.zeros(X_shape)
+    s, p, d = stride, pad, dilation
+    if len(X_shape) == 3:
+        _, p = pad1D(dummy, p)
+        pw1, pw2 = p
+        fw, in_ch, out_ch = W_shape
+        n_ex, in_length, in_ch = X_shape
+
+        _fw = fw * (d + 1) - d
+        out_length = (in_length + pw1 + pw2 - _fw) // s + 1
+        out_dims = (n_ex, out_length, out_ch)
+    elif len(X_shape) == 4:
+        _, p = pad2D(dummy, p)
+        pr1, pr2, pc1, pc2 = p
+        fr, fc, in_ch, out_ch = W_shape
+        n_ex, in_rows, in_cols, in_ch = X_shape
+
+        # adjust effective filter size to account for dilation
+        _fr, _fc = fr * (d + 1) - d, fc * (d + 1) - d
+        out_rows = (in_rows + pr1 + pr2 - _fr) // s + 1
+        out_cols = (in_cols + pc1 + pc2 - _fc) // s + 1
+        out_dims = (n_ex, out_rows, out_cols, out_ch)
+    else:
+        raise ValueError("Unrecognized number of input dims: {}".format(len(X_shape)))
+    return out_dims
+
+
+#######################################################################
+#                   Convolution Vectorization Utils                   #
+#######################################################################
 
 
 def _im2col_indices(X_shape, fr, fc, p, s, d=0):
@@ -360,7 +507,7 @@ def im2col(X, W_shape, pad, stride, dilation=0):
     n_ex, in_rows, in_cols, n_in = X.shape
 
     # zero-pad the input
-    X_pad, p = pad2D(X, p)
+    X_pad, p = pad2D(X, p, W_shape[:2], stride=s, dilation=d)
     pr1, pr2, pc1, pc2 = p
 
     # shuffle to have channels as the first dim
@@ -484,6 +631,11 @@ def conv2D(X, W, stride, pad, dilation=0):
     return Z
 
 
+#######################################################################
+#                             Convolution                             #
+#######################################################################
+
+
 def conv1D(X, W, stride, pad, dilation=0):
     """
     A faster (but more memory intensive) implementation of a 1D "convolution"
@@ -568,7 +720,7 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
         stride = 1
 
     # pad the input
-    X_pad, p = pad2D(X, pad, W.shape[:2], stride, dilation=dilation)
+    X_pad, p = pad2D(X, pad, W.shape[:2], stride=stride, dilation=dilation)
 
     n_ex, in_rows, in_cols, n_in = X_pad.shape
     fr, fc, n_in, n_out = W.shape
@@ -584,8 +736,8 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
     out_dim = (out_rows, out_cols)
 
     # add additional padding to achieve the target output dim
-    _p = calc_pad_dims(X_pad.shape, out_dim, W.shape[:2], s, d)
-    X_pad, pad = pad2D(X_pad, _p, W.shape[:2], s, dilation=dilation)
+    _p = calc_pad_dims_2D(X_pad.shape, out_dim, W.shape[:2], s, d)
+    X_pad, pad = pad2D(X_pad, _p, W.shape[:2], stride=s, dilation=dilation)
 
     # perform the forward convolution using the flipped weight matrix (note
     # we set pad to 0, since we've already added padding)
@@ -628,7 +780,7 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
         The covolution of X with W
     """
     s, d = stride, dilation
-    X_pad, p = pad2D(X, pad, W.shape[:2], s, dilation=dilation)
+    X_pad, p = pad2D(X, pad, W.shape[:2], stride=s, dilation=d)
 
     pr1, pr2, pc1, pc2 = p
     fr, fc, in_ch, out_ch = W.shape
@@ -651,3 +803,137 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
                     window = X_pad[m, i0 : i1 : (d + 1), j0 : j1 : (d + 1), :]
                     Z[m, i, j, c] = np.sum(window * W[:, :, :, c])
     return Z
+
+
+#######################################################################
+#                        Weight Initialization                        #
+#######################################################################
+
+
+def he_uniform(weight_shape):
+    """
+    Initializes network weights W with draws from Uniform(-b, b) where
+
+        b = sqrt(6 / fan_in)
+
+    Developed for deep networks with ReLU nonlinearities.
+
+    Parameters
+    ----------
+    weight_shape : tuple
+        The dimensions of the weight matrix/volume
+
+    Returns
+    -------
+    W : numpy array of shape weight_shape
+        The initialized weights
+    """
+    fan_in, fan_out = calc_fan(weight_shape)
+    b = np.sqrt(6 / fan_in)
+    return np.random.uniform(-b, b, size=weight_shape)
+
+
+def he_normal(weight_shape):
+    """
+    Initializes network weights W with draws from TruncatedNormal(0, b) where
+    the variance b is
+
+        b = 2 / fan_in
+
+    Developed for deep networks with ReLU nonlinearities.
+
+    Parameters
+    ----------
+    weight_shape : tuple
+        The dimensions of the weight matrix/volume
+
+    Returns
+    -------
+    W : numpy array of shape `weight_shape`
+        The initialized weights
+    """
+    fan_in, fan_out = calc_fan(weight_shape)
+    std = np.sqrt(2 / fan_in)
+    return truncated_normal(0, std, weight_shape)
+
+
+def glorot_uniform(weight_shape, gain=1.0):
+    """
+    Initializes network weights W with draws from Uniform(-b, b) where
+
+        b = gain * sqrt(6 / (fan_in + fan_out))
+
+    The motivation is to choose weights to ensure that the variance of the
+    layer outputs are approximately equal to the variance of its inputs.
+    Developed for deep networks with tanh and logistic sigmoid nonlinearities.
+
+    Parameters
+    ----------
+    weight_shape : tuple
+        The dimensions of the weight matrix/volume
+
+    Returns
+    -------
+    W : numpy array of shape weight_shape
+        The initialized weights
+    """
+    fan_in, fan_out = calc_fan(weight_shape)
+    b = gain * np.sqrt(6 / (fan_in + fan_out))
+    return np.random.uniform(-b, b, size=weight_shape)
+
+
+def glorot_normal(weight_shape, gain=1.0):
+    """
+    Initializes network weights W with draws from TruncatedNormal(0, b) where
+    the variance b is
+
+        b = gain^2 * 2 / (fan_in + fan_out)
+
+    The motivation is to choose weights to ensure that the variance of the
+    layer outputs are approximately equal to the variance of its inputs.
+    Developed for deep networks with tanh and logistic sigmoid nonlinearities.
+
+    Parameters
+    ----------
+    weight_shape : tuple
+        The dimensions of the weight matrix/volume
+
+    Returns
+    -------
+    W : numpy array of shape `weight_shape`
+        The initialized weights
+    """
+    fan_in, fan_out = calc_fan(weight_shape)
+    std = gain * np.sqrt(2 / (fan_in + fan_out))
+    return truncated_normal(0, std, weight_shape)
+
+
+def truncated_normal(mean, std, out_shape):
+    """
+    Generate draws from a truncated normal distribution via rejection sampling.
+    Specifically, draw samples from a normal distribution and resample any
+    values more than two standard deviations from the mean.
+
+    Parameters
+    ----------
+    mean : float or array_like of floats
+        The mean/center of the distribution
+    std : float or array_like of floats
+        Standard deviation (spread or "width") of the distribution.
+    out_shape : int or tuple of ints
+        Output shape.  If the given shape is, e.g., `(m, n, k)`, then
+        `m * n * k` samples are drawn.
+
+    Returns
+    -------
+    samples : numy array of shape `out_shape`
+        Samples from the truncated normal distribution parameterized by `mean`
+        and `std`.
+    """
+    samples = np.random.normal(loc=mean, scale=std, size=out_shape)
+    reject = np.logical_or(samples >= mean + 2 * std, samples <= mean - 2 * std)
+    while any(reject.flatten()):
+        resamples = np.random.normal(loc=mean, scale=std, size=reject.sum())
+        samples[reject] = resamples
+        reject = np.logical_or(samples >= mean + 2 * std, samples <= mean - 2 * std)
+    return samples
