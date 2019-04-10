@@ -43,14 +43,22 @@ This repo includes code for the following models:
         - SGD w/ momentum 
         - AdaGrad 
         - RMSProp 
+    * Initializers
+        - Glorot/Xavier uniform and normal
+        - He/Kaiming uniform and normal
     * Losses
         - Cross entropy
         - Squared error
+        - Bernoulli VAE loss
     * Activations
         - ReLU
         - Tanh
-        - Softmax
         - Affine
+        - Sigmoid
+        - Softmax
+        - Leaky ReLU
+    * Models
+        - Bernoulli VAE
     * Utilities
         - `col2im` (MATLAB port)
         - `im2col` (MATLAB port)
@@ -73,8 +81,11 @@ This repo includes code for the following models:
 6. **Preprocessing**
     - Discrete Fourier transform (1D signals)
     - Bilinear interpolation (2D signals)
+    - Nearest neighbor interpolation (1D and 2D signals)
 
 ## Contributing
 
-Am I missing your favorite model? Is there something that could be cleaner / less confusing? Did I mess something up? Submit a PR! The only requirement is that your models are written using just the [Python standard library](https://docs.python.org/3/library/) and numpy.
+Am I missing your favorite model? Is there something that could be cleaner /
+less confusing? Did I mess something up? Submit a PR! The only requirement is
+that your models are written using just the [Python standard library](https://docs.python.org/3/library/) and numpy.
 
