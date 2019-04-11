@@ -8,8 +8,10 @@ The `lm.py` module implements:
     - Known coefficient prior mean and unknown error variance
 
 ## Plots
+<p align="center">
 <img src="img/plot_logistic.png" align='center' height="550" />
 
 <img src="img/plot_bayes.png" align='center' height="300" />
 
 <img src="img/plot_regression.png" align='center' height="550" />
+</p>
