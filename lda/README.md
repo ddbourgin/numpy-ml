@@ -10,7 +10,8 @@ The `lda.py` module implements:
 ## Plots
 
 ### Unsmoothed
-<img src="img/plot_unsmoothed.png" height="400" />
-
+<p align="center">
+   <img src="img/plot_unsmoothed.png" height="400" />
+</p>
 ### Smoothed
 TODO
