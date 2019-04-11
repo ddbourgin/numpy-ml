@@ -10,4 +10,6 @@ This module implements:
    example of gradient boosted machines) (Friedman, 1999).
 
 ## Plots
-<img src="img/plot.png" height='800' align='center' />
+<p align="center">
+   <img src="img/plot.png" height='800' align='center' />
+</p>
