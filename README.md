@@ -11,7 +11,7 @@ This repo includes code for the following models:
 2. **Hidden Markov model**
     - Viterbi decoding
     - Likelihood computation
-    - Baum-Welch/Forward-backward estimation
+    - MLE parameter estimation via Baum-Welch/forward-backward algorithm
 
 3. **Latent Dirichlet allocation** (topic model)
     - Standard model with MLE parameter estimation via variational EM
@@ -42,6 +42,7 @@ This repo includes code for the following models:
         - SGD w/ momentum 
         - AdaGrad 
         - RMSProp 
+        - Adam
     * Initializers
         - Glorot/Xavier uniform and normal
         - He/Kaiming uniform and normal
@@ -57,7 +58,7 @@ This repo includes code for the following models:
         - Softmax
         - Leaky ReLU
     * Models
-        - Bernoulli VAE
+        - Bernoulli variational autoencoder
     * Utilities
         - `col2im` (MATLAB port)
         - `im2col` (MATLAB port)
@@ -86,5 +87,5 @@ This repo includes code for the following models:
 
 Am I missing your favorite model? Is there something that could be cleaner /
 less confusing? Did I mess something up? Submit a PR! The only requirement is
-that your models are written using just the [Python standard library](https://docs.python.org/3/library/) and numpy.
+that your models are written with just the [Python standard library](https://docs.python.org/3/library/) and numpy.
 
