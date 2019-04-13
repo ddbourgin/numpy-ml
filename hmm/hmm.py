@@ -1,10 +1,10 @@
 import numpy as np
 
 
-class HMM:
-    def __init__(self, A=None, B=None, pi=None):
+class MultinomialHMM:
+    def __init__(self, A=None, B=None, pi=None, eps=None):
         """
-        A simple HMM model for discrete observation spaces.
+        A simple hidden Markov model with multinomial emission distribution.
 
         Parameters
         ----------
@@ -17,30 +17,33 @@ class HMM:
             state i emitting an observation of type j.
         pi : numpy array of shape (N,) (default: None)
             The prior probability of each latent state.
+        eps : float (default : None)
+            Epsilon value to avoid log(0) errors
         """
-        eps = np.finfo(float).eps
+        self.eps = np.finfo(float).eps if eps is None else eps
 
         # transition matrix
         self.A = A
-        self.A[self.A == 0] = eps
 
         # emission matrix
         self.B = B
-        self.B[self.B == 0] = eps
 
         # prior probability of each latent state
         self.pi = pi
-        self.pi[self.pi == 0] = eps
+        if self.pi is not None:
+            self.pi[self.pi == 0] = self.eps
 
         # number of latent state types
         self.N = None
         if self.A is not None:
             self.N = self.A.shape[0]
+            self.A[self.A == 0] = self.eps
 
         # number of observation types
         self.V = None
         if self.B is not None:
             self.V = self.B.shape[1]
+            self.B[self.B == 0] = self.eps
 
         # set of training sequences
         self.O = None
@@ -112,14 +115,13 @@ class HMM:
         if O.ndim == 1:
             O = O.reshape(1, -1)
 
-        self.O = O
-        self.I, self.T = self.O.shape
+        I, T = O.shape
 
-        if self.I != 1:
+        if I != 1:
             raise ValueError("Likelihood only accepts a single sequence")
 
-        forward = self._forward(self.O[0])
-        log_likelihood = logsumexp(forward[:, self.T - 1])
+        forward = self._forward(O[0])
+        log_likelihood = logsumexp(forward[:, T - 1])
         return log_likelihood
 
     def decode(self, O):
@@ -173,47 +175,51 @@ class HMM:
             The probability of the latent state sequence in `best_path` under
             the HMM
         """
+        eps = self.eps
+
         if O.ndim == 1:
             O = O.reshape(1, -1)
 
         # observations
-        self.O = O
+        #  self.O = O
 
         # number of observations in each sequence
-        self.T = self.O.shape[1]
+        T = O.shape[1]
 
         # number of training sequences
-        self.I = self.O.shape[0]
-        if self.I != 1:
+        I = O.shape[0]
+        if I != 1:
             raise ValueError("Can only decode a single sequence (O.shape[0] must be 1)")
 
         # initialize the viterbi and back_pointer matrices
-        viterbi = np.zeros((self.N, self.T))
-        back_pointer = np.zeros((self.N, self.T)).astype(int)
+        viterbi = np.zeros((self.N, T))
+        back_pointer = np.zeros((self.N, T)).astype(int)
 
-        ot = self.O[0, 0]
+        ot = O[0, 0]
         for s in range(self.N):
             back_pointer[s, 0] = 0
-            viterbi[s, 0] = np.log(self.pi[s]) + np.log(self.B[s, ot])
+            viterbi[s, 0] = np.log(self.pi[s] + eps) + np.log(self.B[s, ot] + eps)
 
-        for t in range(1, self.T):
-            ot = self.O[0, t]
+        for t in range(1, T):
+            ot = O[0, t]
             for s in range(self.N):
                 seq_probs = [
-                    viterbi[s_, t - 1] + np.log(self.A[s_, s]) + np.log(self.B[s, ot])
+                    viterbi[s_, t - 1]
+                    + np.log(self.A[s_, s] + eps)
+                    + np.log(self.B[s, ot] + eps)
                     for s_ in range(self.N)
                 ]
 
                 viterbi[s, t] = np.max(seq_probs)
                 back_pointer[s, t] = np.argmax(seq_probs)
 
-        best_path_log_prob = viterbi[:, self.T - 1].max()
+        best_path_log_prob = viterbi[:, T - 1].max()
 
         # backtrack through the trellis to get the most likely sequence of
         # latent states
-        pointer = viterbi[:, self.T - 1].argmax()
+        pointer = viterbi[:, T - 1].argmax()
         best_path = [pointer]
-        for t in reversed(range(1, self.T)):
+        for t in reversed(range(1, T)):
             pointer = back_pointer[pointer, t]
             best_path.append(pointer)
         best_path = best_path[::-1]
@@ -252,21 +258,24 @@ class HMM:
         forward : numpy array of shape (N, T)
             The forward trellis
         """
+        eps = self.eps
+        T = Obs.shape[0]
+
         # initialize the forward probability matrix
-        forward = np.zeros((self.N, self.T))
+        forward = np.zeros((self.N, T))
 
         ot = Obs[0]
         for s in range(self.N):
-            forward[s, 0] = np.log(self.pi[s]) + np.log(self.B[s, ot])
+            forward[s, 0] = np.log(self.pi[s] + eps) + np.log(self.B[s, ot] + eps)
 
-        for t in range(1, self.T):
+        for t in range(1, T):
             ot = Obs[t]
             for s in range(self.N):
                 forward[s, t] = logsumexp(
                     [
                         forward[s_, t - 1]
-                        + np.log(self.A[s_, s])
-                        + np.log(self.B[s, ot])
+                        + np.log(self.A[s_, s] + eps)
+                        + np.log(self.B[s, ot] + eps)
                         for s_ in range(self.N)
                     ]
                 )
@@ -306,19 +315,22 @@ class HMM:
         backward : numpy array of shape (N, T)
             The backward trellis
         """
+        eps = self.eps
+        T = Obs.shape[0]
+
         # initialize the backward trellis
-        backward = np.zeros((self.N, self.T))
+        backward = np.zeros((self.N, T))
 
         for s in range(self.N):
-            backward[s, self.T - 1] = 0
+            backward[s, T - 1] = 0
 
-        for t in reversed(range(self.T - 1)):
+        for t in reversed(range(T - 1)):
             ot1 = Obs[t + 1]
             for s in range(self.N):
                 backward[s, t] = logsumexp(
                     [
-                        np.log(self.A[s, s_])
-                        + np.log(self.B[s_, ot1])
+                        np.log(self.A[s, s_] + eps)
+                        + np.log(self.B[s_, ot1] + eps)
                         + backward[s_, t + 1]
                         for s_ in range(self.N)
                     ]
@@ -347,9 +359,14 @@ class HMM:
             The collection of valid latent states
         observation_types : list of length V
             The collection of valid observation states
-        pi : numpy array of shape (N,)
-            The prior probability of each latent state. If None, assume each
+        pi : numpy array of shape (N,) (default : None)
+            The prior probability of each latent state. If `None`, assume each
             latent state is equally likely a priori
+        tol : float (default 1e-5)
+            The tolerance value. If the difference in log likelihood between
+            two epochs is less than this value, terminate training.
+        verbose : bool (default : True)
+            Print training stats after each epoch
 
         Returns
         -------
@@ -366,8 +383,8 @@ class HMM:
         # observations
         self.O = O
 
-        # number of observations
-        self.T = self.O.shape[1]
+        # number of training examples (I) and their lengths (T)
+        self.I, self.T = self.O.shape
 
         # number of types of observation
         self.V = len(observation_types)
@@ -375,50 +392,34 @@ class HMM:
         # number of latent state types
         self.N = len(latent_state_types)
 
-        # initialize the prior over latent states
+        # Uniform initialization of prior over latent states
         self.pi = pi
         if self.pi is None:
-            self.pi = np.random.rand(self.N)
+            self.pi = np.ones(self.N)
             self.pi = self.pi / self.pi.sum()
 
-        # Randomly intialize A and B matrices, ensuring that the rows sum to 1
-        self.A = np.random.rand(self.N, self.N)
+        # Uniform initialization of A
+        self.A = np.ones((self.N, self.N))
         self.A = self.A / self.A.sum(axis=1)[:, None]
 
+        # Random initialization of B
         self.B = np.random.rand(self.N, self.V)
         self.B = self.B / self.B.sum(axis=1)[:, None]
 
-        A_ = np.zeros((self.N, self.N))
-        B_ = np.zeros((self.N, self.V))
-        pi_ = np.zeros(self.N)
-
         # iterate E and M steps until convergence criteria is met
-        step = 0
-
-        def squared_error(x, y):
-            return np.sqrt(((x - y) ** 2).mean())
-
-        A_err, B_err = squared_error(A_, self.A), squared_error(B_, self.B)
-        pi_err = squared_error(pi_, self.pi)
-        while any([A_err > tol, B_err > tol, pi_err > tol]):
-            if verbose:
-                print(
-                    "Training step {}. A err: {:.5f}, B err: {:.5f} pi err: {:.5f}".format(
-                        step, A_err, B_err, pi_err
-                    )
-                )
-
-            # E-step
+        step, delta = 0, np.inf
+        ll_prev = np.sum([self.log_likelihood(o) for o in self.O])
+        while delta > tol:
             gamma, xi, phi = self._Estep()
-
-            # M-step
-            A_, B_, pi_ = self.A.copy(), self.B.copy(), self.pi.copy()
             self.A, self.B, self.pi = self._Mstep(gamma, xi, phi)
-
-            # compute error
-            A_err, B_err = squared_error(A_, self.A), squared_error(B_, self.B)
-            pi_err = squared_error(pi_, self.pi)
+            ll = np.sum([self.log_likelihood(o) for o in self.O])
+            delta = ll - ll_prev
+            ll_prev = ll
             step += 1
+
+            if verbose:
+                fstr = "[Epoch {}] LL: {:.3f} Delta: {:.5f}"
+                print(fstr.format(step, ll_prev, delta))
 
         return self.A, self.B, self.pi
 
@@ -461,6 +462,8 @@ class HMM:
         phi : numpy array of shape (I, N)
             The estimated prior counts for each latent state
         """
+        eps = self.eps
+
         gamma = np.zeros((self.I, self.N, self.T))
         xi = np.zeros((self.I, self.N, self.N, self.T))
         phi = np.zeros((self.I, self.N))
@@ -483,8 +486,8 @@ class HMM:
                     for sj in range(self.N):
                         xi[i, si, sj, t] = (
                             fwd[si, t]
-                            + np.log(self.A[si, sj])
-                            + np.log(self.B[sj, ot1])
+                            + np.log(self.A[si, sj] + eps)
+                            + np.log(self.B[sj, ot1] + eps)
                             + bwd[sj, t + 1]
                             - log_likelihood
                         )
@@ -514,6 +517,8 @@ class HMM:
         pi : numpy array of shape (N,)
             The estimated prior probabilities for each latent state
         """
+        eps = self.eps
+
         # initialize the estimated transition (A) and emission (B) matrices
         A = np.zeros((self.N, self.N))
         B = np.zeros((self.N, self.V))
@@ -527,14 +532,15 @@ class HMM:
             for si in range(self.N):
                 for vk in range(self.V):
                     if not (Obs == vk).any():
-                        count_gamma[i, si, vk] = -np.inf
+                        #  count_gamma[i, si, vk] = -np.inf
+                        count_gamma[i, si, vk] = np.log(eps)
                     else:
                         count_gamma[i, si, vk] = logsumexp(gamma[i, si, Obs == vk])
 
                 for sj in range(self.N):
                     count_xi[i, si, sj] = logsumexp(xi[i, si, sj, :])
 
-        pi = logsumexp(phi, axis=0) - np.log(self.I)
+        pi = logsumexp(phi, axis=0) - np.log(self.I + eps)
         np.testing.assert_almost_equal(np.exp(pi).sum(), 1)
 
         for si in range(self.N):
@@ -558,12 +564,12 @@ class HMM:
 #######################################################################
 
 
-def logsumexp(log_probs):
+def logsumexp(log_probs, axis=None):
     """
     Redefine scipy.special.logsumexp
     see: http://bayesjumping.net/log-sum-exp-trick/
     """
     _max = np.max(log_probs)
     ds = log_probs - _max
-    exp_sum = np.exp(ds).sum()
+    exp_sum = np.exp(ds).sum(axis=axis)
     return _max + np.log(exp_sum)
