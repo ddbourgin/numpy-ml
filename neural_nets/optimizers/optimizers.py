@@ -193,8 +193,9 @@ class RMSProp(OptimizerBase):
         """
         RMSProp optimizer. A refinement of Adagrad to reduce its aggressive,
         monotonically decreasing learning rate. RMSProp uses a *decaying
-        average* of the previous squared gradients rather than just the
-        immediately preceding squared gradient for its previous_update value.
+        average* of the previous squared gradients (second moment) rather than
+        just the immediately preceding squared gradient for its
+        `previous_update` value.
 
         Equations:
             cache[t] = decay * cache[t-1] + (1 - decay) * grad[t] ** 2
@@ -266,4 +267,102 @@ class RMSProp(OptimizerBase):
         C[param_name] = decay * C[param_name] + (1 - decay) * param_grad ** 2
         update = lr * param_grad / (np.sqrt(C[param_name]) + eps)
         self.cache = C
+        return param - update
+
+
+class Adam(OptimizerBase):
+    def __init__(
+        self, lr=0.001, decay1=0.9, decay2=0.999, eps=1e-7, clip_norm=None, **kwargs
+    ):
+        """
+        Adam (adaptive moment estimation) optimization algorithm. Designed to
+        combine the advantages of AdaGrad, which works well with sparse
+        gradients, and RMSProp, which works well in on-line and non-stationary
+        settings.
+
+        Parameters
+        ----------
+        lr : float (default: 0.001)
+            pass
+        decay1: float (default: 0.9)
+            The rate of decay to use for in running estimate of the first
+            moment (mean) of the gradient
+        decay2: float (default: 0.999)
+            The rate of decay to use for in running estimate of the second
+            moment (var) of the gradient
+        eps : float (default: 1e-7)
+            Constant term to avoid divide-by-zero errors during the update calc
+        clip_norm : float (default : None)
+            If not None, all param gradients are scaled to have maximum l2 norm of
+            `clip_norm` before computing update.
+        """
+        super().__init__()
+
+        self.cache = {}
+        self.hyperparameters = {
+            "id": "Adam",
+            "lr": lr,
+            "eps": eps,
+            "decay1": decay1,
+            "decay2": decay2,
+            "clip_norm": clip_norm,
+        }
+
+    def __str__(self):
+        H = self.hyperparameters
+        eps, cn = H["eps"], H["clip_norm"]
+        lr, d1, d2, = H["lr"], H["decay1"], H["decay2"]
+        return "Adam(lr={}, decay1={}, decay2={}, eps={}, clip_norm={})".format(
+            lr, d1, d2, eps, cn
+        )
+
+    def update(self, param, param_grad, param_name):
+        """
+        Compute the Adam update for a given parameter.
+
+        Parameters
+        ----------
+        param : numpy array of shape (n, m)
+            The value of the parameter to be updated
+        param_grad : numpy array of shape (n, m)
+            The gradient of the loss function with respect to `param_name`
+        param_name : str
+            The name of the parameter
+
+        Returns
+        -------
+        updated_params : numpy array of shape (n, m)
+            The value of `param` after applying the Adam update
+        """
+        C = self.cache
+        H = self.hyperparameters
+        eps, clip_norm = H["eps"], H["clip_norm"]
+        lr, d1, d2, = H["lr"], H["decay1"], H["decay2"]
+
+        if param_name not in C:
+            C[param_name] = {
+                "t": 0,
+                "mean": np.zeros_like(param_grad),
+                "var": np.zeros_like(param_grad),
+            }
+
+        # scale gradient to avoid explosion
+        t = np.inf if clip_norm is None else clip_norm
+        if norm(param_grad) > t:
+            param_grad = param_grad * t / norm(param_grad)
+
+        t = C[param_name]["t"] + 1
+        var = C[param_name]["var"]
+        mean = C[param_name]["mean"]
+
+        # update cache
+        C[param_name]["t"] = t
+        C[param_name]["var"] = d2 * var + (1 - d2) * param_grad ** 2
+        C[param_name]["mean"] = d1 * mean + (1 - d1) * param_grad
+        self.cache = C
+
+        # calc unbiased moment estimates and Adam update
+        v_hat = C[param_name]["var"] / (1 - d2 ** t)
+        m_hat = C[param_name]["mean"] / (1 - d1 ** t)
+        update = lr * m_hat / (np.sqrt(v_hat) + eps)
         return param - update

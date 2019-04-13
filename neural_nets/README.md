@@ -39,6 +39,7 @@ emphasize conceptual understanding over flexibility.
     - SGD with momentum ([Rummelhart, Hinton, & Williams, 1986](https://www.cs.princeton.edu/courses/archive/spring18/cos495/res/backprop_old.pdf))
     - AdaGrad ([Duchi, Hazan, & Singer, 2011](http://jmlr.org/papers/volume12/duchi11a/duchi11a.pdf))
     - RMSProp ([Tieleman & Hinton, 2012](http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf))
+    - Adam ([Kingma & Ba, 2015](https://arxiv.org/pdf/1412.6980v8.pdf))
 
 6. **Initializers**. Common weight initialization strategies.
     - Glorot/Xavier uniform and normal ([Glorot & Bengio, 2010](http://jmlr.org/proceedings/papers/v9/glorot10a/glorot10a.pdf))
