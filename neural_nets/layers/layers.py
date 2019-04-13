@@ -713,7 +713,7 @@ class BatchNorm1D(LayerBase):
 
     @property
     def hyperparameters(self):
-        self.hyperparameters = {
+        return {
             "layer": "BatchNorm1D",
             "act_fn": None,
             "n_in": self.n_in,
