@@ -4,7 +4,7 @@ from ast import literal_eval as eval
 
 import numpy as np
 
-from optimizers import OptimizerBase, SGD, AdaGrad, RMSProp
+from optimizers import OptimizerBase, SGD, AdaGrad, RMSProp, Adam
 from activations import ActivationBase, Affine, ReLU, Tanh, Sigmoid, Softmax, LeakyReLU
 
 from utils import he_normal, he_uniform, glorot_normal, glorot_uniform, truncated_normal
@@ -93,6 +93,8 @@ class OptimizerInitializer(object):
             optimizer = AdaGrad(**kwargs)
         elif "rmsprop" in opt_str:
             optimizer = RMSProp(**kwargs)
+        elif "adam" in opt_str:
+            optimizer = Adam(**kwargs)
         else:
             raise NotImplementedError("{}".format(opt_str))
         return optimizer
@@ -111,6 +113,8 @@ class OptimizerInitializer(object):
             optimizer = RMSProp().set_params(op, cc)
         elif op and op["id"] == "AdaGrad":
             optimizer = AdaGrad().set_params(op, cc)
+        elif op and op["id"] == "Adam":
+            optimizer = Adam().set_params(op, cc)
         elif op:
             raise NotImplementedError("{}".format(op["id"]))
         return optimizer
