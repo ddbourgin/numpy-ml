@@ -1,6 +1,4 @@
 import numpy as np
-from scipy.special import logsumexp
-
 import matplotlib
 
 matplotlib.use("TkAgg")
