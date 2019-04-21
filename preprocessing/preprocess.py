@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 
 #######################################################################
 #                          Signal Resampling                          #
@@ -183,3 +184,89 @@ def DFT(frame, fs=44000):
     l, r = (1 + (N - 1) / 2, (1 - N) / 2) if N % 2 else (N / 2, -N / 2)
     freq_bins = np.r_[np.arange(l), np.arange(r, 0)] * fs / N
     return spectrum, freq_bins
+
+
+#######################################################################
+#                              DSP Utils                              #
+#######################################################################
+
+
+def to_frames(x, frame_width, stride, writeable=False):
+    """
+    Convert a 1D signal x into overlapping windows of width `frame_width` using
+    a hop length of `stride`.
+
+    NB 1: if (len(x) - frame_width) % stride != 0 then some number of the samples
+    in x will be dropped. Specifically,
+        n_dropped_frames = len(x) - frame_width - stride * (n_frames - 1)
+    where
+        n_frames = (len(x) - frame_width) // stride + 1
+
+    NB 2: This method uses low-level stride manipulation to avoid creating an
+    additional copy of `x`. The downside is that if `writeable`=True, modifying
+    the `frame` output can result in unexpected behavior:
+
+        >>> out = to_frames(np.arange(6), 5, 1)
+        >>> out
+        array([[0, 1, 2, 3, 4],
+               [1, 2, 3, 4, 5]])
+        >>> out[0, 1] = 99
+        >>> out
+        array([[ 0, 99,  2,  3,  4],
+               [99,  2,  3,  4,  5]])
+
+    Parameters
+    ----------
+    x : numpy array of shape (N,)
+        A 1D signal consisting of N samples
+    frame_width : int
+        The width of a single frame window in samples
+    stride : int
+        The hop size / number of samples advanced between consecutive frames
+    writeable : bool (default: False)
+        If set to False, the returned array will be readonly. Otherwise it will
+        be writable if `x` was. It is advisable to set this to False if
+        possible.
+
+    Returns
+    -------
+    frame: numpy array of shape (n_frames, frame_width)
+        The collection of overlapping frames stacked into a matrix
+    """
+    assert x.ndim == 1
+    assert stride >= 1
+    assert len(x) >= frame_width
+
+    # get the size for an element in x in bits
+    byte = x.itemsize
+    n_frames = (len(x) - frame_width) // stride + 1
+    return as_strided(
+        x,
+        shape=(n_frames, frame_width),
+        strides=(byte * stride, byte),
+        writeable=writeable,
+    )
+
+
+def autocorrelate(x):
+    """
+    Autocorrelate a 1D signal `x` with itself.
+
+        auto[k] = sum_n x[n + k] * x[n]
+
+    Parameters
+    ----------
+    x : numpy array of shape (N,)
+        A 1D signal consisting of N samples
+
+    Returns
+    -------
+    auto : numpy array of shape (N,)
+        The autocorrelation of `x` with itself
+    """
+    N = len(x)
+    auto = np.zeros(N)
+    for k in range(N):
+        for n in range(N - k):
+            auto[k] += x[n + k] * x[n]
+    return auto
