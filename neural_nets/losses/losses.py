@@ -169,7 +169,15 @@ class VAELoss(ObjectiveBase):
     @staticmethod
     def loss(y, y_pred, t_mean, t_log_var):
         """
-        Variational lower bound for a Bernoulli VAE
+        Variational lower bound for a Bernoulli VAE. Equal to the sum of
+        the binary cross entropy between the true input and the predicted
+        output (the "reconstruction loss") and the KL divergence between the
+        learned variational distribution q and the prior, p, assumed to be a
+        unit Gaussian.
+
+        Equations:
+
+            VAELoss = BXE(y, y_pred) + KL[q || p]
 
         Parameters
         ----------
@@ -210,3 +218,170 @@ class VAELoss(ObjectiveBase):
         dLogVar = (np.exp(t_log_var) - 1) / (2 * N)
         dMean = t_mean / N
         return dY_pred, dLogVar, dMean
+
+
+class WGAN_GPLoss(ObjectiveBase):
+    def __init__(self, lambda_=10):
+        """
+        The WGAN-GP value function. Assuming an optimal critic, minimizing this
+        quantity wrt. the generator parameters corresponds to minimizing the
+        Wasserstein-1 (earth-mover) distance between the fake and real data
+        distributions.
+
+        Parameters
+        ----------
+        lambda_ : float (default: 10)
+            The gradient penalty coefficient
+        """
+        self.lambda_ = lambda_
+        super().__init__()
+
+    def __call__(self, Y_fake, module, Y_real=None, gradInterp=None):
+        """
+        Computes the generator and critic loss using the WGAN-GP value
+        function.
+
+        Equations
+        ---------
+
+            WGANLoss = sum([p(x) * D(x) for x in X_real]) -
+                sum([p(x_) * D(x_) for x_ in X_fake])
+
+            WGANLossGP = WGANLoss + lambda * (||∇_Xi D(Xi)|| - 1)^2
+
+            where:
+
+                X_fake ~ G(z) for z ~ N(0, 1)
+                Xi ~ alpha * X_real + (1 - alpha) * X_fake
+                alpha ~ Uniform(0, 1, dim=X_real.shape[0])
+
+        Parameters
+        ----------
+        Y_fake : numpy array of shape (n_ex,)
+            The output of the critic for X_fake
+        module : {'C' or 'G'}
+            Whether to calculate the loss for the critic ('C') or the generator
+            ('G'). If calculating loss for the critic, `Y_real` and
+            `gradInterp` must not be `None`
+        Y_real : numpy array of shape (n_ex,) (default: None)
+            The output of the critic for X_real
+        gradInterp : numpy array of shape (n_ex, n_feats) (default: None)
+            The gradient of the critic output for X_interp wrt. X_interp
+
+        Returns
+        -------
+        loss : float
+            Depending on the setting for `module`, either the critic or
+            generator loss, averaged over examples in the minibatch
+        """
+        return self.loss(Y_fake, module, Y_real=Y_real, gradInterp=gradInterp)
+
+    def __str__(self):
+        return "WGANLossGP(lambda_={})".format(self.lambda_)
+
+    def loss(self, Y_fake, module, Y_real=None, gradInterp=None):
+        """
+        Computes the generator and critic loss using the WGAN-GP value
+        function.
+
+        Equations:
+
+            WGANLoss = sum([p(x) * D(x) for x in X_real]) -
+                sum([p(x_) * D(x_) for x_ in X_fake])
+
+            WGANLossGP = WGANLoss + lambda * (||∇_Xi D(Xi)|| - 1)^2
+
+            where:
+
+                X_fake ~ G(z) for z ~ N(0, 1)
+                Xi ~ alpha * X_real + (1 - alpha) * X_fake
+                alpha ~ Uniform(0, 1, dim=X_real.shape[0])
+
+        Parameters
+        ----------
+        Y_fake : numpy array of shape (n_ex,)
+            The output of the critic for `X_fake`
+        module : {'C' or 'G'}
+            Whether to calculate the loss for the critic ('C') or the generator
+            ('G'). If calculating loss for the critic, `Y_real` and
+            `gradInterp` must not be `None`
+        Y_real : numpy array of shape (n_ex,) (default: None)
+            The output of the critic for `X_real`
+        gradInterp : numpy array of shape (n_ex, n_feats) (default: None)
+            The gradient of the critic output for `X_interp` wrt. `X_interp`
+
+        Returns
+        -------
+        loss : float
+            Depending on the setting for `module`, either the critic or
+            generator loss, averaged over examples in the minibatch
+        """
+        # calc critic loss including gradient penalty
+        if module == "C":
+            X_interp_norm = np.linalg.norm(gradInterp, axis=1, keepdims=True)
+            gradient_penalty = (X_interp_norm - 1) ** 2
+            loss = (
+                Y_fake.mean() - Y_real.mean() + self.lambda_ * gradient_penalty.mean()
+            )
+
+        # calc generator loss
+        elif module == "G":
+            loss = -Y_fake.mean()
+
+        else:
+            raise ValueError("Unrecognized module: {}".format(module))
+
+        return loss
+
+    def grad(self, Y_fake, module, Y_real=None, gradInterp=None):
+        """
+        Computes the gradient of the generator or critic loss wrt to its inputs.
+
+        Parameters
+        ----------
+        Y_fake : numpy array of shape (n_ex,)
+            The output of the critic for X_fake
+        module : {'C' or 'G'}
+            Whether to calculate the gradient for the critic loss ('C') or the
+            generator loss ('G'). If calculating grads for the critic, `Y_real`
+            and `gradInterp` must not be `None`.
+        Y_real : numpy array of shape (n_ex,) (default: None)
+            The output of the critic for X_real
+        gradInterp : numpy array of shape (n_ex, n_feats) (default: None)
+            The gradient of the critic output for X_interp wrt. X_interp
+
+        Returns
+        -------
+        grads : tuple
+            If `module` == 'C', returns a 3-tuple containing the gradient of
+            the critic loss wrt. (`Y_fake`, `Y_real`, `gradInterp`). If
+            `module` == 'G', returns the gradient of the generator wrt. `Y_fake`.
+        """
+        eps = np.finfo(float).eps
+        n_ex_fake = Y_fake.shape[0]
+
+        # calc gradient of the critic loss
+        if module == "C":
+            n_ex_real = Y_real.shape[0]
+
+            dY_fake = -1 / n_ex_fake * np.ones_like(Y_fake)
+            dY_real = 1 / n_ex_real * np.ones_like(Y_real)
+
+            # differentiate through gradient penalty
+            X_interp_norm = np.linalg.norm(gradInterp, axis=1, keepdims=True) + eps
+
+            dGradInterp = (
+                (2 / n_ex_fake)
+                * self.lambda_
+                * (X_interp_norm - 1)
+                * (gradInterp / X_interp_norm)
+            )
+            grad = (dY_fake, dY_real, dGradInterp)
+
+        # calc gradient of the generator loss
+        elif module == "G":
+            grad = -1 / n_ex_fake * np.ones_like(Y_fake)
+
+        else:
+            raise ValueError("Unrecognized module: {}".format(module))
+        return grad
