@@ -1,4 +1,5 @@
 from time import time
+from collections import OrderedDict
 
 import numpy as np
 
@@ -125,7 +126,7 @@ class BernoulliVAE(object):
         Conv1 -> ReLU -> MaxPool1 -> Conv2 -> ReLU -> MaxPool2 ->
             Flatten -> FC1 -> ReLU -> FC2
         """
-        self.encoder = {}
+        self.encoder = OrderedDict()
         self.encoder["Conv1"] = Conv2D(
             act_fn=ReLU(),
             init=self.init,
@@ -173,7 +174,7 @@ class BernoulliVAE(object):
 
         FC1 -> ReLU -> FC2 -> Sigmoid
         """
-        self.decoder = {}
+        self.decoder = OrderedDict()
         self.decoder["FC1"] = FullyConnected(
             act_fn=ReLU(),
             init=self.init,
