@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import tensorflow as tf
+
 import numpy as np
 
 #######################################################################
@@ -46,7 +48,7 @@ def torch_mse_grad(y, z, act_fn):
 
 class TorchVAELoss(nn.Module):
     def __init__(self):
-        pass
+        super(TorchVAELoss, self).__init__()
 
     def extract_grads(self, X, X_recon, t_mean, t_log_var):
         eps = np.finfo(float).eps
@@ -71,6 +73,48 @@ class TorchVAELoss(nn.Module):
             "dX_recon": X_recon.grad.numpy(),
             "dt_mean": t_mean.grad.numpy(),
             "dt_log_var": t_log_var.grad.numpy(),
+        }
+        return grads
+
+
+class TorchWGANGPLoss(nn.Module):
+    def __init__(self, lambda_=10):
+        self.lambda_ = torchify([lambda_])
+        super(TorchWGANGPLoss, self).__init__()
+
+    def forward(self, Y_real, Y_fake, gradInterp):
+        GY_fake = Y_fake.copy()
+        self.Y_real = torchify(Y_real)
+        self.Y_fake = torchify(Y_fake)
+        self.GY_fake = torchify(GY_fake)
+        self.gradInterp = torchify(gradInterp)
+
+        # calc grad penalty
+        norm = self.gradInterp.norm(2, dim=1)
+        self.norm1 = torch.sqrt(torch.sum(self.gradInterp.pow(2), dim=1))
+        assert torch.allclose(norm, self.norm1)
+
+        self.gpenalty = self.lambda_ * ((self.norm1 - 1).pow(2)).mean()
+        self.C_loss = self.Y_fake.mean() - self.Y_real.mean() + self.gpenalty
+        self.G_loss = -self.GY_fake.mean()
+
+    def extract_grads(self, Y_real, Y_fake, gradInterp):
+        self.forward(Y_real, Y_fake, gradInterp)
+
+        self.C_loss.backward()
+        self.G_loss.backward()
+
+        grads = {
+            "Y_real": self.Y_real.detach().numpy(),
+            "Y_fake": self.Y_fake.detach().numpy(),
+            "gradInterp": self.gradInterp.detach().numpy(),
+            "GP": self.gpenalty.detach().numpy(),
+            "C_loss": self.C_loss.detach().numpy(),
+            "G_loss": self.G_loss.detach().numpy(),
+            "C_dY_real": self.Y_real.grad.numpy(),
+            "C_dGradInterp": self.gradInterp.grad.numpy(),
+            "C_dY_fake": self.Y_fake.grad.numpy(),
+            "G_dY_fake": self.GY_fake.grad.numpy(),
         }
         return grads
 
@@ -160,6 +204,91 @@ class TorchBatchNormLayer(nn.Module):
             "dLdy": dY_np,
             "dLdIntercept": self.layer1.bias.grad.numpy(),
             "dLdScaler": self.layer1.weight.grad.numpy(),
+            "dLdX": dX_np,
+        }
+        if isinstance(Y_true, np.ndarray):
+            grads["Y_true"] = Y_true
+        return grads
+
+
+class TorchLayerNormLayer(nn.Module):
+    def __init__(self, feat_dims, params, mode, epsilon=1e-5):
+        super(TorchLayerNormLayer, self).__init__()
+
+        self.layer1 = nn.LayerNorm(
+            normalized_shape=feat_dims, eps=epsilon, elementwise_affine=True
+        )
+
+        scaler = params["scaler"]
+        intercept = params["intercept"]
+
+        if mode == "2D":
+            scaler = np.moveaxis(scaler, [0, 1, 2], [-2, -1, -3])
+            intercept = np.moveaxis(intercept, [0, 1, 2], [-2, -1, -3])
+
+        assert scaler.shape == self.layer1.weight.shape
+        assert intercept.shape == self.layer1.bias.shape
+        self.layer1.weight = nn.Parameter(torch.FloatTensor(scaler))
+        self.layer1.bias = nn.Parameter(torch.FloatTensor(intercept))
+
+    def forward(self, X):
+        # (N, H, W, C) -> (N, C, H, W)
+        if X.ndim == 4:
+            X = np.moveaxis(X, [0, 1, 2, 3], [0, -2, -1, -3])
+
+        if not isinstance(X, torch.Tensor):
+            X = torchify(X)
+
+        self.X = X
+        self.Y = self.layer1(self.X)
+        self.Y.retain_grad()
+
+    def extract_grads(self, X, Y_true=None):
+        self.forward(X)
+
+        if isinstance(Y_true, np.ndarray):
+            Y_true = np.moveaxis(Y_true, [0, 1, 2, 3], [0, -2, -1, -3])
+            self.loss1 = (
+                0.5 * F.mse_loss(self.Y, torchify(Y_true), size_average=False).sum()
+            )
+        else:
+            self.loss1 = self.Y.sum()
+
+        self.loss1.backward()
+
+        X_np = self.X.detach().numpy()
+        Y_np = self.Y.detach().numpy()
+        dX_np = self.X.grad.numpy()
+        dY_np = self.Y.grad.numpy()
+        intercept_np = self.layer1.bias.detach().numpy()
+        scaler_np = self.layer1.weight.detach().numpy()
+        dIntercept_np = self.layer1.bias.grad.numpy()
+        dScaler_np = self.layer1.weight.grad.numpy()
+
+        if self.X.dim() == 4:
+            orig, X_swap = [0, 1, 2, 3], [0, -1, -3, -2]
+            orig_p, p_swap = [0, 1, 2], [-1, -3, -2]
+            if isinstance(Y_true, np.ndarray):
+                Y_true = np.moveaxis(Y_true, orig, X_swap)
+            X_np = np.moveaxis(X_np, orig, X_swap)
+            Y_np = np.moveaxis(Y_np, orig, X_swap)
+            dX_np = np.moveaxis(dX_np, orig, X_swap)
+            dY_np = np.moveaxis(dY_np, orig, X_swap)
+            scaler_np = np.moveaxis(scaler_np, orig_p, p_swap)
+            intercept_np = np.moveaxis(intercept_np, orig_p, p_swap)
+            dScaler_np = np.moveaxis(dScaler_np, orig_p, p_swap)
+            dIntercept_np = np.moveaxis(dIntercept_np, orig_p, p_swap)
+
+        grads = {
+            "loss": self.loss1.detach().numpy(),
+            "X": X_np,
+            "epsilon": self.layer1.eps,
+            "intercept": intercept_np,
+            "scaler": scaler_np,
+            "y": Y_np,
+            "dLdy": dY_np,
+            "dLdIntercept": dIntercept_np,
+            "dLdScaler": dScaler_np,
             "dLdX": dX_np,
         }
         if isinstance(Y_true, np.ndarray):
@@ -1437,3 +1566,386 @@ class TorchFCLayer(nn.Module):
             "dLdX": self.X.grad.numpy(),
         }
         return grads
+
+
+#######################################################################
+#              TF WGAN GP Gold Standard Implementation                #
+#  adapted from: https://github.com/igul222/improved_wgan_training/   #
+#######################################################################
+
+_params = {}
+_param_aliases = {}
+
+
+def param(name, *args, **kwargs):
+    """
+    A wrapper for `tf.Variable` which enables parameter sharing in models.
+
+    Creates and returns theano shared variables similarly to `tf.Variable`,
+    except if you try to create a param with the same name as a
+    previously-created one, `param(...)` will just return the old one instead of
+    making a new one.
+
+    This constructor also adds a `param` attribute to the shared variables it
+    creates, so that you can easily search a graph for all params.
+    """
+
+    if name not in _params:
+        kwargs["name"] = name
+        param = tf.Variable(*args, **kwargs)
+        param.param = True
+        _params[name] = param
+    result = _params[name]
+    i = 0
+    while result in _param_aliases:
+        i += 1
+        result = _param_aliases[result]
+    return result
+
+
+def params_with_name(name):
+    return [p for n, p in _params.items() if name in n]
+
+
+def ReLULayer(name, n_in, n_out, inputs, w_initialization):
+    if isinstance(w_initialization, np.ndarray):
+        weight_values = w_initialization.astype("float32")
+
+    W = param(name + ".W", weight_values)
+    result = tf.matmul(inputs, W)
+    output = tf.nn.bias_add(
+        result, param(name + ".b", np.zeros((n_out,), dtype="float32"))
+    )
+    output = tf.nn.relu(output)
+    return output, W
+
+
+def LinearLayer(name, n_in, n_out, inputs, w_initialization):
+    if isinstance(w_initialization, np.ndarray):
+        weight_values = w_initialization.astype("float32")
+
+    W = param(name + ".W", weight_values)
+    result = tf.matmul(inputs, W)
+    output = tf.nn.bias_add(
+        result, param(name + ".b", np.zeros((n_out,), dtype="float32"))
+    )
+    return output, W
+
+
+def Generator(n_samples, X_real, params=None):
+    n_feats = 2
+    W1 = W2 = W3 = W4 = "he"
+    noise = tf.random_normal([n_samples, 2])
+    if params is not None:
+        noise = tf.convert_to_tensor(params["noise"], dtype="float32")
+        W1 = params["generator"]["FC1"]["W"]
+        W2 = params["generator"]["FC2"]["W"]
+        W3 = params["generator"]["FC3"]["W"]
+        W4 = params["generator"]["FC4"]["W"]
+        DIM = params["g_hidden"]
+        n_feats = params["n_in"]
+
+    outs = {}
+    weights = {}
+    output, W = ReLULayer("Generator.1", n_feats, DIM, noise, w_initialization=W1)
+    outs["FC1"] = output
+    weights["FC1"] = W
+    output, W = ReLULayer("Generator.2", DIM, DIM, output, w_initialization=W2)
+    outs["FC2"] = output
+    weights["FC2"] = W
+    output, W = ReLULayer("Generator.3", DIM, DIM, output, w_initialization=W3)
+    outs["FC3"] = output
+    weights["FC3"] = W
+    output, W = LinearLayer("Generator.4", DIM, n_feats, output, w_initialization=W4)
+    outs["FC4"] = output
+    weights["FC4"] = W
+    return output, outs, weights
+
+
+def Discriminator(inputs, params=None):
+    n_feats = 2
+    W1 = W2 = W3 = W4 = "he"
+    if params is not None:
+        W1 = params["critic"]["FC1"]["W"]
+        W2 = params["critic"]["FC2"]["W"]
+        W3 = params["critic"]["FC3"]["W"]
+        W4 = params["critic"]["FC4"]["W"]
+        DIM = params["g_hidden"]
+        n_feats = params["n_in"]
+
+    outs = {}
+    weights = {}
+    output, W = ReLULayer("Discriminator.1", n_feats, DIM, inputs, w_initialization=W1)
+    outs["FC1"] = output
+    weights["FC1"] = W
+
+    output, W = ReLULayer("Discriminator.2", DIM, DIM, output, w_initialization=W2)
+    outs["FC2"] = output
+    weights["FC2"] = W
+
+    output, W = ReLULayer("Discriminator.3", DIM, DIM, output, w_initialization=W3)
+    outs["FC3"] = output
+    weights["FC3"] = W
+
+    output, W = LinearLayer("Discriminator.4", DIM, 1, output, w_initialization=W4)
+    outs["FC4"] = output
+    weights["FC4"] = W
+
+    # get bias
+    for var in params_with_name("Discriminator"):
+        if "1.b:" in var.name:
+            weights["FC1_b"] = var
+        elif "2.b:" in var.name:
+            weights["FC2_b"] = var
+        elif "3.b:" in var.name:
+            weights["FC3_b"] = var
+        elif "4.b:" in var.name:
+            weights["FC4_b"] = var
+
+    return tf.reshape(output, [-1]), outs, weights
+
+
+def WGAN_GP_tf(X, lambda_, params, batch_size):
+    batch_size = X.shape[0]
+
+    # get alpha value
+    n_steps = params["n_steps"]
+    c_updates_per_epoch = params["c_updates_per_epoch"]
+    alpha = tf.convert_to_tensor(params["alpha"], dtype="float32")
+
+    X_real = tf.placeholder(tf.float32, shape=[None, params["n_in"]])
+    X_fake, G_out_X_fake, G_weights = Generator(batch_size, X_real, params)
+
+    Y_real, C_out_Y_real, C_Y_real_weights = Discriminator(X_real, params)
+    Y_fake, C_out_Y_fake, C_Y_fake_weights = Discriminator(X_fake, params)
+
+    # WGAN loss
+    mean_fake = tf.reduce_mean(Y_fake)
+    mean_real = tf.reduce_mean(Y_real)
+
+    C_loss = tf.reduce_mean(Y_fake) - tf.reduce_mean(Y_real)
+    G_loss = -tf.reduce_mean(Y_fake)
+
+    # WGAN gradient penalty
+    X_interp = alpha * X_real + ((1 - alpha) * X_fake)
+    Y_interp, C_out_Y_interp, C_Y_interp_weights = Discriminator(X_interp, params)
+    gradInterp = tf.gradients(Y_interp, [X_interp])[0]
+
+    norm_gradInterp = tf.sqrt(
+        tf.reduce_sum(tf.square(gradInterp), reduction_indices=[1])
+    )
+    gradient_penalty = tf.reduce_mean((norm_gradInterp - 1) ** 2)
+    C_loss += lambda_ * gradient_penalty
+
+    # extract gradient of Y_interp wrt. each layer output in critic
+    C_bwd_Y_interp = {}
+    for k, v in C_out_Y_interp.items():
+        C_bwd_Y_interp[k] = tf.gradients(Y_interp, [v])[0]
+
+    C_bwd_W = {}
+    for k, v in C_Y_interp_weights.items():
+        C_bwd_W[k] = tf.gradients(C_loss, [v])[0]
+
+    # get gradients
+    dC_Y_fake = tf.gradients(C_loss, [Y_fake])[0]
+    dC_Y_real = tf.gradients(C_loss, [Y_real])[0]
+    dC_gradInterp = tf.gradients(C_loss, [gradInterp])[0]
+    dG_Y_fake = tf.gradients(G_loss, [Y_fake])[0]
+
+    with tf.Session() as session:
+        session.run(tf.global_variables_initializer())
+
+        for iteration in range(n_steps):
+            # Train critic
+            for i in range(c_updates_per_epoch):
+                _data = X
+                (
+                    _alpha,
+                    _X_interp,
+                    _Y_interp,
+                    _gradInterp,
+                    _norm_gradInterp,
+                    _gradient_penalty,
+                    _C_loss,
+                    _X_fake,
+                    _Y_fake,
+                    _Y_real,
+                    _dC_Y_fake,
+                    _dC_Y_real,
+                    _dC_gradInterp,
+                    _dG_Y_fake,
+                    _mean_fake,
+                    _mean_real,
+                    _G_weights_FC1,
+                    _G_weights_FC2,
+                    _G_weights_FC3,
+                    _G_weights_FC4,
+                    _G_fwd_X_fake_FC1,
+                    _G_fwd_X_fake_FC2,
+                    _G_fwd_X_fake_FC3,
+                    _G_fwd_X_fake_FC4,
+                    _C_weights_Y_fake_FC1,
+                    _C_weights_Y_fake_FC2,
+                    _C_weights_Y_fake_FC3,
+                    _C_weights_Y_fake_FC4,
+                    _C_fwd_Y_fake_FC1,
+                    _C_fwd_Y_fake_FC2,
+                    _C_fwd_Y_fake_FC3,
+                    _C_fwd_Y_fake_FC4,
+                    _C_weights_Y_real_FC1,
+                    _C_weights_Y_real_FC2,
+                    _C_weights_Y_real_FC3,
+                    _C_weights_Y_real_FC4,
+                    _C_fwd_Y_real_FC1,
+                    _C_fwd_Y_real_FC2,
+                    _C_fwd_Y_real_FC3,
+                    _C_fwd_Y_real_FC4,
+                    _C_weights_Y_interp_FC1,
+                    _C_weights_Y_interp_FC2,
+                    _C_weights_Y_interp_FC3,
+                    _C_weights_Y_interp_FC4,
+                    _C_dY_interp_wrt_FC1,
+                    _C_dY_interp_wrt_FC2,
+                    _C_dY_interp_wrt_FC3,
+                    _C_dY_interp_wrt_FC4,
+                    _C_fwd_Y_interp_FC1,
+                    _C_fwd_Y_interp_FC2,
+                    _C_fwd_Y_interp_FC3,
+                    _C_fwd_Y_interp_FC4,
+                    _C_dW_FC1,
+                    _C_db_FC1,
+                    _C_dW_FC2,
+                    _C_db_FC2,
+                    _C_dW_FC3,
+                    _C_db_FC3,
+                    _C_dW_FC4,
+                    _C_db_FC4,
+                ) = session.run(
+                    [
+                        alpha,
+                        X_interp,
+                        Y_interp,
+                        gradInterp,
+                        norm_gradInterp,
+                        gradient_penalty,
+                        C_loss,
+                        X_fake,
+                        Y_fake,
+                        Y_real,
+                        dC_Y_fake,
+                        dC_Y_real,
+                        dC_gradInterp,
+                        dG_Y_fake,
+                        mean_fake,
+                        mean_real,
+                        G_weights["FC1"],
+                        G_weights["FC2"],
+                        G_weights["FC3"],
+                        G_weights["FC4"],
+                        G_out_X_fake["FC1"],
+                        G_out_X_fake["FC2"],
+                        G_out_X_fake["FC3"],
+                        G_out_X_fake["FC4"],
+                        C_Y_fake_weights["FC1"],
+                        C_Y_fake_weights["FC2"],
+                        C_Y_fake_weights["FC3"],
+                        C_Y_fake_weights["FC4"],
+                        C_out_Y_fake["FC1"],
+                        C_out_Y_fake["FC2"],
+                        C_out_Y_fake["FC3"],
+                        C_out_Y_fake["FC4"],
+                        C_Y_real_weights["FC1"],
+                        C_Y_real_weights["FC2"],
+                        C_Y_real_weights["FC3"],
+                        C_Y_real_weights["FC4"],
+                        C_out_Y_real["FC1"],
+                        C_out_Y_real["FC2"],
+                        C_out_Y_real["FC3"],
+                        C_out_Y_real["FC4"],
+                        C_Y_interp_weights["FC1"],
+                        C_Y_interp_weights["FC2"],
+                        C_Y_interp_weights["FC3"],
+                        C_Y_interp_weights["FC4"],
+                        C_bwd_Y_interp["FC1"],
+                        C_bwd_Y_interp["FC2"],
+                        C_bwd_Y_interp["FC3"],
+                        C_bwd_Y_interp["FC4"],
+                        C_out_Y_interp["FC1"],
+                        C_out_Y_interp["FC2"],
+                        C_out_Y_interp["FC3"],
+                        C_out_Y_interp["FC4"],
+                        C_bwd_W["FC1"],
+                        C_bwd_W["FC1_b"],
+                        C_bwd_W["FC2"],
+                        C_bwd_W["FC2_b"],
+                        C_bwd_W["FC3"],
+                        C_bwd_W["FC3_b"],
+                        C_bwd_W["FC4"],
+                        C_bwd_W["FC4_b"],
+                    ],
+                    feed_dict={X_real: _data},
+                )
+
+            _G_loss = session.run(G_loss, feed_dict={X_real: _data})
+
+        grads = {
+            "X_real": _data,
+            "X_interp": _X_interp,
+            "G_weights_FC1": _G_weights_FC1,
+            "G_weights_FC2": _G_weights_FC2,
+            "G_weights_FC3": _G_weights_FC3,
+            "G_weights_FC4": _G_weights_FC4,
+            "G_fwd_X_fake_FC1": _G_fwd_X_fake_FC1,
+            "G_fwd_X_fake_FC2": _G_fwd_X_fake_FC2,
+            "G_fwd_X_fake_FC3": _G_fwd_X_fake_FC3,
+            "G_fwd_X_fake_FC4": _G_fwd_X_fake_FC4,
+            "X_fake": _X_fake,
+            "C_weights_Y_fake_FC1": _C_weights_Y_fake_FC1,
+            "C_weights_Y_fake_FC2": _C_weights_Y_fake_FC2,
+            "C_weights_Y_fake_FC3": _C_weights_Y_fake_FC3,
+            "C_weights_Y_fake_FC4": _C_weights_Y_fake_FC4,
+            "C_fwd_Y_fake_FC1": _C_fwd_Y_fake_FC1,
+            "C_fwd_Y_fake_FC2": _C_fwd_Y_fake_FC2,
+            "C_fwd_Y_fake_FC3": _C_fwd_Y_fake_FC3,
+            "C_fwd_Y_fake_FC4": _C_fwd_Y_fake_FC4,
+            "Y_fake": _Y_fake,
+            "C_weights_Y_real_FC1": _C_weights_Y_real_FC1,
+            "C_weights_Y_real_FC2": _C_weights_Y_real_FC2,
+            "C_weights_Y_real_FC3": _C_weights_Y_real_FC3,
+            "C_weights_Y_real_FC4": _C_weights_Y_real_FC4,
+            "C_fwd_Y_real_FC1": _C_fwd_Y_real_FC1,
+            "C_fwd_Y_real_FC2": _C_fwd_Y_real_FC2,
+            "C_fwd_Y_real_FC3": _C_fwd_Y_real_FC3,
+            "C_fwd_Y_real_FC4": _C_fwd_Y_real_FC4,
+            "Y_real": _Y_real,
+            "C_weights_Y_interp_FC1": _C_weights_Y_interp_FC1,
+            "C_weights_Y_interp_FC2": _C_weights_Y_interp_FC2,
+            "C_weights_Y_interp_FC3": _C_weights_Y_interp_FC3,
+            "C_weights_Y_interp_FC4": _C_weights_Y_interp_FC4,
+            "C_fwd_Y_interp_FC1": _C_fwd_Y_interp_FC1,
+            "C_fwd_Y_interp_FC2": _C_fwd_Y_interp_FC2,
+            "C_fwd_Y_interp_FC3": _C_fwd_Y_interp_FC3,
+            "C_fwd_Y_interp_FC4": _C_fwd_Y_interp_FC4,
+            "Y_interp": _Y_interp,
+            "dY_interp_wrt_FC1": _C_dY_interp_wrt_FC1,
+            "dY_interp_wrt_FC2": _C_dY_interp_wrt_FC2,
+            "dY_interp_wrt_FC3": _C_dY_interp_wrt_FC3,
+            "dY_interp_wrt_FC4": _C_dY_interp_wrt_FC4,
+            "gradInterp": _gradInterp,
+            "gradInterp_norm": _norm_gradInterp,
+            "G_loss": _G_loss,
+            "C_loss": _C_loss,
+            "dC_loss_dW_FC1": _C_dW_FC1,
+            "dC_loss_db_FC1": _C_db_FC1,
+            "dC_loss_dW_FC2": _C_dW_FC2,
+            "dC_loss_db_FC2": _C_db_FC2,
+            "dC_loss_dW_FC3": _C_dW_FC3,
+            "dC_loss_db_FC3": _C_db_FC3,
+            "dC_loss_dW_FC4": _C_dW_FC4,
+            "dC_loss_db_FC4": _C_db_FC4,
+            "dC_Y_fake": _dC_Y_fake,
+            "dC_Y_real": _dC_Y_real,
+            "dC_gradInterp": _dC_gradInterp,
+            "dG_Y_fake": _dG_Y_fake,
+        }
+    return grads

@@ -15,6 +15,7 @@ import torch.nn.functional as F
 
 from utils import calc_pad_dims_2D, conv2D_naive, conv2D, pad2D, pad1D
 from .torch_models import (
+    WGAN_GP_tf,
     torch_xe_grad,
     torch_mse_grad,
     TorchVAELoss,
@@ -22,12 +23,14 @@ from .torch_models import (
     TorchRNNCell,
     TorchLSTMCell,
     TorchAddLayer,
+    TorchWGANGPLoss,
     TorchConv1DLayer,
     TorchConv2DLayer,
     TorchPool2DLayer,
     TorchWavenetModule,
     TorchMultiplyLayer,
     TorchDeconv2DLayer,
+    TorchLayerNormLayer,
     TorchBatchNormLayer,
     TorchLinearActivation,
     TorchBidirectionalLSTM,
@@ -115,6 +118,14 @@ def err_fmt(params, golds, ix, warn_str=""):
 #######################################################################
 
 
+def test_everything(N=50):
+    test_losses(N=N)
+    test_activations(N=N)
+    test_layers(N=N)
+    test_utils(N=N)
+    test_modules(N=N)
+
+
 def test_losses(N=50):
     print("Testing SquaredError loss")
     time.sleep(1)
@@ -129,6 +140,10 @@ def test_losses(N=50):
     print("Testing VAELoss")
     time.sleep(1)
     test_VAE_loss(N)
+
+    print("Testing WGAN_GPLoss")
+    time.sleep(1)
+    test_WGAN_GP_loss(N)
 
 
 def test_activations(N=50):
@@ -175,6 +190,14 @@ def test_layers(N=50):
     print("Testing BatchNorm2D layer")
     time.sleep(1)
     test_BatchNorm2D(N)
+
+    print("Testing LayerNorm1D layer")
+    time.sleep(1)
+    test_LayerNorm1D(N)
+
+    print("Testing LayerNorm2D layer")
+    time.sleep(1)
+    test_LayerNorm2D(N)
 
     print("Testing Deconv2D layer")
     time.sleep(1)
@@ -315,6 +338,56 @@ def test_VAE_loss(N=None):
             (dLogVar, "dt_log_var"),
             (dMean, "dt_mean"),
         ]
+        print("\nTrial {}".format(i))
+        for ix, (mine, label) in enumerate(params):
+            np.testing.assert_allclose(
+                mine,
+                golds[label],
+                err_msg=err_fmt(params, golds, ix),
+                rtol=0.1,
+                atol=1e-2,
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_WGAN_GP_loss(N=None):
+    from losses import WGAN_GPLoss
+
+    N = np.inf if N is None else N
+
+    i = 1
+    while i < N:
+        lambda_ = np.random.randint(0, 10)
+        n_ex = np.random.randint(1, 10)
+        n_feats = np.random.randint(2, 10)
+        Y_real = random_tensor([n_ex], standardize=True)
+        Y_fake = random_tensor([n_ex], standardize=True)
+        gradInterp = random_tensor([n_ex, n_feats], standardize=True)
+
+        mine = WGAN_GPLoss(lambda_=lambda_)
+        C_loss = mine(Y_fake, "C", Y_real, gradInterp)
+        G_loss = mine(Y_fake, "G")
+
+        C_dY_fake, dY_real, dGradInterp = mine.grad(Y_fake, "C", Y_real, gradInterp)
+        G_dY_fake = mine.grad(Y_fake, "G")
+
+        golds = TorchWGANGPLoss(lambda_).extract_grads(Y_real, Y_fake, gradInterp)
+        if np.isnan(golds["C_dGradInterp"]).any():
+            continue
+
+        params = [
+            (Y_real, "Y_real"),
+            (Y_fake, "Y_fake"),
+            (gradInterp, "gradInterp"),
+            (C_loss, "C_loss"),
+            (G_loss, "G_loss"),
+            (-dY_real, "C_dY_real"),
+            (-C_dY_fake, "C_dY_fake"),
+            (dGradInterp, "C_dGradInterp"),
+            (G_dY_fake, "G_dY_fake"),
+        ]
+
         print("\nTrial {}".format(i))
         for ix, (mine, label) in enumerate(params):
             np.testing.assert_allclose(
@@ -544,12 +617,11 @@ def test_FullyConnected(N=None):
         golds = gold_mod.extract_grads(X)
 
         params = [
-            (L1.X, "X"),
+            (L1.X[0], "X"),
             (y_pred, "y"),
             (L1.parameters["W"].T, "W"),
             (L1.parameters["b"], "b"),
-            (L1.gradients["Y"], "dLdy"),
-            (L1.gradients["Z"], "dLdZ"),
+            (dLdy, "dLdy"),
             (L1.gradients["W"].T, "dLdW"),
             (L1.gradients["b"], "dLdB"),
             (dLdX, "dLdX"),
@@ -594,7 +666,7 @@ def test_BatchNorm1D(N=None):
         golds = gold_mod.extract_grads(X)
 
         params = [
-            (L1.X, "X"),
+            (L1.X[0], "X"),
             (y_pred, "y"),
             (L1.parameters["scaler"].T, "scaler"),
             (L1.parameters["intercept"], "intercept"),
@@ -611,6 +683,105 @@ def test_BatchNorm1D(N=None):
                 mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=1
             )
             print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_LayerNorm1D(N=None):
+    from layers import LayerNorm1D
+
+    N = np.inf if N is None else N
+
+    np.random.seed(12345)
+
+    i = 1
+    while i < N + 1:
+        n_ex = np.random.randint(2, 1000)
+        n_in = np.random.randint(1, 1000)
+        X = random_tensor((n_ex, n_in), standardize=True)
+
+        # initialize BatchNorm1D layer
+        L1 = LayerNorm1D()
+
+        # forward prop
+        y_pred = L1.forward(X)
+
+        # backprop
+        dLdy = np.ones_like(y_pred)
+        dLdX = L1.backward(dLdy)
+
+        # get gold standard gradients
+        gold_mod = TorchLayerNormLayer(n_in, L1.parameters, "1D", epsilon=L1.epsilon)
+        golds = gold_mod.extract_grads(X)
+
+        params = [
+            (L1.X[0], "X"),
+            (y_pred, "y"),
+            (L1.parameters["scaler"].T, "scaler"),
+            (L1.parameters["intercept"], "intercept"),
+            (L1.gradients["scaler"], "dLdScaler"),
+            (L1.gradients["intercept"], "dLdIntercept"),
+            (dLdX, "dLdX"),
+        ]
+
+        print("Trial {}".format(i))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=3
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_LayerNorm2D(N=None):
+    from layers import LayerNorm2D
+
+    N = np.inf if N is None else N
+
+    np.random.seed(12345)
+
+    i = 1
+    while i < N + 1:
+        n_ex = np.random.randint(2, 10)
+        in_rows = np.random.randint(1, 10)
+        in_cols = np.random.randint(1, 10)
+        n_in = np.random.randint(1, 3)
+
+        # initialize LayerNorm2D layer
+        X = random_tensor((n_ex, in_rows, in_cols, n_in), standardize=True)
+        L1 = LayerNorm2D()
+
+        # forward prop
+        y_pred = L1.forward(X)
+
+        # standard sum loss
+        dLdy = np.ones_like(X)
+        dLdX = L1.backward(dLdy)
+
+        # get gold standard gradients
+        gold_mod = TorchLayerNormLayer(
+            [n_in, in_rows, in_cols], L1.parameters, mode="2D", epsilon=L1.epsilon
+        )
+        golds = gold_mod.extract_grads(X, Y_true=None)
+
+        params = [
+            (L1.X[0], "X"),
+            (L1.hyperparameters["epsilon"], "epsilon"),
+            (L1.parameters["scaler"], "scaler"),
+            (L1.parameters["intercept"], "intercept"),
+            (y_pred, "y"),
+            (L1.gradients["scaler"], "dLdScaler"),
+            (L1.gradients["intercept"], "dLdIntercept"),
+            (dLdX, "dLdX"),
+        ]
+
+        print("Trial {}".format(i))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=3
+            )
+
+            print("\tPASSED {}".format(label))
+
         i += 1
 
 
@@ -758,7 +929,7 @@ def test_BatchNorm2D(N=None):
         golds = gold_mod.extract_grads(X, Y_true=None)
 
         params = [
-            (L1.X, "X"),
+            (L1.X[0], "X"),
             (L1.hyperparameters["momentum"], "momentum"),
             (L1.hyperparameters["epsilon"], "epsilon"),
             (L1.parameters["scaler"].T, "scaler"),
@@ -909,7 +1080,7 @@ def test_Conv2D(N=None):
         golds = gold_mod.extract_grads(X)
 
         params = [
-            (L1.X, "X"),
+            (L1.X[0], "X"),
             (y_pred, "y"),
             (L1.parameters["W"], "W"),
             (L1.parameters["b"], "b"),
@@ -990,7 +1161,7 @@ def test_Conv1D(N=None):
         golds = gold_mod.extract_grads(X)
 
         params = [
-            (L1.X, "X"),
+            (L1.X[0], "X"),
             (y_pred, "y"),
             (L1.parameters["W"], "W"),
             (L1.parameters["b"], "b"),
@@ -1073,7 +1244,7 @@ def test_Deconv2D(N=None):
         golds = gold_mod.extract_grads(X)
 
         params = [
-            (L1.X, "X"),
+            (L1.X[0], "X"),
             (L1.parameters["W"], "W"),
             (L1.parameters["b"], "b"),
             (y_pred, "y"),
@@ -1137,7 +1308,7 @@ def test_Pool2D(N=None):
         gold_mod = TorchPool2DLayer(n_in, L1.hyperparameters)
         golds = gold_mod.extract_grads(X)
 
-        params = [(L1.X, "X"), (y_pred, "y"), (dLdX, "dLdX")]
+        params = [(L1.X[0], "X"), (y_pred, "y"), (dLdX, "dLdX")]
         for ix, (mine, label) in enumerate(params):
             assert_almost_equal(
                 mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=4
@@ -1897,3 +2068,124 @@ def test_VAE():
 
     BV = BernoulliVAE()
     BV.fit(X_train)
+
+
+def test_WGAN_GP(N=1):
+    from models.wgan_gp import WGAN_GP
+
+    ss = np.random.randint(0, 1000)
+    np.random.seed(ss)
+
+    N = np.inf if N is None else N
+
+    i = 1
+    while i < N + 1:
+        c_updates_per_epoch, n_steps = 1, 1
+        n_ex = np.random.randint(1, 500)
+        n_in = np.random.randint(1, 100)
+        lambda_ = np.random.randint(0, 20)
+        g_hidden = np.random.randint(2, 500)
+        X = random_tensor((n_ex, n_in), standardize=True)
+
+        # initialize WGAN_GP model
+        L1 = WGAN_GP(g_hidden=g_hidden, debug=True)
+
+        # forward prop
+        batchsize = n_ex
+        L1.fit(
+            X,
+            lambda_=lambda_,
+            c_updates_per_epoch=c_updates_per_epoch,
+            n_steps=n_steps,
+            batchsize=batchsize,
+        )
+
+        # backprop
+        dv = L1.derived_variables
+        params = L1.parameters["components"]
+        grads = L1.gradients["components"]
+        params["noise"] = dv["noise"]
+        params["alpha"] = dv["alpha"]
+        params["n_in"] = n_in
+        params["g_hidden"] = g_hidden
+        params["c_updates_per_epoch"] = c_updates_per_epoch
+        params["n_steps"] = n_steps
+
+        # get gold standard gradients
+        golds = WGAN_GP_tf(X, lambda_=lambda_, batch_size=batchsize, params=params)
+
+        params = [
+            (dv["X_real"], "X_real"),
+            (params["generator"]["FC1"]["W"], "G_weights_FC1"),
+            (params["generator"]["FC2"]["W"], "G_weights_FC2"),
+            (params["generator"]["FC3"]["W"], "G_weights_FC3"),
+            (params["generator"]["FC4"]["W"], "G_weights_FC4"),
+            (dv["G_fwd_X_fake"]["FC1"], "G_fwd_X_fake_FC1"),
+            (dv["G_fwd_X_fake"]["FC2"], "G_fwd_X_fake_FC2"),
+            (dv["G_fwd_X_fake"]["FC3"], "G_fwd_X_fake_FC3"),
+            (dv["G_fwd_X_fake"]["FC4"], "G_fwd_X_fake_FC4"),
+            (dv["X_fake"], "X_fake"),
+            (dv["X_interp"], "X_interp"),
+            (params["critic"]["FC1"]["W"], "C_weights_Y_real_FC1"),
+            (params["critic"]["FC2"]["W"], "C_weights_Y_real_FC2"),
+            (params["critic"]["FC3"]["W"], "C_weights_Y_real_FC3"),
+            (params["critic"]["FC4"]["W"], "C_weights_Y_real_FC4"),
+            (dv["C_fwd_Y_real"]["FC1"], "C_fwd_Y_real_FC1"),
+            (dv["C_fwd_Y_real"]["FC2"], "C_fwd_Y_real_FC2"),
+            (dv["C_fwd_Y_real"]["FC3"], "C_fwd_Y_real_FC3"),
+            (dv["C_fwd_Y_real"]["FC4"], "C_fwd_Y_real_FC4"),
+            (dv["Y_real"].flatten(), "Y_real"),
+            (params["critic"]["FC1"]["W"], "C_weights_Y_fake_FC1"),
+            (params["critic"]["FC2"]["W"], "C_weights_Y_fake_FC2"),
+            (params["critic"]["FC3"]["W"], "C_weights_Y_fake_FC3"),
+            (params["critic"]["FC4"]["W"], "C_weights_Y_fake_FC4"),
+            (dv["C_fwd_Y_fake"]["FC1"], "C_fwd_Y_fake_FC1"),
+            (dv["C_fwd_Y_fake"]["FC2"], "C_fwd_Y_fake_FC2"),
+            (dv["C_fwd_Y_fake"]["FC3"], "C_fwd_Y_fake_FC3"),
+            (dv["C_fwd_Y_fake"]["FC4"], "C_fwd_Y_fake_FC4"),
+            (dv["Y_fake"].flatten(), "Y_fake"),
+            (params["critic"]["FC1"]["W"], "C_weights_Y_interp_FC1"),
+            (params["critic"]["FC2"]["W"], "C_weights_Y_interp_FC2"),
+            (params["critic"]["FC3"]["W"], "C_weights_Y_interp_FC3"),
+            (params["critic"]["FC4"]["W"], "C_weights_Y_interp_FC4"),
+            (dv["C_fwd_Y_interp"]["FC1"], "C_fwd_Y_interp_FC1"),
+            (dv["C_fwd_Y_interp"]["FC2"], "C_fwd_Y_interp_FC2"),
+            (dv["C_fwd_Y_interp"]["FC3"], "C_fwd_Y_interp_FC3"),
+            (dv["C_fwd_Y_interp"]["FC4"], "C_fwd_Y_interp_FC4"),
+            (dv["Y_interp"].flatten(), "Y_interp"),
+            (dv["C_dY_interp_wrt"]["FC4"], "dY_interp_wrt_FC4"),
+            (dv["C_dY_interp_wrt"]["FC3"], "dY_interp_wrt_FC3"),
+            (dv["C_dY_interp_wrt"]["FC2"], "dY_interp_wrt_FC2"),
+            (dv["C_dY_interp_wrt"]["FC1"], "dY_interp_wrt_FC1"),
+            (dv["gradInterp"], "gradInterp"),
+            (dv["C_loss"], "C_loss"),
+            (dv["G_loss"], "G_loss"),
+            (grads["critic"]["FC1"]["W"], "dC_loss_dW_FC1"),
+            (grads["critic"]["FC1"]["b"].flatten(), "dC_loss_db_FC1"),
+            (grads["critic"]["FC2"]["W"], "dC_loss_dW_FC2"),
+            (grads["critic"]["FC2"]["b"].flatten(), "dC_loss_db_FC2"),
+            (grads["critic"]["FC3"]["W"], "dC_loss_dW_FC3"),
+            (grads["critic"]["FC3"]["b"].flatten(), "dC_loss_db_FC3"),
+            (grads["critic"]["FC4"]["W"], "dC_loss_dW_FC4"),
+            (grads["critic"]["FC4"]["b"].flatten(), "dC_loss_db_FC4"),
+            (dv["dG_Y_fake"].flatten(), "dG_Y_fake"),
+            (dv["dY_real"].flatten(), "dC_Y_real"),
+            (dv["dC_Y_fake"].flatten(), "dC_Y_fake"),
+            (dv["dGrad_interp"], "dC_gradInterp"),
+        ]
+
+        print("\nTrial {}".format(i))
+        print("Seed: {} g_hidden={}".format(ss, g_hidden))
+        print("lambda={} n_ex={} n_in={}".format(lambda_, n_ex, n_in))
+        print(
+            "c_updates_per_epoch={}, n_steps={} batchsize={}".format(
+                c_updates_per_epoch, n_steps, batchsize
+            )
+        )
+
+        for ix, (mine, label) in enumerate(params):
+            np.testing.assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=3
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
