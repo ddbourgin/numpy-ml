@@ -38,6 +38,7 @@ This repo includes code for the following models:
         - Dropout 
     * Normalization
         - Batch normalization (spatial and temporal)
+        - Layer normalization (spatial and temporal)
     * Optimizers
         - SGD w/ momentum 
         - AdaGrad 
@@ -65,6 +66,7 @@ This repo includes code for the following models:
         - `conv1D`
         - `conv2D`
         - `deconv2D`
+        - `minibatch`
 
 5. **Tree-based models**
     - Decision trees (CART)
@@ -82,6 +84,8 @@ This repo includes code for the following models:
     - Discrete Fourier transform (1D signals)
     - Bilinear interpolation (2D signals)
     - Nearest neighbor interpolation (1D and 2D signals)
+    - Signal windowing
+    - Autocorrelation
 
 ## Contributing
 

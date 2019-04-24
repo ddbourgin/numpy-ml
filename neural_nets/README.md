@@ -31,6 +31,7 @@ emphasize conceptual understanding over flexibility.
     - Flattening
     - Max & average pooling
     - 1D and 2D batch normalization ([Ioffe & Szegedy, 2015](http://proceedings.mlr.press/v37/ioffe15.pdf))
+    - 1D and 2D layer normalization ([Ba, Kiros, & Hinton, 2016](https://arxiv.org/pdf/1607.06450.pdf))
     - Recurrent ([Elman, 1990](https://crl.ucsd.edu/~elman/Papers/fsit.pdf))
     - Long short-term memory (LSTM) ([Hochreiter & Schmidhuber, 1997](http://www.bioinf.jku.at/publications/older/2604.pdf))
 
@@ -56,6 +57,9 @@ emphasize conceptual understanding over flexibility.
 
 8. **Models**. Well-known network architectures. Includes:
     - `vae.py`: Bernoulli variational autoencoder ([Kingma & Welling, 2014](https://arxiv.org/abs/1312.6114))
+    - `wgan_gp.py`: Wasserstein generative adversarial network with gradient
+      penalty ([Gulrajani et al., 2017](https://arxiv.org/pdf/1704.00028.pdf);
+[Goodfellow et al., 2014](https://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf))
     
 8. **Utils**. Common helper functions, primarily for dealing with CNNs.
    Includes:
