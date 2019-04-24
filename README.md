@@ -51,6 +51,7 @@ This repo includes code for the following models:
         - Cross entropy
         - Squared error
         - Bernoulli VAE loss
+        - WGAN-GP loss
     * Activations
         - ReLU
         - Tanh
@@ -60,6 +61,7 @@ This repo includes code for the following models:
         - Leaky ReLU
     * Models
         - Bernoulli variational autoencoder
+        - WGAN with gradient penalty
     * Utilities
         - `col2im` (MATLAB port)
         - `im2col` (MATLAB port)
