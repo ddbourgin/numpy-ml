@@ -1,4 +1,3 @@
-import re
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -33,6 +32,9 @@ class Sigmoid(ActivationBase):
     def grad(self, x):
         return self.fn(x) * (1 - self.fn(x))
 
+    def grad2(self, x):
+        return self.grad(x) * (1 - self.fn(x)) - self.fn(x) * self.grad(x)
+
 
 class ReLU(ActivationBase):
     """
@@ -62,8 +64,10 @@ class ReLU(ActivationBase):
         return np.clip(z, 0, np.inf)
 
     def grad(self, x):
-        with np.errstate(invalid="raise"):
-            return (x > 0).astype(int)
+        return (x > 0).astype(int)
+
+    def grad2(self, x):
+        return np.zeros_like(x)
 
 
 class LeakyReLU(ActivationBase):
@@ -84,6 +88,9 @@ class LeakyReLU(ActivationBase):
         out[x < 0] *= self.alpha
         return out
 
+    def grad2(self, x):
+        return np.zeros_like(x)
+
 
 class Tanh(ActivationBase):
     def __init__(self):
@@ -97,6 +104,9 @@ class Tanh(ActivationBase):
 
     def grad(self, x):
         return 1 - np.tanh(x) ** 2
+
+    def grad2(self, x):
+        return -2 * np.tanh(x) * self.grad(x)
 
 
 class Affine(ActivationBase):
@@ -113,6 +123,9 @@ class Affine(ActivationBase):
 
     def grad(self, x):
         return self.slope * np.ones_like(x)
+
+    def grad2(self, x):
+        return np.zeros_like(x)
 
 
 class Softmax(ActivationBase):
