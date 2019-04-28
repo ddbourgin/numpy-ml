@@ -6,6 +6,13 @@ import numpy as np
 
 from optimizers import OptimizerBase, SGD, AdaGrad, RMSProp, Adam
 from activations import ActivationBase, Affine, ReLU, Tanh, Sigmoid, Softmax, LeakyReLU
+from schedulers import (
+    SchedulerBase,
+    ConstantScheduler,
+    ExponentialScheduler,
+    NoamScheduler,
+    KingScheduler,
+)
 
 from utils import he_normal, he_uniform, glorot_normal, glorot_uniform, truncated_normal
 
@@ -56,6 +63,71 @@ class ActivationInitializer(object):
         return act_fn
 
 
+class SchedulerInitializer(object):
+    def __init__(self, param=None, lr=None):
+        """
+        A class for initializing learning rate schedulers. Valid inputs are:
+            (a) __str__ representations of `SchedulerBase` instances
+            (b) `SchedulerBase` instances
+            (c) Parameter dicts (e.g., as produced via the `summary` method in
+                `LayerBase` instances)
+
+        If `param` is `None`, return the ConstantScheduler with learning rate
+        equal to `lr`.
+        """
+        if all([lr is None, param is None]):
+            raise ValueError("lr and param cannot both be `None`")
+
+        self.lr = lr
+        self.param = param
+
+    def __call__(self):
+        param = self.param
+        if param is None:
+            scheduler = ConstantScheduler(self.lr)
+        elif isinstance(param, SchedulerBase):
+            scheduler = param
+        elif isinstance(param, str):
+            scheduler = self.init_from_str()
+        elif isinstance(param, dict):
+            scheduler = self.init_from_dict()
+        return scheduler
+
+    def init_from_str(self):
+        r = r"([a-zA-Z]*)=([^,)]*)"
+        sch_str = self.param.lower()
+        kwargs = dict([(i, eval(j)) for (i, j) in re.findall(r, sch_str)])
+
+        if "constant" in sch_str:
+            scheduler = ConstantScheduler(**kwargs)
+        elif "exponential" in sch_str:
+            scheduler = ExponentialScheduler(**kwargs)
+        elif "noam" in sch_str:
+            scheduler = NoamScheduler(**kwargs)
+        elif "king" in sch_str:
+            scheduler = KingScheduler(**kwargs)
+        else:
+            raise NotImplementedError("{}".format(sch_str))
+        return scheduler
+
+    def init_from_dict(self):
+        S = self.param
+        sc = S["hyperparameters"] if "hyperparameters" in S else None
+
+        if sc is None:
+            raise ValueError("Must have `hyperparameters` key: {}".format(S))
+
+        if sc and sc["id"] == "ConstantScheduler":
+            scheduler = ConstantScheduler().set_params(sc)
+        elif sc and sc["id"] == "ExponentialScheduler":
+            scheduler = ExponentialScheduler().set_params(sc)
+        elif sc and sc["id"] == "NoamScheduler":
+            scheduler = NoamScheduler().set_params(sc)
+        elif sc:
+            raise NotImplementedError("{}".format(sc["id"]))
+        return scheduler
+
+
 class OptimizerInitializer(object):
     def __init__(self, param=None):
         """
@@ -76,18 +148,16 @@ class OptimizerInitializer(object):
         elif isinstance(param, OptimizerBase):
             opt = param
         elif isinstance(param, str):
-            opt = self.init_from_str(param)
+            opt = self.init_from_str()
         elif isinstance(param, dict):
-            opt = self.init_from_dict(param)
+            opt = self.init_from_dict()
         return opt
 
-    def init_from_str(self, opt_str):
+    def init_from_str(self):
         r = r"([a-zA-Z]*)=([^,)]*)"
+        opt_str = self.param.lower()
         kwargs = dict([(i, eval(j)) for (i, j) in re.findall(r, opt_str)])
-        opt_str = opt_str.lower()
-        if opt_str is None:
-            optimizer = SGD()
-        elif "sgd" in opt_str:
+        if "sgd" in opt_str:
             optimizer = SGD(**kwargs)
         elif "adagrad" in opt_str:
             optimizer = AdaGrad(**kwargs)
@@ -99,13 +169,13 @@ class OptimizerInitializer(object):
             raise NotImplementedError("{}".format(opt_str))
         return optimizer
 
-    def init_from_dict(self, opt_dict):
-        O = opt_dict
+    def init_from_dict(self):
+        O = self.param
         cc = O["cache"] if "cache" in O else None
         op = O["hyperparameters"] if "hyperparameters" in O else None
 
         if op is None:
-            raise ValueError("Must have `hyperparemeters` key: {}".format(opt_dict))
+            raise ValueError("Must have `hyperparemeters` key: {}".format(O))
 
         if op and op["id"] == "SGD":
             optimizer = SGD().set_params(op, cc)
@@ -120,7 +190,7 @@ class OptimizerInitializer(object):
         return optimizer
 
 
-class WeightInitializer:
+class WeightInitializer(object):
     def __init__(self, act_fn_str, mode="glorot_uniform"):
         """
         A factory for weight initializers.
