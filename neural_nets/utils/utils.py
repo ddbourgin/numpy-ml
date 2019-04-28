@@ -407,6 +407,7 @@ def calc_conv_out_dims(X_shape, W_shape, stride=1, pad=0, dilation=0):
         _fw = fw * (d + 1) - d
         out_length = (in_length + pw1 + pw2 - _fw) // s + 1
         out_dims = (n_ex, out_length, out_ch)
+
     elif len(X_shape) == 4:
         _, p = pad2D(dummy, p)
         pr1, pr2, pc1, pc2 = p
@@ -622,11 +623,7 @@ def conv2D(X, W, stride, pad, dilation=0):
     X_col, _ = im2col(X, W.shape, p, s, d)
     W_col = W.transpose(3, 2, 0, 1).reshape(out_ch, -1)
 
-    Z = (
-        np.dot(W_col, X_col)
-        .reshape(out_ch, out_rows, out_cols, n_ex)
-        .transpose(3, 1, 2, 0)
-    )
+    Z = (W_col @ X_col).reshape(out_ch, out_rows, out_cols, n_ex).transpose(3, 1, 2, 0)
 
     return Z
 

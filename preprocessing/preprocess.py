@@ -248,11 +248,15 @@ def to_frames(x, frame_width, stride, writeable=False):
     )
 
 
-def autocorrelate(x):
+def autocorrelate1D(x):
     """
     Autocorrelate a 1D signal `x` with itself.
 
         auto[k] = sum_n x[n + k] * x[n]
+
+    NB. This is a naive O(N^2) implementation.  For a faster O(N log N)
+    approach using the FFT, see:
+    https://en.wikipedia.org/wiki/Autocorrelation#Efficient%computation
 
     Parameters
     ----------
