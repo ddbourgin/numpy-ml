@@ -23,6 +23,7 @@ This repo includes code for the following models:
         - LSTM 
         - Fully connected
         - Max + average pooling 
+        - Sparse with evolutionary connections
         - Restricted Boltzmann machine (w. CD-n training)
         - 2D deconvolution (w. padding and stride)
         - 2D convolution (w. padding, dilation, and stride)
@@ -44,13 +45,20 @@ This repo includes code for the following models:
         - AdaGrad 
         - RMSProp 
         - Adam
-    * Initializers
+    * Learning Rate Schedulers
+        - Constant
+        - Exponential
+        - Noam/Transformer 
+        - Dlib scheduler
+    * Weight Initializers
         - Glorot/Xavier uniform and normal
         - He/Kaiming uniform and normal
+        - Standard and truncated normal
     * Losses
         - Cross entropy
         - Squared error
         - Bernoulli VAE loss
+        - Wasserstein loss with gradient penalty
     * Activations
         - ReLU
         - Tanh
@@ -60,6 +68,7 @@ This repo includes code for the following models:
         - Leaky ReLU
     * Models
         - Bernoulli variational autoencoder
+        - Wasserstein GAN with gradient penalty
     * Utilities
         - `col2im` (MATLAB port)
         - `im2col` (MATLAB port)
@@ -85,7 +94,7 @@ This repo includes code for the following models:
     - Bilinear interpolation (2D signals)
     - Nearest neighbor interpolation (1D and 2D signals)
     - Signal windowing
-    - Autocorrelation
+    - Autocorrelation (1D signals)
 
 ## Contributing
 

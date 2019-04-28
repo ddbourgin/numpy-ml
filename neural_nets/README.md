@@ -23,6 +23,7 @@ emphasize conceptual understanding over flexibility.
 4. **Layers**. Common layers / layer-wise operations that can be composed to
    create larger neural networks. Includes:
     - Fully-connected 
+    - Sparse evolutionary ([Mocanu et al., 2018](https://www.nature.com/articles/s41467-018-04316-3))
     - 1D and 2D convolution (with stride, padding (`same`, `valid`, `causal`, etc), and dilation) ([van den Oord et al., 2016](https://arxiv.org/pdf/1609.03499.pdf); [Yu & Kolton, 2016](https://arxiv.org/pdf/1511.07122.pdf))
     - 2D "deconvolution" (with stride and padding) ([Zeiler et al., 2010](https://www.matthewzeiler.com/mattzeiler/deconvolutionalnetworks.pdf))
     - Restricted Boltzmann machines (with CD-_n_ training) ([Smolensky, 1996](http://stanford.edu/~jlmcc/papers/PDP/Volume%201/Chap6_PDP86.pdf); [Carreira-Perpiñán & Hinton, 2005](http://www.cs.toronto.edu/~fritz/absps/cdmiguel.pdf))
@@ -41,6 +42,12 @@ emphasize conceptual understanding over flexibility.
     - AdaGrad ([Duchi, Hazan, & Singer, 2011](http://jmlr.org/papers/volume12/duchi11a/duchi11a.pdf))
     - RMSProp ([Tieleman & Hinton, 2012](http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf))
     - Adam ([Kingma & Ba, 2015](https://arxiv.org/pdf/1412.6980v8.pdf))
+
+6. **Learning Rate Schedulers**. Common learning rate decay schedules.
+    - Constant
+    - Exponential decay
+    - Noam/Transformer scheduler ([Vaswani et al., 2017](https://arxiv.org/pdf/1706.03762.pdf))
+    - King/Dlib scheduler ([King, 2018](http://blog.dlib.net/2018/02/automatic-learning-rate-scheduling-that.html))
 
 6. **Initializers**. Common weight initialization strategies.
     - Glorot/Xavier uniform and normal ([Glorot & Bengio, 2010](http://jmlr.org/proceedings/papers/v9/glorot10a/glorot10a.pdf))
