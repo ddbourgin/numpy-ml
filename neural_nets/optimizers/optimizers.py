@@ -4,36 +4,80 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.linalg import norm
 
+"""
+For a discussion regarding the impact of different optimization strategies, see:
+
+    Wilson et al. (2017) "The marginal value of adaptive gradient methods in machine
+    learning", Proceedings of the 31st Conference on Neural Information Processing Systems
+    https://arxiv.org/pdf/1705.08292.pdf
+
+Particularly, the authors find that
+    The solutions found by adaptive methods generalize worse (often
+    significantly worse) than SGD, even when these solutions have better
+    training performance.
+
+    (i) Adaptive methods find solutions that generalize worse than those found
+        by non-adaptive methods.
+
+    (ii) Even when the adaptive methods achieve the same training loss or lower
+         than non-adaptive methods, the development or test performance is
+         worse.
+
+    (iii) Adaptive methods often display faster initial progress on the
+          training set, but their performance quickly plateaus on the
+          development set.
+
+    (iv) Though conventional wisdom suggests that Adam does not require tuning,
+         we find that tuning the initial learning rate and decay scheme for Adam
+         yields significant improvements over its default settings in all cases.
+"""
+
 
 class OptimizerBase(ABC):
-    def __init__(self):
-        self.cache = {}
-        self.hyperparameters = {}
-        pass
+    def __init__(self, lr, scheduler=None):
+        from initializers import SchedulerInitializer
 
-    def __call__(self, param, param_grad, param_name):
-        return self.update(param, param_grad, param_name)
+        self.cache = {}
+        self.cur_step = 0
+        self.hyperparameters = {}
+        self.lr_scheduler = SchedulerInitializer(scheduler, lr=lr)()
+
+    def __call__(self, param, param_grad, param_name, cur_loss=None):
+        return self.update(param, param_grad, param_name, cur_loss)
+
+    def step(self):
+        self.cur_step += 1
+
+    def reset_step(self):
+        self.cur_step = 0
 
     def copy(self):
         return deepcopy(self)
 
     def set_params(self, hparam_dict=None, cache_dict=None):
+        from initializers import SchedulerInitializer
+
         if hparam_dict is not None:
             for k, v in hparam_dict.items():
                 if k in self.hyperparameters:
                     self.hyperparameters[k] = v
+                    if k == "lr_scheduler":
+                        self.lr_scheduler = SchedulerInitializer(v, lr=None)()
+
         if cache_dict is not None:
             for k, v in cache_dict.items():
                 if k in self.cache:
                     self.cache[k] = v
 
     @abstractmethod
-    def update(self, param, param_grad, param_name):
+    def update(self, param, param_grad, param_name, cur_loss=None):
         raise NotImplementedError
 
 
 class SGD(OptimizerBase):
-    def __init__(self, lr=0.01, momentum=0.0, clip_norm=None, **kwargs):
+    def __init__(
+        self, lr=0.01, momentum=0.0, clip_norm=None, lr_scheduler=None, **kwargs
+    ):
         """
         Stochastic gradient descent optimizer.
 
@@ -44,32 +88,38 @@ class SGD(OptimizerBase):
         Parameters
         ----------
         lr : float (default: 0.01)
-            Learning rate for SGD
+            Learning rate for SGD. If scheduler is not None, this is used as
+            the starting learning rate.
         momentum : float in range [0, 1] (default: 0)
             The fraction of the previous update to add to the current update.
             If 0, no momentum is applied.
         clip_norm : float (default: None)
             If not None, all param gradients are scaled to have maximum l2 norm of
             `clip_norm` before computing update.
+        lr_scheduler : str or `SchedulerBase` instance (default: None)
+            The learning rate scheduler. If `None`, use a constant learning
+            rate equal to `lr`.
         """
-        super().__init__()
+        super().__init__(lr, lr_scheduler)
 
-        self.cache = {}
         self.hyperparameters = {
             "id": "SGD",
             "lr": lr,
             "momentum": momentum,
             "clip_norm": clip_norm,
+            "lr_scheduler": str(self.lr_scheduler),
         }
 
     def __str__(self):
         H = self.hyperparameters
-        lr, mm, cn = H["lr"], H["momentum"], H["clip_norm"]
-        return "SGD(lr={}, momentum={}, clip_norm={})".format(lr, mm, cn)
+        lr, mm, cn, sc = H["lr"], H["momentum"], H["clip_norm"], H["lr_scheduler"]
+        return "SGD(lr={}, momentum={}, clip_norm={}, lr_scheduler={})".format(
+            lr, mm, cn, sc
+        )
 
-    def update(self, param, param_grad, param_name):
+    def update(self, param, param_grad, param_name, cur_loss=None):
         """
-        Compute the momentum update for a given parameter
+        Compute the SGD update for a given parameter
 
         Parameters
         ----------
@@ -79,6 +129,9 @@ class SGD(OptimizerBase):
             The gradient of the loss function with respect to `param_name`
         param_name : str
             The name of the parameter
+        cur_loss : float (default: None)
+            The training or validation loss for the current minibatch. Used for
+            learning rate scheduling e.g., by `KingScheduler`.
 
         Returns
         -------
@@ -86,9 +139,9 @@ class SGD(OptimizerBase):
             The value of `param` after applying the momentum update
         """
         C = self.cache
-        lr = self.hyperparameters["lr"]
-        momentum = self.hyperparameters["momentum"]
-        clip_norm = self.hyperparameters["clip_norm"]
+        H = self.hyperparameters
+        momentum, clip_norm = H["momentum"], H["clip_norm"]
+        lr = self.lr_scheduler(self.cur_step, cur_loss)
 
         if param_name not in C:
             C[param_name] = np.zeros_like(param_grad)
@@ -103,6 +156,11 @@ class SGD(OptimizerBase):
         return param - update
 
 
+#######################################################################
+#                      Adaptive Gradient Methods                      #
+#######################################################################
+
+
 class AdaGrad(OptimizerBase):
     """
     A downside of Adagrad ... is that the monotonic learning rate usually
@@ -111,7 +169,7 @@ class AdaGrad(OptimizerBase):
     -- Andrej Karpathy
     """
 
-    def __init__(self, lr=0.01, eps=1e-7, clip_norm=None, **kwargs):
+    def __init__(self, lr=0.01, eps=1e-7, clip_norm=None, lr_scheduler=None, **kwargs):
         """
         AdaGrad optimizer. Weights that receive large gradients will have their
         effective learning rate reduced, while weights that receive small or
@@ -133,8 +191,11 @@ class AdaGrad(OptimizerBase):
         clip_norm : float (default: None)
             If not None, all param gradients are scaled to have maximum l2 norm of
             `clip_norm` before computing update.
+        lr_scheduler : str or `SchedulerBase` instance (default: None)
+            The learning rate scheduler. If `None`, use a constant learning
+            rate equal to `lr`.
         """
-        super().__init__()
+        super().__init__(lr, lr_scheduler)
 
         self.cache = {}
         self.hyperparameters = {
@@ -142,14 +203,17 @@ class AdaGrad(OptimizerBase):
             "lr": lr,
             "eps": eps,
             "clip_norm": clip_norm,
+            "lr_scheduler": str(self.lr_scheduler),
         }
 
     def __str__(self):
         H = self.hyperparameters
-        lr, eps, cn = H["lr"], H["eps"], H["clip_norm"]
-        return "AdaGrad(lr={}, eps={}, clip_norm={})".format(lr, eps, cn)
+        lr, eps, cn, sc = H["lr"], H["eps"], H["clip_norm"], H["lr_scheduler"]
+        return "AdaGrad(lr={}, eps={}, clip_norm={}, lr_scheduler={})".format(
+            lr, eps, cn, sc
+        )
 
-    def update(self, param, param_grad, param_name):
+    def update(self, param, param_grad, param_name, cur_loss=None):
         """
         Compute the AdaGrad update for a given parameter. Adjusts the
         learning rate of each weight based on the magnitudes of its gradients
@@ -163,6 +227,9 @@ class AdaGrad(OptimizerBase):
             The gradient of the loss function with respect to `param_name`
         param_name : str
             The name of the parameter
+        cur_loss : float (default: None)
+            The training or validation loss for the current minibatch. Used for
+            learning rate scheduling e.g., by `KingScheduler`.
 
         Returns
         -------
@@ -170,9 +237,9 @@ class AdaGrad(OptimizerBase):
             The value of `param` after applying the AdaGrad update
         """
         C = self.cache
-        lr = self.hyperparameters["lr"]
-        eps = self.hyperparameters["eps"]
-        clip_norm = self.hyperparameters["clip_norm"]
+        H = self.hyperparameters
+        eps, clip_norm = H["eps"], H["clip_norm"]
+        lr = self.lr_scheduler(self.cur_step, cur_loss)
 
         if param_name not in C:
             C[param_name] = np.zeros_like(param_grad)
@@ -189,7 +256,9 @@ class AdaGrad(OptimizerBase):
 
 
 class RMSProp(OptimizerBase):
-    def __init__(self, lr=0.001, decay=0.9, eps=1e-7, clip_norm=None, **kwargs):
+    def __init__(
+        self, lr=0.001, decay=0.9, eps=1e-7, clip_norm=None, lr_scheduler=None, **kwargs
+    ):
         """
         RMSProp optimizer. A refinement of Adagrad to reduce its aggressive,
         monotonically decreasing learning rate. RMSProp uses a *decaying
@@ -215,8 +284,11 @@ class RMSProp(OptimizerBase):
         clip_norm : float (default : None)
             If not None, all param gradients are scaled to have maximum l2 norm of
             `clip_norm` before computing update.
+        lr_scheduler : str or `SchedulerBase` instance (default: None)
+            The learning rate scheduler. If `None`, use a constant learning
+            rate equal to `lr`.
         """
-        super().__init__()
+        super().__init__(lr, lr_scheduler)
 
         self.cache = {}
         self.hyperparameters = {
@@ -225,14 +297,18 @@ class RMSProp(OptimizerBase):
             "eps": eps,
             "decay": decay,
             "clip_norm": clip_norm,
+            "lr_scheduler": str(self.lr_scheduler),
         }
 
     def __str__(self):
         H = self.hyperparameters
+        sc = H["lr_scheduler"]
         lr, eps, dc, cn = H["lr"], H["eps"], H["decay"], H["clip_norm"]
-        return "RMSProp(lr={}, eps={}, decay={}, clip_norm={})".format(lr, eps, dc, cn)
+        return "RMSProp(lr={}, eps={}, decay={}, clip_norm={}, lr_scheduler={})".format(
+            lr, eps, dc, cn, sc
+        )
 
-    def update(self, param, param_grad, param_name):
+    def update(self, param, param_grad, param_name, cur_loss=None):
         """
         Compute the RMSProp update for a given parameter.
 
@@ -244,6 +320,9 @@ class RMSProp(OptimizerBase):
             The gradient of the loss function with respect to `param_name`
         param_name : str
             The name of the parameter
+        cur_loss : float (default: None)
+            The training or validation loss for the current minibatch. Used for
+            learning rate scheduling e.g., by `KingScheduler`.
 
         Returns
         -------
@@ -251,10 +330,9 @@ class RMSProp(OptimizerBase):
             The value of `param` after applying the RMSProp update
         """
         C = self.cache
-        lr = self.hyperparameters["lr"]
-        eps = self.hyperparameters["eps"]
-        decay = self.hyperparameters["decay"]
-        clip_norm = self.hyperparameters["clip_norm"]
+        H = self.hyperparameters
+        eps, decay, clip_norm = H["eps"], H["decay"], H["clip_norm"]
+        lr = self.lr_scheduler(self.cur_step, cur_loss)
 
         if param_name not in C:
             C[param_name] = np.zeros_like(param_grad)
@@ -272,7 +350,14 @@ class RMSProp(OptimizerBase):
 
 class Adam(OptimizerBase):
     def __init__(
-        self, lr=0.001, decay1=0.9, decay2=0.999, eps=1e-7, clip_norm=None, **kwargs
+        self,
+        lr=0.001,
+        decay1=0.9,
+        decay2=0.999,
+        eps=1e-7,
+        clip_norm=None,
+        lr_scheduler=None,
+        **kwargs
     ):
         """
         Adam (adaptive moment estimation) optimization algorithm. Designed to
@@ -283,7 +368,8 @@ class Adam(OptimizerBase):
         Parameters
         ----------
         lr : float (default: 0.001)
-            pass
+            Learning rate for update. This parameter is ignored if using
+            `NoamScheduler`.
         decay1: float (default: 0.9)
             The rate of decay to use for in running estimate of the first
             moment (mean) of the gradient
@@ -295,8 +381,11 @@ class Adam(OptimizerBase):
         clip_norm : float (default : None)
             If not None, all param gradients are scaled to have maximum l2 norm of
             `clip_norm` before computing update.
+        lr_scheduler : str or `SchedulerBase` instance (default: None)
+            The learning rate scheduler. If `None`, use a constant learning
+            rate equal to `lr`.
         """
-        super().__init__()
+        super().__init__(lr, lr_scheduler)
 
         self.cache = {}
         self.hyperparameters = {
@@ -306,17 +395,18 @@ class Adam(OptimizerBase):
             "decay1": decay1,
             "decay2": decay2,
             "clip_norm": clip_norm,
+            "lr_scheduler": str(self.lr_scheduler),
         }
 
     def __str__(self):
         H = self.hyperparameters
-        eps, cn = H["eps"], H["clip_norm"]
-        lr, d1, d2, = H["lr"], H["decay1"], H["decay2"]
-        return "Adam(lr={}, decay1={}, decay2={}, eps={}, clip_norm={})".format(
-            lr, d1, d2, eps, cn
+        lr, d1, d2 = H["lr"], H["decay1"], H["decay2"]
+        eps, cn, sc = H["eps"], H["clip_norm"], H["lr_scheduler"]
+        return "Adam(lr={}, decay1={}, decay2={}, eps={}, clip_norm={}, lr_scheduler={})".format(
+            lr, d1, d2, eps, cn, sc
         )
 
-    def update(self, param, param_grad, param_name):
+    def update(self, param, param_grad, param_name, cur_loss=None):
         """
         Compute the Adam update for a given parameter.
 
@@ -328,6 +418,9 @@ class Adam(OptimizerBase):
             The gradient of the loss function with respect to `param_name`
         param_name : str
             The name of the parameter
+        cur_loss : float (default: None)
+            The training or validation loss for the current minibatch. Used for
+            learning rate scheduling e.g., by `KingScheduler`.
 
         Returns
         -------
@@ -336,8 +429,9 @@ class Adam(OptimizerBase):
         """
         C = self.cache
         H = self.hyperparameters
+        d1, d2 = H["decay1"], H["decay2"]
         eps, clip_norm = H["eps"], H["clip_norm"]
-        lr, d1, d2, = H["lr"], H["decay1"], H["decay2"]
+        lr = self.lr_scheduler(self.cur_step, cur_loss)
 
         if param_name not in C:
             C[param_name] = {

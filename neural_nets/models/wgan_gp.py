@@ -413,7 +413,7 @@ class WGAN_GP(object):
         for k, v in mod.items():
             v.flush_gradients()
 
-    def update(self, module):
+    def update(self, module, module_loss=None):
         """Perform gradient updates"""
         if module == "G":
             mod = self.generator
@@ -423,7 +423,7 @@ class WGAN_GP(object):
             raise ValueError("Unrecognized module name: {}".format(module))
 
         for k, v in reversed(list(mod.items())):
-            v.update()
+            v.update(module_loss)
         self.flush_gradients(module)
 
     def fit(
@@ -482,7 +482,7 @@ class WGAN_GP(object):
 
                 # for testing, don't perform gradient update so we can inspect each grad
                 if not self.debug:
-                    self.update("C")
+                    self.update("C", C_loss)
 
                 if self.verbose:
                     fstr = "\t[Critic batch {}] Critic loss: {:.3f} {:.3f}∆ ({:.1f}s/batch)"
@@ -494,7 +494,7 @@ class WGAN_GP(object):
 
             # for testing, don't perform gradient update so we can inspect each grad
             if not self.debug:
-                self.update("G")
+                self.update("G", G_loss)
 
             if i % 99 == 0:
                 fstr = "[Epoch {}] Gen. loss: {:.3f}  Critic loss: {:.3f}"

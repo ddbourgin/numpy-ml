@@ -57,11 +57,12 @@ class LayerBase(ABC):
         for k, v in self.gradients.items():
             self.gradients[k] = np.zeros_like(v)
 
-    def update(self):
+    def update(self, cur_loss=None):
         assert self.trainable, "Layer is frozen"
+        self.optimizer.step()
         for k, v in self.gradients.items():
-            if k in self.parameters:
-                self.parameters[k] = self.optimizer(self.parameters[k], v, k)
+            if k in self.paramters:
+                self.parameters[k] = self.optimizer(self.parameters[k], v, k, cur_loss)
         self.flush_gradients()
 
     def set_params(self, summary_dict):
@@ -230,7 +231,7 @@ class RestrictedBoltzmannMachine(LayerBase):
         b_out = self.parameters["b_out"]
 
         # compute hidden unit probabilities
-        Z_H = np.dot(V, W) + b_out
+        Z_H = V @ W + b_out
         p_H = self.act_fn_H.fn(Z_H)
 
         # sample hidden states (stochastic binary values)
@@ -238,7 +239,7 @@ class RestrictedBoltzmannMachine(LayerBase):
         H = H.astype(float)
 
         # always use probabilities when computing gradients
-        positive_grad = np.dot(V.T, p_H)
+        positive_grad = V.T @ p_H
 
         if retain_derived:
             self.derived_variables["V"] = V
@@ -251,14 +252,14 @@ class RestrictedBoltzmannMachine(LayerBase):
         H_prime = H.copy()
         for k in range(K):
             # resample v' given h (H_prime is binary for all but final step)
-            Z_V_prime = np.dot(H_prime, W.T) + b_in
+            Z_V_prime = H_prime @ W.T + b_in
             p_V_prime = self.act_fn_V.fn(Z_V_prime)
 
             # don't resample visual units - always use raw probabilities!
             V_prime = p_V_prime
 
             # compute p(h' | v')
-            Z_H_prime = np.dot(V_prime, W) + b_out
+            Z_H_prime = V_prime @ W + b_out
             p_H_prime = self.act_fn_H.fn(Z_H_prime)
 
             # if this is the final iteration of CD, keep hidden state
@@ -268,7 +269,7 @@ class RestrictedBoltzmannMachine(LayerBase):
                 H_prime = np.random.rand(*p_H_prime.shape) <= p_H_prime
                 H_prime = H_prime.astype(float)
 
-        negative_grad = np.dot(p_V_prime.T, p_H_prime)
+        negative_grad = p_V_prime.T @ p_H_prime
 
         if retain_derived:
             self.derived_variables["p_V_prime"] = p_V_prime
@@ -1568,6 +1569,231 @@ class FullyConnected(LayerBase):
         return ddX, ddW, ddB
 
 
+class SparseEvolution(LayerBase):
+    def __init__(
+        self,
+        n_out,
+        zeta=0.3,
+        epsilon=20,
+        act_fn=None,
+        init="glorot_uniform",
+        optimizer=None,
+    ):
+        """
+        A sparse Erdos-Renyi layer with evolutionary rewiring via the sparse
+        evolutionary training (SET) algorithm.
+
+        Equations:
+            Y = act_fn( (W * W_mask) @ X + b )
+
+        Parameters
+        ----------
+        n_out : int
+            The dimensionality of the layer output
+        zeta : float (default: 0.3)
+            Proportion of the positive and negative weights closest to zero to
+            drop after each training update
+        epsilon : float (default: 20)
+            Layer sparsity parameter
+        act_fn : str or `activations.ActivationBase` instance (default: None)
+            The element-wise output nonlinearity used in computing Y. If None,
+            use the identity function act_fn(X) = X
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
+        """
+        super().__init__(optimizer)
+
+        self.init = init
+        self.n_in = None
+        self.zeta = zeta
+        self.n_out = n_out
+        self.epsilon = epsilon
+        self.act_fn = ActivationInitializer(act_fn)()
+        self.parameters = {"W": None, "b": None}
+        self.is_initialized = False
+
+    def _init_params(self):
+        init_weights = WeightInitializer(str(self.act_fn), mode=self.init)
+
+        b = np.zeros((1, self.n_out))
+        W = init_weights((self.n_in, self.n_out))
+
+        # convert a fully connected base layer into a sparse layer
+        n_in, n_out = W.shape
+        p = (self.epsilon * (n_in + n_out)) / (n_in * n_out)
+        mask = np.random.binomial(1, p, shape=W.shape)
+
+        self.derived_variables = {"Z": []}
+        self.parameters = {"W": W, "b": b, "W_mask": mask}
+        self.gradients = {"W": np.zeros_like(W), "b": np.zeros_like(b)}
+        self.is_initialized = True
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "SparseEvolutionary",
+            "init": self.init,
+            "zeta": self.zeta,
+            "n_in": self.n_in,
+            "n_out": self.n_out,
+            "epsilon": self.epsilon,
+            "act_fn": str(self.act_fn),
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
+        }
+
+    def forward(self, X, retain_derived=True):
+        """
+        Compute the layer output on a single minibatch.
+
+        Equations:
+            Y = act_fn( (W * W_mask) @ X + b )
+
+        Parameters
+        ----------
+        X : numpy array of shape (n_ex, n_in)
+            Layer input, representing the `n_in`-dimensional features for a
+            minibatch of `n_ex` examples
+        retain_derived : bool (default : True)
+            Whether to retain the variables calculated during the forward pass
+            for use later during backprop. If `False`, this suggests the layer
+            will not be expected to backprop through wrt. this input.
+
+        Returns
+        -------
+        Y : numpy array of shape (n_ex, n_out)
+            Layer output for each of the `n_ex` examples
+        """
+        if not self.is_initialized:
+            self.n_in = X.shape[1]
+            self._init_params()
+
+        Y, Z = self._fwd(X)
+
+        if retain_derived:
+            self.X.append(X)
+            self.derived_variables["Z"].append(Z)
+
+        return Y
+
+    def _fwd(self, X):
+        """Actual computation of forward pass"""
+        W = self.parameters["W"]
+        b = self.parameters["b"]
+        W_mask = self.parameters["W_mask"]
+
+        Z = X @ (W * W_mask) + b
+        Y = self.act_fn(Z)
+        return Y, Z
+
+    def backward(self, dLdy, retain_grads=True):
+        """
+        Backprop from layer outputs to inputs
+
+        Parameters
+        ----------
+        dLdy : numpy array of shape (n_ex, n_out) or list of arrays
+            The gradient(s) of the loss wrt. the layer output(s)
+        retain_grads : bool (default: True)
+            Whether to include the intermediate parameter gradients computed
+            during the backward pass in the final parameter update
+
+        Returns
+        -------
+        dLdX : numpy array of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer input X
+        """
+        assert self.trainable, "Layer is frozen"
+        if not isinstance(dLdy, list):
+            dLdy = [dLdy]
+
+        dX = []
+        X = self.X
+        for dy, x in zip(dLdy, X):
+            dx, dw, db = self._bwd(dy, x)
+            dX.append(dx)
+
+            if retain_grads:
+                self.gradients["W"] += dw
+                self.gradients["b"] += db
+
+        return dX[0] if len(X) == 1 else dX
+
+    def _bwd(self, dLdy, X):
+        """Actual computation of gradient of the loss wrt. X, W, and b"""
+        W = self.parameters["W"]
+        b = self.parameters["b"]
+        W_sparse = W * self.parameters["W_mask"]
+
+        Z = X @ W_sparse + b
+        dZ = dLdy * self.act_fn.grad(Z)
+
+        dX = dZ @ W.T
+        dW = X.T @ dZ
+        dB = dZ.sum(axis=0, keepdims=True)
+        return dX, dW, dB
+
+    def _bwd2(self, dLdy, X, dLdy_bwd):
+        """Compute second derivatives / deriv. of loss wrt. dX, dW, and db"""
+        W = self.parameters["W"]
+        b = self.parameters["b"]
+        W_sparse = W * self.parameters["W_mask"]
+
+        dZ = self.act_fn.grad(X @ W_sparse + b)
+        ddZ = self.act_fn.grad2(X @ W_sparse + b)
+
+        ddX = dLdy @ W * dZ
+        ddW = dLdy.T @ (dLdy_bwd * dZ)
+        ddB = np.sum(dLdy @ W_sparse * dLdy_bwd * ddZ, axis=0, keepdims=True)
+        return ddX, ddW, ddB
+
+    def update(self):
+        """
+        Update parameters using current gradients and evolve network
+        connections via SET
+        """
+        assert self.trainable, "Layer is frozen"
+        for k, v in self.gradients.items():
+            if k in self.parameters:
+                self.parameters[k] = self.optimizer(self.parameters[k], v, k)
+        self.flush_gradients()
+        self._evolve_connections()
+
+    def _evolve_connections(self):
+        assert self.trainable, "Layer is frozen"
+        W = self.parameters["W"]
+        W_mask = self.parameters["W_mask"]
+        W_flat = (W * W_mask).reshape(-1)
+
+        k = int(np.prod(W.shape) * self.zeta)
+
+        p_ix, = np.where(W_flat > 0)
+        n_ix, = np.where(W_flat < 0)
+
+        # remove the k largest negative and k smallest positive weights
+        k_smallest_p = p_ix[np.argsort(W_flat[p_ix])][:k]
+        k_largest_n = n_ix[np.argsort(W_flat[n_ix])][-k:]
+        n_rewired = len(k_smallest_p) + len(k_largest_n)
+
+        self.mask = np.ones_like(W_flat)
+        self.mask[k_largest_n] = 0
+        self.mask[k_smallest_p] = 0
+
+        zero_ixs = np.where(self.mask == 0)
+
+        # resample new connections and update mask
+        np.shuffle(zero_ixs)
+        self.mask[zero_ixs[:n_rewired]] = 1
+        self.mask = self.mask.reshape(*W.shape)
+
+
 #######################################################################
 #                        Convolutional Layers                         #
 #######################################################################
@@ -1771,10 +1997,10 @@ class Conv1D(LayerBase):
 
         # compute gradients via matrix multiplication and reshape
         dB = dLdZ_col.sum(axis=1).reshape(1, 1, -1)
-        dW = dLdZ_col.dot(X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
+        dW = (dLdZ_col @ X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
 
         # reshape columnized dX back into the same format as the input volume
-        dX_col = np.dot(W_col, dLdZ_col)
+        dX_col = W_col @ dLdZ_col
         dX = col2im(dX_col, X2D.shape, W2D.shape, p2D, s, d).transpose(0, 2, 3, 1)
 
         return np.squeeze(dX, axis=1), np.squeeze(dW, axis=0), dB
@@ -2029,10 +2255,10 @@ class Conv2D(LayerBase):
 
         # compute gradients via matrix multiplication and reshape
         dB = dLdZ_col.sum(axis=1).reshape(1, 1, 1, -1)
-        dW = dLdZ_col.dot(X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
+        dW = (dLdZ_col @ X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
 
         # reshape columnized dX back into the same format as the input volume
-        dX_col = np.dot(W_col, dLdZ_col)
+        dX_col = W_col @ dLdZ_col
         dX = col2im(dX_col, X.shape, W.shape, p, s, d).transpose(0, 2, 3, 1)
 
         return dX, dW, dB
@@ -2460,11 +2686,11 @@ class Deconv2D(LayerBase):
 
         # compute gradients via matrix multiplication and reshape
         dB = dLdZ_col.sum(axis=1).reshape(1, 1, 1, -1)
-        dW = dLdZ_col.dot(X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
+        dW = (dLdZ_col @ X_col.T).reshape(out_ch, in_ch, fr, fc).transpose(2, 3, 1, 0)
         dW = np.rot90(dW, 2)
 
         # reshape columnized dX back into the same format as the input volume
-        dX_col = np.dot(W_col.T, dLdZ_col)
+        dX_col = W_col.T @ dLdZ_col
 
         total_pad = tuple(i + j for i, j in zip(p, _p))
         dX = col2im(dX_col, X.shape, W.shape, total_pad, s, 0).transpose(0, 2, 3, 1)
@@ -2600,7 +2826,7 @@ class RNNCell(LayerBase):
             As.append(A0)
 
         # compute next hidden state
-        Zt = np.dot(As[-1], Waa) + ba.T + np.dot(Xt, Wax) + bx.T
+        Zt = As[-1] @ Waa + ba.T + Xt @ Wax + bx.T
         At = self.act_fn(Zt)
 
         self.derived_variables["Z"].append(Zt)
@@ -2653,16 +2879,16 @@ class RNNCell(LayerBase):
         # compute gradient components at timestep t
         dA = dLdAt + dA_acc
         dZ = self.act_fn.grad(Zs[t]) * dA
-        dXt = np.dot(dZ, Wax.T)
+        dXt = dZ @ Wax.T
 
         # update parameter gradients with signal from current step
-        self.gradients["Waa"] += np.dot(As[t].T, dZ)
-        self.gradients["Wax"] += np.dot(self.X[t].T, dZ)
+        self.gradients["Waa"] += As[t].T @ dZ
+        self.gradients["Wax"] += self.X[t].T @ dZ
         self.gradients["ba"] += dZ.sum(axis=0, keepdims=True).T
         self.gradients["bx"] += dZ.sum(axis=0, keepdims=True).T
 
         # update accumulator variable for hidden state
-        self.derived_variables["dLdA_accumulator"] = np.dot(dZ, Waa.T)
+        self.derived_variables["dLdA_accumulator"] = dZ @ Waa.T
         return dXt
 
     def flush_gradients(self):
@@ -2703,14 +2929,14 @@ class LSTMCell(LayerBase):
 
         Equations:
             Z[t]  = stack([A[t-1], X[t]])
-            Gf[t] = gate_fn(Wf . Z[t] + bf)
-            Gu[t] = gate_fn(Wu . Z[t] + bu)
-            Go[t] = gate_fn(Wo . Z[t] + bo)
-            Cc[t] = act_fn(Wc . Z[t] + bc)
+            Gf[t] = gate_fn(Wf @ Z[t] + bf)
+            Gu[t] = gate_fn(Wu @ Z[t] + bu)
+            Go[t] = gate_fn(Wo @ Z[t] + bo)
+            Cc[t] = act_fn(Wc @ Z[t] + bc)
             C[t]  = Gf[t] * C[t-1] + Gu[t] * Cc[t]
             A[t]  = Go[t] * act_fn(C[t])
 
-            where '.' indicates dot/matrix product, and '*' indicates
+            where '@' indicates dot/matrix product, and '*' indicates
             elementwise multiplication
 
         We refer to A[t] as the hidden state at timestep t and C[t] as the
@@ -2847,14 +3073,14 @@ class LSTMCell(LayerBase):
 
         Equations:
             Z[t]  = stack([A[t-1], X[t]])
-            Gf[t] = gate_fn(Wf . Z[t] + bf)
-            Gu[t] = gate_fn(Wu . Z[t] + bu)
-            Go[t] = gate_fn(Wo . Z[t] + bo)
-            Cc[t] = act_fn(Wc . Z[t] + bc)
+            Gf[t] = gate_fn(Wf @ Z[t] + bf)
+            Gu[t] = gate_fn(Wu @ Z[t] + bu)
+            Go[t] = gate_fn(Wo @ Z[t] + bo)
+            Cc[t] = act_fn(Wc @ Z[t] + bc)
             C[t]  = Gf[t] * C[t-1] + Gu[t] * Cc[t]
             A[t]  = Go[t] * act_fn(C[t])
 
-            where '.' indicates dot/matrix product, and '*' indicates
+            where '@' indicates dot/matrix product, and '*' indicates
             elementwise multiplication
 
         Parameters
@@ -2893,10 +3119,10 @@ class LSTMCell(LayerBase):
         # concatenate A_prev and Xt to create Zt
         Zt = np.hstack([A_prev, Xt])
 
-        Gft = self.gate_fn.fn(np.dot(Zt, Wf) + bf)
-        Gut = self.gate_fn.fn(np.dot(Zt, Wu) + bu)
-        Got = self.gate_fn.fn(np.dot(Zt, Wo) + bo)
-        Cct = self.act_fn(np.dot(Zt, Wc) + bc)
+        Gft = self.gate_fn(Zt @ Wf + bf)
+        Gut = self.gate_fn(Zt @ Wu + bu)
+        Got = self.gate_fn(Zt @ Wo + bo)
+        Cct = self.act_fn(Zt @ Wc + bc)
         Ct = Gft * C_prev + Gut * Cct
         At = Got * self.act_fn(Ct)
 
@@ -2961,10 +3187,10 @@ class LSTMCell(LayerBase):
         dC = dC_acc + dA * Got * self.act_fn.grad(Ct)
 
         # compute the input to the gate functions at timestep t
-        _Go = np.dot(Zt, Wo) + bo
-        _Gf = np.dot(Zt, Wf) + bo
-        _Gu = np.dot(Zt, Wu) + bo
-        _Gc = np.dot(Zt, Wc) + bc
+        _Go = Zt @ Wo + bo
+        _Gf = Zt @ Wf + bo
+        _Gu = Zt @ Wu + bo
+        _Gc = Zt @ Wc + bc
 
         # compute gradients wrt the *input* to each gate
         dGot = dA * self.act_fn(Ct) * self.gate_fn.grad(_Go)
@@ -2972,19 +3198,13 @@ class LSTMCell(LayerBase):
         dGut = dC * Cct * self.gate_fn.grad(_Gu)
         dGft = dC * C_prev * self.gate_fn.grad(_Gf)
 
-        dZ = (
-            np.dot(dGft, Wf.T)
-            + np.dot(dGut, Wu.T)
-            + np.dot(dCct, Wc.T)
-            + np.dot(dGot, Wo.T)
-        )
-
+        dZ = dGft @ Wf.T + dGut @ Wu.T + dCct @ Wc.T + dGot @ Wo.T
         dXt = dZ[:, self.n_out :]
 
-        self.gradients["Wc"] += np.dot(Zt.T, dCct)
-        self.gradients["Wu"] += np.dot(Zt.T, dGut)
-        self.gradients["Wf"] += np.dot(Zt.T, dGft)
-        self.gradients["Wo"] += np.dot(Zt.T, dGot)
+        self.gradients["Wc"] += Zt.T @ dCct
+        self.gradients["Wu"] += Zt.T @ dGut
+        self.gradients["Wf"] += Zt.T @ dGft
+        self.gradients["Wo"] += Zt.T @ dGot
         self.gradients["bo"] += dGot.sum(axis=0, keepdims=True)
         self.gradients["bu"] += dGut.sum(axis=0, keepdims=True)
         self.gradients["bf"] += dGft.sum(axis=0, keepdims=True)

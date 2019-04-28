@@ -45,10 +45,10 @@ class ModuleBase(ABC):
         for c in self.components:
             c.unfreeze()
 
-    def update(self, lr):
+    def update(self, cur_loss=None):
         assert self.trainable, "Layer is frozen"
         for c in self.components:
-            c.update(lr)
+            c.update(cur_loss)
         self.flush_gradients()
 
     def flush_gradients(self):
@@ -813,7 +813,7 @@ class BidirectionalLSTM(ModuleBase):
         init="glorot_uniform",
     ):
         """
-        A single *bidirectional* long short-term memory (LSTM) layer.
+        A single bidirectional long short-term memory (LSTM) layer.
 
         Parameters
         ----------

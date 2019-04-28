@@ -364,12 +364,12 @@ class BernoulliVAE(object):
         self._dv["dEncoder_Flatten3_out"] = dEncoder_Flatten3_out
         return dX
 
-    def update(self):
+    def update(self, cur_loss=None):
         """Perform gradient updates"""
         for k, v in reversed(list(self.decoder.items())):
-            v.update()
+            v.update(cur_loss)
         for k, v in reversed(list(self.encoder.items())):
-            v.update()
+            v.update(cur_loss)
         self.flush_gradients()
 
     def flush_gradients(self):
@@ -421,7 +421,7 @@ class BernoulliVAE(object):
                 batch_loss = self.loss(X_batch_col, X_recon, t_mean, t_log_var)
                 loss += batch_loss
 
-                self.update()
+                self.update(batch_loss)
 
                 if self.verbose:
                     fstr = "\t[Batch {}/{}] Train loss: {:.3f} ({:.1f}s/batch)"
