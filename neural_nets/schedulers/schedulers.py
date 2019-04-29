@@ -11,7 +11,8 @@ def gaussian_cdf(x, mean, var):
     Compute the probability that a random draw from a 1D Gaussian with mean
     `mean` and variance `var` is less than or equal to x.
     """
-    x_scaled = (x - mean) / np.sqrt(var)
+    eps = np.finfo(float).eps
+    x_scaled = (x - mean) / np.sqrt(var + eps)
     return (1 + erf(x_scaled / np.sqrt(2))) / 2
 
 
@@ -180,7 +181,7 @@ class NoamScheduler(SchedulerBase):
 
 
 class KingScheduler(SchedulerBase):
-    def __init__(self, initial_lr=0.01, patience=1000, decay=0.1, **kwargs):
+    def __init__(self, initial_lr=0.01, patience=1000, decay=0.99, **kwargs):
         """
         The KingScheduler exponentially decreases the learning rate by decay if
         the loss has not decreased for `patience` timesteps.
@@ -195,7 +196,7 @@ class KingScheduler(SchedulerBase):
         patience : int (default: 1000)
             Amount of time to maintain the current learning rate without a
             decrease in loss before adjustment
-        decay : float (default: 0.1)
+        decay : float (default: 0.99)
             The amount to decay the learning rate at each new stage
         """
         super().__init__()
@@ -218,7 +219,7 @@ class KingScheduler(SchedulerBase):
             self.initial_lr, self.patience, self.decay
         )
 
-    def _steps_without_decrease(self, robust=False):
+    def _steps_without_decrease(self, robust=False, check_all=False):
         """
         Returns the maximum number of timesteps for which P(loss is decreasing)
         < 0.51.
@@ -229,6 +230,12 @@ class KingScheduler(SchedulerBase):
             If `robust=True`, first filter out the largest 10% of the loss
             values to remove transient spikes in the loss due to, e.g., a few
             bad minibatches.
+        check_all : bool (default: False)
+            If check_all is False, returns the maximum number of timesteps for
+            which P(loss is decreasing) < 0.51. If True, only checks whether
+            the number of timesteps for which P(loss is decreasing) < 0.51 is
+            equal to self.patience. The former provides more information but is
+            significantly more computationally expensive.
 
         Returns
         -------
@@ -245,7 +252,12 @@ class KingScheduler(SchedulerBase):
 
         N = len(lh)
         steps_without_decrease = 0
-        for i in reversed(range(N)):
+        if check_all:
+            for i in reversed(range(N - 2)):
+                if self._p_decreasing(lh, i) < 0.51:
+                    steps_without_decrease = N - i
+        else:
+            i = max(0, N - self.patience - 1)
             if self._p_decreasing(lh, i) < 0.51:
                 steps_without_decrease = N - i
         return steps_without_decrease
@@ -253,11 +265,7 @@ class KingScheduler(SchedulerBase):
     def _p_decreasing(self, loss_history, i):
         """
         Compute the probability that the slope of the OLS fit to the loss
-        history is negative. This corresponds to calculating:
-
-            P(Slope <= 0) where
-            Slope ~ N(mean(loss), (12 * L_Var) / (N ** 3 - N))
-            L_Var =  1/(N-2) * sum([loss - loss.mean()]) ^ 2)
+        history is negative.
 
         Parameters
         ----------
@@ -272,11 +280,22 @@ class KingScheduler(SchedulerBase):
             The probability that the slope of the OLS fit to loss_history is
             less than or equal to 0.
         """
-        N = len(loss_history[i:])
-        l_mean = np.mean(loss_history)
-        l_var = 1 / (N - 2) * np.sum((loss_history - l_mean) ** 2)
-        slope_var = (12 * l_var) / (N ** 3 - N)
-        p_decreasing = gaussian_cdf(0, l_mean, slope_var)
+        loss = loss_history[i:]
+        N = len(loss)
+
+        # perform OLS on the loss entries to calc the slope mean
+        X = np.c_[np.ones(N), np.arange(i, len(loss_history))]
+        intercept, s_mean = np.linalg.inv(X.T @ X) @ X.T @ loss
+        loss_pred = s_mean * X[:, 1] + intercept
+
+        # compute the variance of our loss predictions and use this to compute
+        # the (unbiased) estimate of the slope variance
+        loss_var = 1 / (N - 2) * np.sum((loss - loss_pred) ** 2)
+        s_var = (12 * loss_var) / (N ** 3 - N)
+
+        # compute the probability that a random sample from a Gaussian
+        # parameterized by s_mean and s_var is less than or equal to 0
+        p_decreasing = gaussian_cdf(0, s_mean, s_var)
         return p_decreasing
 
     def learning_rate(self, step, cur_loss):
