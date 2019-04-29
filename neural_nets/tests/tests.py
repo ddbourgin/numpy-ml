@@ -2067,7 +2067,7 @@ def test_VAE():
     X_train = X_train[: 128 * 10]
 
     BV = BernoulliVAE()
-    BV.fit(X_train)
+    BV.fit(X_train, verbose=True)
 
 
 def test_WGAN_GP(N=1):

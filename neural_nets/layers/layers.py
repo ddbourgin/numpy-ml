@@ -61,7 +61,7 @@ class LayerBase(ABC):
         assert self.trainable, "Layer is frozen"
         self.optimizer.step()
         for k, v in self.gradients.items():
-            if k in self.paramters:
+            if k in self.parameters:
                 self.parameters[k] = self.optimizer(self.parameters[k], v, k, cur_loss)
         self.flush_gradients()
 
@@ -241,11 +241,6 @@ class RestrictedBoltzmannMachine(LayerBase):
         # always use probabilities when computing gradients
         positive_grad = V.T @ p_H
 
-        if retain_derived:
-            self.derived_variables["V"] = V
-            self.derived_variables["p_H"] = p_H
-            self.derived_variables["positive_grad"] = positive_grad
-
         # perform CD-k
         # TODO: use persistent CD-k
         # https://www.cs.toronto.edu/~tijmen/pcd/pcd.pdf
@@ -272,8 +267,11 @@ class RestrictedBoltzmannMachine(LayerBase):
         negative_grad = p_V_prime.T @ p_H_prime
 
         if retain_derived:
+            self.derived_variables["V"] = V
+            self.derived_variables["p_H"] = p_H
             self.derived_variables["p_V_prime"] = p_V_prime
             self.derived_variables["p_H_prime"] = p_H_prime
+            self.derived_variables["positive_grad"] = positive_grad
             self.derived_variables["negative_grad"] = negative_grad
 
     def backward(self, retain_grads=True, *args):
@@ -397,11 +395,11 @@ class Add(LayerBase):
         Y : numpy array of shape (n_ex, *dim)
             The sum over the `n_ex` examples
         """
-        self.X.append(X)
         out = X[0].copy()
         for i in range(1, len(X)):
             out += X[i]
         if retain_derived:
+            self.X.append(X)
             self.derived_variables["sum"].append(out)
         return self.act_fn(out)
 
@@ -488,11 +486,11 @@ class Multiply(LayerBase):
         Y : numpy array of shape (n_ex, *dim)
             The product over the `n_ex` examples
         """
-        self.X.append(X)
         out = X[0].copy()
         for i in range(1, len(X)):
             out *= X[i]
         if retain_derived:
+            self.X.append(X)
             self.derived_variables["product"].append(out)
         return self.act_fn(out)
 
@@ -523,7 +521,7 @@ class Multiply(LayerBase):
 
     def _bwd(self, dLdY, X, prod):
         """Actual computation of gradient of loss wrt. each input"""
-        grads = [dLdY * self.act_fn.grad(prod)] * len(self.X)
+        grads = [dLdY * self.act_fn.grad(prod)] * len(X)
         for i, x in enumerate(X):
             grads = [g * x if j != i else g for j, g in enumerate(grads)]
         return grads
@@ -552,8 +550,6 @@ class Flatten(LayerBase):
 
     def _init_params(self):
         self.X = []
-
-        self.in_dims = []
         self.gradients = {}
         self.parameters = {}
         self.derived_variables = {"in_dims": []}
@@ -562,7 +558,6 @@ class Flatten(LayerBase):
     def hyperparameters(self):
         return {
             "layer": "Flatten",
-            "in_dims": self.in_dims,
             "keep_dim": self.keep_dim,
             "optimizer": {
                 "cache": self.optimizer.cache,
@@ -614,7 +609,7 @@ class Flatten(LayerBase):
             The gradient of the loss wrt. the layer input X
         """
         if not isinstance(dLdy, list):
-            dLdy = list(dLdy)
+            dLdy = [dLdy]
         in_dims = self.derived_variables["in_dims"]
         out = [dy.reshape(*dims) for dy, dims in zip(dLdy, in_dims)]
         return out[0] if len(dLdy) == 1 else out
@@ -754,9 +749,9 @@ class BatchNorm2D(LayerBase):
             Input volume containing the `in_rows` x `in_cols`-dimensional
             features for a minibatch of `n_ex` examples.
         retain_derived : bool (default : True)
-            Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            Whether to use the current intput to adjust the running mean and
+            running_var computations. Setting this to `True` is the same as
+            freezing the layer for the current input.
 
         Returns
         -------
@@ -767,7 +762,6 @@ class BatchNorm2D(LayerBase):
             self.in_ch = self.out_ch = X.shape[3]
             self._init_params()
 
-        self.X.append(X)
         ep = self.hyperparameters["epsilon"]
         mm = self.hyperparameters["momentum"]
         rm = self.parameters["running_mean"]
@@ -781,10 +775,13 @@ class BatchNorm2D(LayerBase):
         X_mean = self.parameters["running_mean"]
         X_var = self.parameters["running_var"]
 
-        if self.trainable:
+        if self.trainable and retain_derived:
             X_mean, X_var = X.mean(axis=(0, 1, 2)), X.var(axis=(0, 1, 2))  # , ddof=1)
             self.parameters["running_mean"] = mm * rm + (1.0 - mm) * X_mean
             self.parameters["running_var"] = mm * rv + (1.0 - mm) * X_var
+
+        if retain_derived:
+            self.X.append(X)
 
         N = (X - X_mean) / np.sqrt(X_var + ep)
         y = scaler * N + intercept
@@ -974,9 +971,9 @@ class BatchNorm1D(LayerBase):
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples
         retain_derived : bool (default : True)
-            Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            Whether to use the current intput to adjust the running mean and
+            running_var computations. Setting this to `True` is the same as
+            freezing the layer for the current input.
 
         Returns
         -------
@@ -987,7 +984,6 @@ class BatchNorm1D(LayerBase):
             self.n_in = self.n_out = X.shape[1]
             self._init_params()
 
-        self.X.append(X)
         ep = self.hyperparameters["epsilon"]
         mm = self.hyperparameters["momentum"]
         rm = self.parameters["running_mean"]
@@ -1001,10 +997,13 @@ class BatchNorm1D(LayerBase):
         X_mean = self.parameters["running_mean"]
         X_var = self.parameters["running_var"]
 
-        if self.trainable:
+        if self.trainable and retain_derived:
             X_mean, X_var = X.mean(axis=0), X.var(axis=0)  # , ddof=1)
             self.parameters["running_mean"] = mm * rm + (1.0 - mm) * X_mean
             self.parameters["running_var"] = mm * rv + (1.0 - mm) * X_var
+
+        if retain_derived:
+            self.X.append(X)
 
         N = (X - X_mean) / np.sqrt(X_var + ep)
         y = scaler * N + intercept
@@ -1164,10 +1163,12 @@ class LayerNorm2D(LayerBase):
             self.in_ch = self.out_ch = X.shape[3]
             self._init_params(X.shape)
 
-        self.X.append(X)
         scaler = self.parameters["scaler"]
         ep = self.hyperparameters["epsilon"]
         intercept = self.parameters["intercept"]
+
+        if retain_derived:
+            self.X.append(X)
 
         X_var = X.var(axis=(1, 2, 3), keepdims=True)
         X_mean = X.mean(axis=(1, 2, 3), keepdims=True)
@@ -1245,7 +1246,7 @@ class LayerNorm1D(LayerBase):
 
     Advantages of LayerNorm:
         1. Independence between inputs means that each input has a different
-        normalization operation, allowing for arbitrary mini-batch sizes.
+           normalization operation, allowing for arbitrary mini-batch sizes.
     """
 
     def __init__(self, epsilon=1e-5, optimizer=None):
@@ -1339,10 +1340,12 @@ class LayerNorm1D(LayerBase):
             self.n_in = self.n_out = X.shape[1]
             self._init_params()
 
-        self.X.append(X)
         scaler = self.parameters["scaler"]
         ep = self.hyperparameters["epsilon"]
         intercept = self.parameters["intercept"]
+
+        if retain_derived:
+            self.X.append(X)
 
         X_mean, X_var = X.mean(axis=1, keepdims=True), X.var(axis=1, keepdims=True)
         lnorm = (X - X_mean) / np.sqrt(X_var + ep)
@@ -1915,7 +1918,6 @@ class Conv1D(LayerBase):
             self.in_ch = X.shape[2]
             self._init_params()
 
-        self.X.append(X)
         W = self.parameters["W"]
         b = self.parameters["b"]
 
@@ -1927,6 +1929,7 @@ class Conv1D(LayerBase):
         Y = self.act_fn(Z)
 
         if retain_derived:
+            self.X.append(X)
             self.derived_variables["Z"].append(Z)
             self.derived_variables["out_rows"].append(Z.shape[1])
             self.derived_variables["out_cols"].append(Z.shape[2])
@@ -2180,8 +2183,6 @@ class Conv2D(LayerBase):
             self.in_ch = X.shape[3]
             self._init_params()
 
-        self.X.append(X)
-
         W = self.parameters["W"]
         b = self.parameters["b"]
 
@@ -2193,6 +2194,7 @@ class Conv2D(LayerBase):
         Y = self.act_fn(Z)
 
         if retain_derived:
+            self.X.append(X)
             self.derived_variables["Z"].append(Z)
             self.derived_variables["out_rows"].append(Z.shape[1])
             self.derived_variables["out_cols"].append(Z.shape[2])
@@ -2402,7 +2404,6 @@ class Pool2D(LayerBase):
             self.in_ch = self.out_ch = X.shape[3]
             self._init_params()
 
-        self.X.append(X)
         n_ex, in_rows, in_cols, nc_in = X.shape
         (fr, fc), s, p = self.kernel_shape, self.stride, self.pad
         X_pad, (pr1, pr2, pc1, pc2) = pad2D(X, p, self.kernel_shape, s)
@@ -2428,6 +2429,7 @@ class Pool2D(LayerBase):
                         Y[m, i, j, c] = pool_fn(xi)
 
         if retain_derived:
+            self.X.append(X)
             self.derived_variables["out_rows"].append(out_rows)
             self.derived_variables["out_cols"].append(out_cols)
 
@@ -2475,7 +2477,7 @@ class Pool2D(LayerBase):
                             j0, j1 = j * s, (j * s) + fc
 
                             if self.mode == "max":
-                                xi = self.X[m, i0:i1, j0:j1, c]
+                                xi = X[m, i0:i1, j0:j1, c]
 
                                 # enforce that the mask can only consist of a
                                 # single `True` entry, even if multiple entries in
@@ -2596,7 +2598,6 @@ class Deconv2D(LayerBase):
             self.in_ch = X.shape[3]
             self._init_params()
 
-        self.X.append(X)
         W = self.parameters["W"]
         b = self.parameters["b"]
 
@@ -2608,6 +2609,7 @@ class Deconv2D(LayerBase):
         Y = self.act_fn(Z)
 
         if retain_derived:
+            self.X.append(X)
             self.derived_variables["Z"].append(Z)
             self.derived_variables["out_rows"].append(Z.shape[1])
             self.derived_variables["out_cols"].append(Z.shape[2])
