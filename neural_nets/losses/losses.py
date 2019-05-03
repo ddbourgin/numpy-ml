@@ -186,9 +186,9 @@ class VAELoss(ObjectiveBase):
         y_pred : numpy array of shape (n_ex, N)
             The VAE reconstruction of the images
         t_mean: numpy array of shape (n_ex, T)
-            Mean vector of the distribution q(t | x)
+            Mean of the variational distribution q(t | x)
         t_log_var: numpy array of shape (n_ex, T)
-            Log of the variance vector of the distribution q(t | x)
+            Log of the variance vector of the variational distribution q(t | x)
 
         Returns
         -------
