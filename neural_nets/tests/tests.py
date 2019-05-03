@@ -33,6 +33,7 @@ from .torch_models import (
     TorchLayerNormLayer,
     TorchBatchNormLayer,
     TorchLinearActivation,
+    TorchSDPAttentionLayer,
     TorchBidirectionalLSTM,
     torch_gradient_generator,
     TorchSkipConnectionConv,
@@ -155,6 +156,7 @@ def test_activations(N=50):
     print("Testing Softmax activation")
     time.sleep(1)
     test_softmax_activation(N)
+    test_softmax_grad(N)
 
     print("Testing Tanh activation")
     time.sleep(1)
@@ -218,6 +220,10 @@ def test_layers(N=50):
     print("Testing RNNCell layer")
     time.sleep(1)
     test_RNNCell(N)
+
+    print("Testing DotProductAttention layer")
+    time.sleep(1)
+    test_DPAttention(N)
 
 
 def test_utils(N=50):
@@ -482,7 +488,7 @@ def test_sigmoid_activation(N=None):
 
 
 def test_softmax_activation(N=None):
-    from activations import Softmax
+    from layers import Softmax
 
     N = np.inf if N is None else N
 
@@ -493,7 +499,7 @@ def test_softmax_activation(N=None):
     while i < N:
         n_dims = np.random.randint(1, 100)
         z = random_stochastic_matrix(1, n_dims)
-        assert_almost_equal(mine.fn(z), gold(z))
+        assert_almost_equal(mine.forward(z), gold(z))
         print("PASSED")
         i += 1
 
@@ -570,6 +576,34 @@ def test_relu_grad(N=None):
         n_dims = np.random.randint(1, 100)
         z = random_tensor((n_ex, n_dims))
         assert_almost_equal(mine.grad(z), gold(z))
+        print("PASSED")
+        i += 1
+
+
+def test_softmax_grad(N=None):
+    from layers import Softmax
+    from functools import partial
+
+    N = np.inf if N is None else N
+    p_soft = partial(F.softmax, dim=1)
+    gold = torch_gradient_generator(p_soft)
+
+    i = 0
+    while i < N:
+        mine = Softmax()
+        n_ex = np.random.randint(1, 3)
+        n_dims = np.random.randint(1, 50)
+        z = random_tensor((n_ex, n_dims), standardize=True)
+        out = mine.forward(z)
+
+        assert_almost_equal(
+            gold(z),
+            mine.backward(np.ones_like(out)),
+            err_msg="Theirs:\n{}\n\nMine:\n{}\n".format(
+                gold(z), mine.backward(np.ones_like(out))
+            ),
+            decimal=3,
+        )
         print("PASSED")
         i += 1
 
@@ -1094,6 +1128,61 @@ def test_Conv2D(N=None):
         print("in_rows={}, in_cols={}, n_in={}".format(in_rows, in_cols, n_in))
         print("out_rows={}, out_cols={}, n_out={}".format(out_rows, out_cols, n_out))
         print("dilation={}".format(d))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=4
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_DPAttention(N=None):
+    from layers import DotProductAttention
+
+    N = np.inf if N is None else N
+
+    np.random.seed(12345)
+
+    i = 1
+    while i < N + 1:
+        n_ex = np.random.randint(1, 10)
+        d_k = np.random.randint(1, 100)
+        d_v = np.random.randint(1, 100)
+
+        Q = random_tensor((n_ex, d_k), standardize=True)
+        K = random_tensor((n_ex, d_k), standardize=True)
+        V = random_tensor((n_ex, d_v), standardize=True)
+
+        # initialize Conv2D layer
+        mine = DotProductAttention(scale=True)
+
+        # forward prop
+        y_pred = mine.forward(Q, K, V)
+
+        # backprop
+        dLdy = np.ones_like(y_pred)
+        dLdQ, dLdK, dLdV = mine.backward(dLdy)
+
+        # get gold standard gradients
+        gold_mod = TorchSDPAttentionLayer()
+        golds = gold_mod.extract_grads(Q, K, V)
+
+        params = [
+            (mine.X[0][0], "Q"),
+            (mine.X[0][1], "K"),
+            (mine.X[0][2], "V"),
+            (mine.derived_variables["scores"], "scores"),
+            (mine.derived_variables["attention_weights"][0], "weights"),
+            (y_pred, "Y"),
+            (dLdV, "dLdV"),
+            (mine.derived_variables["dWeights"], "dWeights"),
+            (mine.derived_variables["dScores"], "dScores"),
+            (dLdK, "dLdK"),
+            (dLdQ, "dLdQ"),
+        ]
+
+        print("\nTrial {}".format(i))
+        print("n_ex={} d_k={} d_v={}".format(n_ex, d_k, d_v))
         for ix, (mine, label) in enumerate(params):
             assert_almost_equal(
                 mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=4

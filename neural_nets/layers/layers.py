@@ -99,6 +99,158 @@ class LayerBase(ABC):
         }
 
 
+class DotProductAttention(LayerBase):
+    def __init__(self, scale=True, init="glorot_uniform", optimizer=None):
+        """
+        An attention layer using a dot-product for the scoring function.
+
+        Equations:
+            Z = K @ Q.T                 if scale = False
+                K @ Q.T / sqrt(d_k)     if scale = True
+            Y = softmax(Z) @ V
+
+        Parameters
+        ----------
+        scale : bool (default: True)
+            Whether to scale the the key-query dot product by the square root
+            of the key/query vector dimensionality before applying the Softmax.
+            This is useful, since the scale of dot product will otherwise
+            increase as query / key dimensions grow.
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}.
+            Unused.
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters. Unused.
+        """
+        super().__init__(optimizer)
+
+        self.init = init
+        self.scale = scale
+        self.optimizer = self.optimizer
+        self._init_params()
+
+    def _init_params(self):
+        self.derived_variables = {"attention_weights": []}
+        self.softmax = Softmax()
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "DotProductAttention",
+            "init": self.init,
+            "scale": self.scale,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
+        }
+
+    def forward(self, Q, K, V, retain_derived=True):
+        """
+        Compute the attention-weighted output of a collection of keys, values,
+        and queries.
+
+        For a single query and n key-value pairs, this is:
+
+            w0 = softmax( (query @ key[0]) / sqrt(d_k) )
+            w1 = softmax( (query @ key[1]) / sqrt(d_k) )
+            ...
+            wn = softmax( (query @ key[n]) / sqrt(d_k) )
+
+            y = values @ np.array([w0, ..., wn])
+
+        In vectorized form,
+
+            Y = softmax( (K @ Q.T) / sqrt(d_k)) @ V
+
+        Parameters
+        ----------
+        Q : numpy array of shape (n_ex, d_k)
+            A set of `n_ex` query vectors packed into a single matrix
+        K : numpy array of shape (n_ex, d_k)
+            A set of `n_ex` key vectors packed into a single matrix
+        V : numpy array of shape (n_ex, d_v)
+            A set of `n_ex` value vectors packed into a single matrix
+        retain_derived : bool (default : True)
+            Whether to retain the variables calculated during the forward pass
+            for use later during backprop. If `False`, this suggests the layer
+            will not be expected to backprop through wrt. this input.
+
+        Returns
+        -------
+        Y : numpy array of shape (n_ex, d_v)
+            The attention-weighted output values
+        """
+        Y, weights = self._fwd(Q, K, V)
+
+        if retain_derived:
+            self.X.append((Q, K, V))
+            self.derived_variables["attention_weights"].append(weights)
+
+        return Y
+
+    def _fwd(self, Q, K, V):
+        """Actual computation of forward pass"""
+        scale = 1 / np.sqrt(Q.shape[1]) if self.scale else 1
+        scores = Q @ K.T * scale  # attention scores
+        weights = self.softmax.forward(scores)  # attention weights
+        Y = weights @ V
+        return Y, weights
+
+    def backward(self, dLdy, retain_grads=True):
+        """
+        Backprop from layer outputs to inputs
+
+        Parameters
+        ----------
+        dLdY : numpy array of shape (n_ex, *dim)
+            The gradient of the loss wrt. the layer output Y
+        retain_grads : bool (default: True)
+            Whether to include the intermediate parameter gradients computed
+            during the backward pass in the final parameter update
+
+        Returns
+        -------
+        dQ : numpy array of shape (n_ex, d_k) or list of arrays
+            The gradient of the loss wrt. the layer query matrix/matrices Q
+        dK : numpy array of shape (n_ex, d_k) or list of arrays
+            The gradient of the loss wrt. the layer key matrix/matrices K
+        dV : numpy array of shape (n_ex, d_v) or list of arrays
+            The gradient of the loss wrt. the layer value matrix/matrices V
+        """
+        assert self.trainable, "Layer is frozen"
+        if not isinstance(dLdy, list):
+            dLdy = [dLdy]
+
+        dQ, dK, dV = [], [], []
+        weights = self.derived_variables["attention_weights"]
+        for dy, (q, k, v), w in zip(dLdy, self.X, weights):
+            dq, dk, dv = self._bwd(dy, q, k, v, w)
+            dQ.append(dq)
+            dK.append(dk)
+            dV.append(dv)
+
+        if len(self.X) == 1:
+            dQ, dK, dV = dQ[0], dK[0], dV[0]
+
+        return dQ, dK, dV
+
+    def _bwd(self, dy, q, k, v, weights):
+        """Actual computation of the gradient of the loss wrt. q, k, and v"""
+        d_k = k.shape[1]
+        scale = 1 / np.sqrt(d_k) if self.scale else 1
+
+        dV = weights.T @ dy
+        dWeights = dy @ v.T
+        dScores = self.softmax.backward(dWeights)
+        dQ = dScores @ k * scale
+        dK = dScores.T @ q * scale
+        return dQ, dK, dV
+
+
 class RestrictedBoltzmannMachine(LayerBase):
     def __init__(self, n_out, K=1, init="glorot_uniform", optimizer=None):
         """
@@ -605,8 +757,8 @@ class Flatten(LayerBase):
 
         Returns
         -------
-        dX : numpy array of shape (*in_dims)
-            The gradient of the loss wrt. the layer input X
+        dX : numpy array of shape (*in_dims) or list of arrays
+            The gradient of the loss wrt. the layer input(s) X
         """
         if not isinstance(dLdy, list):
             dLdy = [dLdy]
@@ -1570,6 +1722,132 @@ class FullyConnected(LayerBase):
         ddW = dLdy.T @ (dLdy_bwd * dZ)
         ddB = np.sum(dLdy @ W * dLdy_bwd * ddZ, axis=0, keepdims=True)
         return ddX, ddW, ddB
+
+
+class Softmax(LayerBase):
+    def __init__(self, optimizer=None):
+        """
+        A softmax layer.
+
+        Equations:
+            Y = e^X / sum(e^X)
+
+        Parameters
+        ----------
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters. Unused for this layer.
+        """
+        super().__init__(optimizer)
+
+        self.n_in = None
+        self.is_initialized = False
+
+    def _init_params(self):
+        self.gradients = {}
+        self.parameters = {}
+        self.derived_variables = {}
+        self.is_initialized = True
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "SoftmaxLayer",
+            "n_in": self.n_in,
+            "n_out": self.n_in,
+            "optimizer": {
+                "cache": self.optimizer.cache,
+                "hyperparameters": self.optimizer.hyperparameters,
+            },
+        }
+
+    def forward(self, X, retain_derived=True):
+        """
+        Compute the layer output on a single minibatch.
+
+        Equations:
+            Y = e^X / sum(e^X)
+
+        Parameters
+        ----------
+        X : numpy array of shape (n_ex, n_in)
+            Layer input, representing the `n_in`-dimensional features for a
+            minibatch of `n_ex` examples
+        retain_derived : bool (default : True)
+            Whether to retain the variables calculated during the forward pass
+            for use later during backprop. If `False`, this suggests the layer
+            will not be expected to backprop through wrt. this input.
+
+        Returns
+        -------
+        Y : numpy array of shape (n_ex, n_out)
+            Layer output for each of the `n_ex` examples
+        """
+        if not self.is_initialized:
+            self.n_in = X.shape[1]
+            self._init_params()
+
+        Y = self._fwd(X)
+
+        if retain_derived:
+            self.X.append(X)
+
+        return Y
+
+    def _fwd(self, X):
+        """Actual computation of softmax forward pass"""
+        # center data to avoid overflow
+        e_X = np.exp(X - np.max(X, axis=1, keepdims=True))
+        return e_X / e_X.sum(axis=1, keepdims=True)
+
+    def backward(self, dLdy):
+        """
+        Backprop from layer outputs to inputs
+
+        Parameters
+        ----------
+        dLdy : numpy array of shape (n_ex, n_out) or list of arrays
+            The gradient(s) of the loss wrt. the layer output(s)
+        retain_grads : bool (default: True)
+            Whether to include the intermediate parameter gradients computed
+            during the backward pass in the final parameter update
+
+        Returns
+        -------
+        dLdX : numpy array of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer input X
+        """
+        assert self.trainable, "Layer is frozen"
+        if not isinstance(dLdy, list):
+            dLdy = [dLdy]
+
+        dX = []
+        X = self.X
+        for dy, x in zip(dLdy, X):
+            dx = self._bwd(dy, x)
+            dX.append(dx)
+
+        return dX[0] if len(X) == 1 else dX
+
+    def _bwd(self, dLdy, X):
+        """
+        Actual computation of the gradient of the loss wrt. the input X.
+
+        The Jacobian, J, of the softmax for input x = [x1, ..., xn] is:
+            J[i, j] =
+                softmax(x_i)  * (1 - softmax(x_j))  if i = j
+                -softmax(x_i) * softmax(x_j)        if i != j
+            where
+                x_n is input example n (ie., the n'th row in X)
+        """
+        out = []
+        # iterate over rows (examples) in X
+        for dy, x in zip(dLdy, X):
+            y = self._fwd(x.reshape(1, -1)).reshape(-1, 1)
+            dydx = np.diagflat(y) - y @ y.T  # jacobian wrt. the input X
+            out.append(dy @ dydx)
+        return np.array(out)
 
 
 class SparseEvolution(LayerBase):

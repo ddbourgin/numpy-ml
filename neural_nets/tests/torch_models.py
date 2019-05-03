@@ -1568,6 +1568,59 @@ class TorchFCLayer(nn.Module):
         return grads
 
 
+class TorchSDPAttentionLayer(nn.Module):
+    def __init__(self):
+        super(TorchSDPAttentionLayer, self).__init__()
+
+    def forward(self, Q, K, V, mask=None):
+        self.Q = Q
+        self.K = K
+        self.V = V
+
+        if not isinstance(self.Q, torch.Tensor):
+            self.Q = torchify(self.Q)
+        if not isinstance(self.K, torch.Tensor):
+            self.K = torchify(self.K)
+        if not isinstance(self.V, torch.Tensor):
+            self.V = torchify(self.V)
+
+        self.Q.retain_grad()
+        self.K.retain_grad()
+        self.V.retain_grad()
+
+        self.d_k = self.Q.size(-1)
+
+        self.scores = torch.matmul(self.Q, self.K.transpose(-2, -1)) / np.sqrt(self.d_k)
+        if mask is not None:
+            self.scores = self.scores.masked_fill(mask == 0, -1e9)
+        self.scores.retain_grad()
+
+        self.weights = F.softmax(self.scores, dim=-1)
+        self.weights.retain_grad()
+        self.Y = torch.matmul(self.weights, self.V)
+        self.Y.retain_grad()
+
+    def extract_grads(self, Q, K, V, mask=None):
+        self.forward(Q, K, V, mask=mask)
+        self.loss1 = self.Y.sum()
+        self.loss1.backward()
+        grads = {
+            "Q": self.Q.detach().numpy(),
+            "K": self.K.detach().numpy(),
+            "V": self.V.detach().numpy(),
+            "d_k": self.d_k,
+            "scores": self.scores.detach().numpy(),
+            "weights": self.weights.detach().numpy(),
+            "Y": self.Y.detach().numpy(),
+            "dLdV": self.V.grad.numpy(),
+            "dWeights": self.weights.grad.numpy(),
+            "dScores": self.scores.grad.numpy(),
+            "dLdQ": self.Q.grad.numpy(),
+            "dLdK": self.K.grad.numpy(),
+        }
+        return grads
+
+
 #######################################################################
 #              TF WGAN GP Gold Standard Implementation                #
 #  adapted from: https://github.com/igul222/improved_wgan_training/   #
