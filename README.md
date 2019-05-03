@@ -20,9 +20,9 @@ This repo includes code for the following models:
 4. **Neural networks** 
     * Layers / Layer-wise ops
         - Add
-        - Softmax
         - Flatten
         - Multiply
+        - Softmax
         - Fully-connected/Dense
         - Sparse evolutionary connections
         - LSTM 
