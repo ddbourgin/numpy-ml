@@ -5,7 +5,7 @@ from ast import literal_eval as eval
 import numpy as np
 
 from optimizers import OptimizerBase, SGD, AdaGrad, RMSProp, Adam
-from activations import ActivationBase, Affine, ReLU, Tanh, Sigmoid, Softmax, LeakyReLU
+from activations import ActivationBase, Affine, ReLU, Tanh, Sigmoid, LeakyReLU
 from schedulers import (
     SchedulerBase,
     ConstantScheduler,
@@ -48,8 +48,6 @@ class ActivationInitializer(object):
             act_fn = Tanh()
         elif act_str == "sigmoid":
             act_fn = Sigmoid()
-        elif act_str == "softmax":
-            act_fn = Softmax()
         elif "affine" in act_str:
             r = r"affine\(slope=(.*), intercept=(.*)\)"
             slope, intercept = re.match(r, act_str).groups()

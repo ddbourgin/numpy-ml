@@ -8,6 +8,8 @@ class ActivationBase(ABC):
         super().__init__()
 
     def __call__(self, z):
+        if z.ndim == 1:
+            z = z.reshape(1, -1)
         return self.fn(z)
 
     @abstractmethod
@@ -126,24 +128,3 @@ class Affine(ActivationBase):
 
     def grad2(self, x):
         return np.zeros_like(x)
-
-
-class Softmax(ActivationBase):
-    def __init__(self):
-        super().__init__()
-
-    def __str__(self):
-        return "Softmax"
-
-    def fn(self, z):
-        # center data to avoid overflow
-        e_z = np.exp(z - np.max(z, axis=1, keepdims=True))
-        return e_z / e_z.sum(axis=1, keepdims=True)
-
-    def grad(self, z):
-        pass
-
-    #      p = self.fn(z)
-    #      gr = np.outer(p, 1 - p)
-    #      np.fill_diagonal(gr, [pi * (1 - pi) for pi in p])
-    #      return gr
