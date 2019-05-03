@@ -10,12 +10,12 @@ emphasize conceptual understanding over flexibility.
     - Hyperbolic tangent (tanh)
     - Logistic sigmoid
     - Affine
-    - Softmax
 
 2. **Losses**. Common loss functions. Includes:
     - Squared error
     - Categorical cross entropy 
     - VAE Bernoulli loss ([Kingma & Welling, 2014](https://arxiv.org/abs/1312.6114))
+    - Wasserstein loss with gradient penalty ([Gulrajani et al., 2017](https://arxiv.org/pdf/1704.00028.pdf))
 
 3. **Wrappers**. Layer wrappers. Includes:
     - Dropout ([Srivastava, et al., 2014](http://www.jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf))
@@ -24,12 +24,14 @@ emphasize conceptual understanding over flexibility.
    create larger neural networks. Includes:
     - Fully-connected 
     - Sparse evolutionary ([Mocanu et al., 2018](https://www.nature.com/articles/s41467-018-04316-3))
+    - Dot-product attention ([Luong, Pho, & Manning, 2015](https://arxiv.org/pdf/1508.04025.pdf); [Vaswani et al., 2017](https://arxiv.org/pdf/1706.03762.pdf))
     - 1D and 2D convolution (with stride, padding (`same`, `valid`, `causal`, etc), and dilation) ([van den Oord et al., 2016](https://arxiv.org/pdf/1609.03499.pdf); [Yu & Kolton, 2016](https://arxiv.org/pdf/1511.07122.pdf))
     - 2D "deconvolution" (with stride and padding) ([Zeiler et al., 2010](https://www.matthewzeiler.com/mattzeiler/deconvolutionalnetworks.pdf))
     - Restricted Boltzmann machines (with CD-_n_ training) ([Smolensky, 1996](http://stanford.edu/~jlmcc/papers/PDP/Volume%201/Chap6_PDP86.pdf); [Carreira-Perpiñán & Hinton, 2005](http://www.cs.toronto.edu/~fritz/absps/cdmiguel.pdf))
     - Elementwise multiplication
     - Summation
     - Flattening
+    - Softmax
     - Max & average pooling
     - 1D and 2D batch normalization ([Ioffe & Szegedy, 2015](http://proceedings.mlr.press/v37/ioffe15.pdf))
     - 1D and 2D layer normalization ([Ba, Kiros, & Hinton, 2016](https://arxiv.org/pdf/1607.06450.pdf))

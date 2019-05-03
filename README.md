@@ -19,18 +19,20 @@ This repo includes code for the following models:
 
 4. **Neural networks** 
     * Layers / Layer-wise ops
-        - Elman-style RNN 
+        - Add
+        - Softmax
+        - Flatten
+        - Multiply
+        - Fully-connected/Dense
+        - Sparse evolutionary connections
         - LSTM 
-        - Fully connected
+        - Elman-style RNN 
         - Max + average pooling 
-        - Sparse with evolutionary connections
+        - Dot-product attention
         - Restricted Boltzmann machine (w. CD-n training)
         - 2D deconvolution (w. padding and stride)
         - 2D convolution (w. padding, dilation, and stride)
         - 1D convolution (w. padding, dilation, stride, and causality)
-        - Add
-        - Multiply
-        - Flatten
     * Modules
         - Bidirectional LSTM 
         - ResNet-style residual blocks (identity and convolution)
@@ -64,7 +66,6 @@ This repo includes code for the following models:
         - Tanh
         - Affine
         - Sigmoid
-        - Softmax
         - Leaky ReLU
     * Models
         - Bernoulli variational autoencoder
