@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from initializers import WeightInitializer, OptimizerInitializer, ActivationInitializer
-from wrappers import init_wrappers
+from wrappers import init_wrappers, Dropout
 
 from utils import (
     pad1D,
@@ -21,6 +21,7 @@ from utils import (
 class LayerBase(ABC):
     def __init__(self, optimizer=None):
         self.X = []
+        self.act_fn = None
         self.trainable = True
         self.optimizer = OptimizerInitializer(optimizer)()
 
@@ -100,14 +101,14 @@ class LayerBase(ABC):
 
 
 class DotProductAttention(LayerBase):
-    def __init__(self, scale=True, init="glorot_uniform", optimizer=None):
+    def __init__(self, scale=True, dropout_p=0, init="glorot_uniform", optimizer=None):
         """
-        An attention layer using a dot-product for the scoring function.
+        A single "attention head" layer using a dot-product for the scoring function.
 
         Equations:
             Z = K @ Q.T                 if scale = False
                 K @ Q.T / sqrt(d_k)     if scale = True
-            Y = softmax(Z) @ V
+            Y = dropout(softmax(Z)) @ V
 
         Parameters
         ----------
@@ -116,6 +117,9 @@ class DotProductAttention(LayerBase):
             of the key/query vector dimensionality before applying the Softmax.
             This is useful, since the scale of dot product will otherwise
             increase as query / key dimensions grow.
+        dropout_p : float in [0, 1)
+            The dropout propbability during training, applied to the output of
+            the softmax. If 0, no dropout is applied.
         init : str (default: 'glorot_uniform')
             The weight initialization strategy. Valid entries are
             {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}.
@@ -129,12 +133,17 @@ class DotProductAttention(LayerBase):
 
         self.init = init
         self.scale = scale
+        self.dropout_p = dropout_p
         self.optimizer = self.optimizer
         self._init_params()
 
     def _init_params(self):
-        self.derived_variables = {"attention_weights": []}
-        self.softmax = Softmax()
+        self.softmax = Dropout(Softmax(), self.dropout_p)
+        smdv = self.softmax.derived_variables
+        self.derived_variables = {
+            "attention_weights": [],
+            "dropout_mask": smdv["wrappers"][0]["dropout_mask"],
+        }
 
     @property
     def hyperparameters(self):
@@ -142,38 +151,66 @@ class DotProductAttention(LayerBase):
             "layer": "DotProductAttention",
             "init": self.init,
             "scale": self.scale,
+            "dropout_p": self.dropout_p,
             "optimizer": {
                 "cache": self.optimizer.cache,
                 "hyperparameters": self.optimizer.hyperparameters,
             },
         }
 
+    def freeze(self):
+        self.trainable = False
+        self.softmax.freeze()
+
+    def unfreeze(self):
+        self.trainable = True
+        self.softmax.unfreeze()
+
     def forward(self, Q, K, V, retain_derived=True):
         """
         Compute the attention-weighted output of a collection of keys, values,
-        and queries.
+        and queries. In the most abstract (ie., hand-wave-y) sense:
+            - Query vectors ask questions
+            - Key vectors advertise their relevancy to questions
+            - Value vectors give possible answers to questions
+            - The dot product between Key and Query vectors provides scores for
+              each of the the `n_ex` different Value vectors
 
-        For a single query and n key-value pairs, this is:
+        For a single query and n key-value pairs, dot-product attention (with
+        scaling) is:
 
-            w0 = softmax( (query @ key[0]) / sqrt(d_k) )
-            w1 = softmax( (query @ key[1]) / sqrt(d_k) )
-            ...
-            wn = softmax( (query @ key[n]) / sqrt(d_k) )
+            w0 = dropout(softmax( (query @ key[0]) / sqrt(d_k) ))
+            w1 = dropout(softmax( (query @ key[1]) / sqrt(d_k) ))
+                                    ...
+            wn = dropout(softmax( (query @ key[n]) / sqrt(d_k) ))
 
-            y = values @ np.array([w0, ..., wn])
+            y = np.array([w0, ..., wn]) @ values
+                      (1 × n_ex)      (n_ex × d_v)
+
+        In words, keys and queries are combined via dot-product to produce a
+        score, which is then passed through a softmax to produce a weight on
+        each value vector in Values. We elementwise multiply each value vector
+        by its weight, and then take the elementwise sum of each weighted value
+        vector to get the 1 x d_v output for the current example.
 
         In vectorized form,
 
-            Y = softmax( (K @ Q.T) / sqrt(d_k)) @ V
+            Y = dropout(softmax( (K @ Q.T) / sqrt(d_k))) @ V
 
         Parameters
         ----------
-        Q : numpy array of shape (n_ex, d_k)
-            A set of `n_ex` query vectors packed into a single matrix
-        K : numpy array of shape (n_ex, d_k)
-            A set of `n_ex` key vectors packed into a single matrix
-        V : numpy array of shape (n_ex, d_v)
-            A set of `n_ex` value vectors packed into a single matrix
+        Q : numpy array of shape (n_ex, *, d_k)
+            A set of `n_ex` query vectors packed into a single matrix.
+            Optional middle dimensions can be used to specify, e.g., the number
+            of parallel attention heads.
+        K : numpy array of shape (n_ex, *, d_k)
+            A set of `n_ex` key vectors packed into a single matrix. Optional
+            middle dimensions can be used to specify, e.g., the number of
+            parallel attention heads.
+        V : numpy array of shape (n_ex, *, d_v)
+            A set of `n_ex` value vectors packed into a single matrix. Optional
+            middle dimensions can be used to specify, e.g., the number of
+            parallel attention heads.
         retain_derived : bool (default : True)
             Whether to retain the variables calculated during the forward pass
             for use later during backprop. If `False`, this suggests the layer
@@ -181,7 +218,7 @@ class DotProductAttention(LayerBase):
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, d_v)
+        Y : numpy array of shape (n_ex, *, d_v)
             The attention-weighted output values
         """
         Y, weights = self._fwd(Q, K, V)
@@ -194,8 +231,8 @@ class DotProductAttention(LayerBase):
 
     def _fwd(self, Q, K, V):
         """Actual computation of forward pass"""
-        scale = 1 / np.sqrt(Q.shape[1]) if self.scale else 1
-        scores = Q @ K.T * scale  # attention scores
+        scale = 1 / np.sqrt(Q.shape[-1]) if self.scale else 1
+        scores = Q @ K.swapaxes(-2, -1) * scale  # attention scores
         weights = self.softmax.forward(scores)  # attention weights
         Y = weights @ V
         return Y, weights
@@ -206,7 +243,7 @@ class DotProductAttention(LayerBase):
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, *dim)
+        dLdY : numpy array of shape (n_ex, *, d_v)
             The gradient of the loss wrt. the layer output Y
         retain_grads : bool (default: True)
             Whether to include the intermediate parameter gradients computed
@@ -214,11 +251,11 @@ class DotProductAttention(LayerBase):
 
         Returns
         -------
-        dQ : numpy array of shape (n_ex, d_k) or list of arrays
+        dQ : numpy array of shape (n_ex, *, d_k) or list of arrays
             The gradient of the loss wrt. the layer query matrix/matrices Q
-        dK : numpy array of shape (n_ex, d_k) or list of arrays
+        dK : numpy array of shape (n_ex, *, d_k) or list of arrays
             The gradient of the loss wrt. the layer key matrix/matrices K
-        dV : numpy array of shape (n_ex, d_v) or list of arrays
+        dV : numpy array of shape (n_ex, *, d_v) or list of arrays
             The gradient of the loss wrt. the layer value matrix/matrices V
         """
         assert self.trainable, "Layer is frozen"
@@ -240,14 +277,14 @@ class DotProductAttention(LayerBase):
 
     def _bwd(self, dy, q, k, v, weights):
         """Actual computation of the gradient of the loss wrt. q, k, and v"""
-        d_k = k.shape[1]
+        d_k = k.shape[-1]
         scale = 1 / np.sqrt(d_k) if self.scale else 1
 
-        dV = weights.T @ dy
-        dWeights = dy @ v.T
+        dV = weights.swapaxes(-2, -1) @ dy
+        dWeights = dy @ v.swapaxes(-2, -1)
         dScores = self.softmax.backward(dWeights)
         dQ = dScores @ k * scale
-        dK = dScores.T @ q * scale
+        dK = dScores.swapaxes(-2, -1) @ q * scale
         return dQ, dK, dV
 
 
@@ -1725,7 +1762,7 @@ class FullyConnected(LayerBase):
 
 
 class Softmax(LayerBase):
-    def __init__(self, optimizer=None):
+    def __init__(self, dim=-1, optimizer=None):
         """
         A softmax layer.
 
@@ -1734,6 +1771,8 @@ class Softmax(LayerBase):
 
         Parameters
         ----------
+        dim: int (default: -1)
+            The dimension in X along which the softmax will be computed
         optimizer : str or `OptimizerBase` instance (default: None)
             The optimization strategy to use when performing gradient updates
             within the `update` method.  If `None`, use the `SGD` optimizer with
@@ -1741,6 +1780,7 @@ class Softmax(LayerBase):
         """
         super().__init__(optimizer)
 
+        self.dim = dim
         self.n_in = None
         self.is_initialized = False
 
@@ -1798,8 +1838,8 @@ class Softmax(LayerBase):
     def _fwd(self, X):
         """Actual computation of softmax forward pass"""
         # center data to avoid overflow
-        e_X = np.exp(X - np.max(X, axis=1, keepdims=True))
-        return e_X / e_X.sum(axis=1, keepdims=True)
+        e_X = np.exp(X - np.max(X, axis=self.dim, keepdims=True))
+        return e_X / e_X.sum(axis=self.dim, keepdims=True)
 
     def backward(self, dLdy):
         """
@@ -1841,13 +1881,15 @@ class Softmax(LayerBase):
             where
                 x_n is input example n (ie., the n'th row in X)
         """
-        out = []
-        # iterate over rows (examples) in X
+        dX = []
         for dy, x in zip(dLdy, X):
-            y = self._fwd(x.reshape(1, -1)).reshape(-1, 1)
-            dydx = np.diagflat(y) - y @ y.T  # jacobian wrt. the input X
-            out.append(dy @ dydx)
-        return np.array(out)
+            dxi = []
+            for dyi, xi in zip(*np.atleast_2d(dy, x)):
+                yi = self._fwd(xi.reshape(1, -1)).reshape(-1, 1)
+                dyidxi = np.diagflat(yi) - yi @ yi.T  # jacobian wrt. input sample xi
+                dxi.append(dyi @ dyidxi)
+            dX.append(dxi)
+        return np.array(dX).reshape(*X.shape)
 
 
 class SparseEvolution(LayerBase):
