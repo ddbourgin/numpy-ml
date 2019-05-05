@@ -32,23 +32,26 @@ class WrapperBase(ABC):
 
     @property
     def hyperparameters(self):
-        return self._base_layer.hyperparameters
+        hp = self._base_layer.hyperparameters
+        hpw = self._wrapper_hyperparameters
+        if "wrappers" in hp:
+            hp["wrappers"].append(hpw)
+        else:
+            hp["wrappers"] = [hpw]
+        return hp
+
+    @property
+    def derived_variables(self):
+        dv = self._base_layer.derived_variables.copy()
+        if "wrappers" in dv:
+            dv["wrappers"].append(self._wrapper_derived_variables)
+        else:
+            dv["wrappers"] = [self._wrapper_derived_variables]
+        return dv
 
     @property
     def gradients(self):
         return self._base_layer.gradients
-
-    @property
-    def derived_variables(self):
-        return self._base_layer.derived_variables
-
-    @property
-    def n_in(self):
-        return self._base_layer.n_in
-
-    @property
-    def n_out(self):
-        return self._base_layer.n_out
 
     @property
     def act_fn(self):
@@ -122,14 +125,16 @@ class Dropout(WrapperBase):
         self._init_params()
 
     def _init_wrapper_params(self):
+        self._wrapper_derived_variables = {"dropout_mask": None}
         self._wrapper_hyperparameters = {"wrapper": "Dropout", "p": self.p}
 
     def forward(self, X):
-        scaler = 1.0
+        scaler, mask = 1.0, np.ones(X.shape).astype(bool)
         if self.trainable:
             scaler = 1.0 / (1.0 - self.p)
-            dropout_mask = np.random.rand(*X.shape) >= self.p
-            X = dropout_mask * X
+            mask = np.random.rand(*X.shape) >= self.p
+            X = mask * X
+        self._wrapper_derived_variables["dropout_mask"] = mask
         return scaler * self._base_layer.forward(X)
 
     def backward(self, dLdy):
