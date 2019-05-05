@@ -37,6 +37,7 @@ This repo includes code for the following models:
         - Bidirectional LSTM 
         - ResNet-style residual blocks (identity and convolution)
         - WaveNet-style residual blocks with dilated causal convolutions
+        - Transformer-style multi-headed scaled dot product attention
     * Regularizers
         - Dropout 
     * Normalization
