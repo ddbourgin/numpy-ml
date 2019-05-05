@@ -3,9 +3,19 @@ from abc import ABC, abstractmethod
 import re
 import numpy as np
 
+from wrappers import Dropout
 from utils import calc_pad_dims_2D
 from activations import Tanh, Sigmoid, ReLU, LeakyReLU, Affine
-from layers import Conv1D, Conv2D, BatchNorm2D, Add, Multiply, LSTMCell
+from layers import (
+    DotProductAttention,
+    FullyConnected,
+    BatchNorm2D,
+    Conv1D,
+    Conv2D,
+    Multiply,
+    LSTMCell,
+    Add,
+)
 
 
 class ModuleBase(ABC):
@@ -108,7 +118,13 @@ class ModuleBase(ABC):
 
 class WavenetResidualModule(ModuleBase):
     def __init__(
-        self, ch_residual, ch_dilation, dilation, kernel_width, init="glorot_uniform"
+        self,
+        ch_residual,
+        ch_dilation,
+        dilation,
+        kernel_width,
+        optimizer=None,
+        init="glorot_uniform",
     ):
         """
         A WaveNet-like residual block with causal dilated convolutions.
@@ -142,11 +158,16 @@ class WavenetResidualModule(ModuleBase):
         init : str (default: 'glorot_uniform')
             The weight initialization strategy. Valid entries are
             {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
         super().__init__()
 
         self.init = init
         self.dilation = dilation
+        self.optimizer = optimizer
         self.ch_residual = ch_residual
         self.ch_dilation = ch_dilation
         self.kernel_width = kernel_width
@@ -163,6 +184,7 @@ class WavenetResidualModule(ModuleBase):
             kernel_width=2,
             dilation=self.dilation,
             out_ch=self.ch_dilation,
+            optimizer=self.optimizer,
             act_fn=Affine(slope=1, intercept=0),
         )
 
@@ -177,6 +199,7 @@ class WavenetResidualModule(ModuleBase):
             init=self.init,
             kernel_width=1,
             out_ch=self.ch_residual,
+            optimizer=self.optimizer,
             act_fn=Affine(slope=1, intercept=0),
         )
 
@@ -201,6 +224,7 @@ class WavenetResidualModule(ModuleBase):
             "layer": "WavenetResidualModule",
             "init": self.init,
             "dilation": self.dilation,
+            "optimizer": self.optimizer,
             "ch_residual": self.ch_residual,
             "ch_dilation": self.ch_dilation,
             "kernel_width": self.kernel_width,
@@ -314,6 +338,7 @@ class SkipConnectionIdentityModule(ModuleBase):
         act_fn=None,
         epsilon=1e-5,
         momentum=0.9,
+        optimizer=None,
         init="glorot_uniform",
     ):
         """
@@ -365,6 +390,7 @@ class SkipConnectionIdentityModule(ModuleBase):
         self.epsilon = epsilon
         self.stride1 = stride1
         self.stride2 = stride2
+        self.optimizer = optimizer
         self.momentum = momentum
         self.kernel_shape1 = kernel_shape1
         self.kernel_shape2 = kernel_shape2
@@ -381,6 +407,7 @@ class SkipConnectionIdentityModule(ModuleBase):
             out_ch=self.out_ch,
             act_fn=self.act_fn,
             stride=self.stride1,
+            optimizer=self.optimizer,
             kernel_shape=self.kernel_shape1,
         )
         # we can't initialize `conv2` without X's dimensions; see `forward`
@@ -395,6 +422,7 @@ class SkipConnectionIdentityModule(ModuleBase):
             init=self.init,
             out_ch=self.in_ch,
             stride=self.stride2,
+            optimizer=self.optimizer,
             kernel_shape=self.kernel_shape2,
             act_fn=Affine(slope=1, intercept=0),
         )
@@ -422,6 +450,7 @@ class SkipConnectionIdentityModule(ModuleBase):
             "stride1": self.stride1,
             "stride2": self.stride2,
             "momentum": self.momentum,
+            "optimizer": self.optimizer,
             "act_fn": str(self.act_fn),
             "kernel_shape1": self.kernel_shape1,
             "kernel_shape2": self.kernel_shape2,
@@ -513,6 +542,7 @@ class SkipConnectionConvModule(ModuleBase):
         epsilon=1e-5,
         momentum=0.9,
         stride_skip=1,
+        optimizer=None,
         init="glorot_uniform",
     ):
         """
@@ -570,6 +600,10 @@ class SkipConnectionConvModule(ModuleBase):
         init : str (default: 'glorot_uniform')
             The weight initialization strategy. Valid entries are
             {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
         super().__init__()
 
@@ -583,6 +617,7 @@ class SkipConnectionConvModule(ModuleBase):
         self.stride1 = stride1
         self.stride2 = stride2
         self.momentum = momentum
+        self.optimizer = optimizer
         self.stride_skip = stride_skip
         self.kernel_shape1 = kernel_shape1
         self.kernel_shape2 = kernel_shape2
@@ -599,6 +634,7 @@ class SkipConnectionConvModule(ModuleBase):
             act_fn=self.act_fn,
             out_ch=self.out_ch1,
             stride=self.stride1,
+            optimizer=self.optimizer,
             kernel_shape=self.kernel_shape1,
         )
         self.conv2 = Conv2D(
@@ -606,6 +642,7 @@ class SkipConnectionConvModule(ModuleBase):
             init=self.init,
             out_ch=self.out_ch2,
             stride=self.stride2,
+            optimizer=self.optimizer,
             kernel_shape=self.kernel_shape2,
             act_fn=Affine(slope=1, intercept=0),
         )
@@ -660,6 +697,7 @@ class SkipConnectionConvModule(ModuleBase):
             stride=self.stride_skip,
             kernel_shape=self.kernel_shape_skip,
             act_fn=Affine(slope=1, intercept=0),
+            optimizer=self.optimizer,
         )
 
     @property
@@ -811,6 +849,7 @@ class BidirectionalLSTM(ModuleBase):
         gate_fn=None,
         merge_mode="concat",
         init="glorot_uniform",
+        optimizer=None,
     ):
         """
         A single bidirectional long short-term memory (LSTM) layer.
@@ -831,12 +870,17 @@ class BidirectionalLSTM(ModuleBase):
         init : str (default: 'glorot_uniform')
             The weight initialization strategy. Valid entries are
             {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
         """
         super().__init__()
 
         self.init = init
         self.n_in = None
         self.n_out = n_out
+        self.optimizer = optimizer
         self.merge_mode = merge_mode
         self.act_fn = Tanh() if act_fn is None else act_fn
         self.gate_fn = Sigmoid() if gate_fn is None else gate_fn
@@ -844,10 +888,18 @@ class BidirectionalLSTM(ModuleBase):
 
     def _init_params(self):
         self.cell_fwd = LSTMCell(
-            init=self.init, n_out=self.n_out, act_fn=self.act_fn, gate_fn=self.gate_fn
+            init=self.init,
+            n_out=self.n_out,
+            act_fn=self.act_fn,
+            gate_fn=self.gate_fn,
+            optimizer=self.optimizer,
         )
         self.cell_bwd = LSTMCell(
-            init=self.init, n_out=self.n_out, act_fn=self.act_fn, gate_fn=self.gate_fn
+            init=self.init,
+            n_out=self.n_out,
+            act_fn=self.act_fn,
+            gate_fn=self.gate_fn,
+            optimizer=self.optimizer,
         )
 
     def forward(self, X):
@@ -948,10 +1000,221 @@ class BidirectionalLSTM(ModuleBase):
             "n_in": self.n_in,
             "n_out": self.n_out,
             "act_fn": str(self.act_fn),
+            "optimizer": self.optimizer,
             "merge_mode": self.merge_mode,
             "component_ids": ["cell_fwd", "cell_bwd"],
             "components": {
                 "cell_fwd": self.cell_fwd.hyperparameters,
                 "cell_bwd": self.cell_bwd.hyperparameters,
+            },
+        }
+
+
+class MultiHeadedAttentionModule(ModuleBase):
+    def __init__(self, n_heads=8, dropout_p=0, init="glorot_uniform", optimizer=None):
+        """
+        Multi-head attention allows a model to jointly attend to information from
+        different representation subspaces at different positions. With a
+        single head, this information would get averaged away when the
+        attention weights are combined with the value
+
+            MultiHead(Q, K, V) = concat(head_1, ..., head_h) @ W^(O)
+
+        where
+
+            head_i = SDP_attention(Q @ W_i^(Q), K @ W_i^(K), V @ W_i^(V))
+
+        and the projection weights are parameter matrices:
+
+            W_i^(Q) ∈ ℝ ^(kqv_dim × latent_dim)
+            W_i^(K) ∈ ℝ ^(kqv_dim × latent_dim)
+            W_i^(V) ∈ ℝ ^(kqv_dim × latent_dim)
+            W^(O) ∈ ℝ ^(n_heads * latent_dim × kqv_dim)
+
+        Importantly, the current module explicitly assumes that
+
+            kqv_dim = dim(query) = dim(keys) = dim(values)
+
+        and that
+
+            latent_dim = kqv_dim / n_heads
+
+        [MH Attention Head `h`]
+
+            K --> W_h^(K) ------\
+            V --> W_h^(V) ------- > DP_Attention --> head_h
+            Q --> W_h^(Q) ------/
+
+        The full [MultiHeadedAttentionModule] then becomes:
+
+                  -----------------
+            K --> | [Attn Head 1] | --> head_1 --\
+            V --> | [Attn Head 2] | --> head_2 --\
+            Q --> |      ...      |      ...       ---> Concat --> W^(O) --> MH_out
+                  | [Attn Head Z] | --> head_Z --/
+                  -----------------
+
+        Due to the reduced dimension of each head, the total computational cost
+        is similar to that of a single attention head with full (i.e., kqv_dim)
+        dimensionality.
+
+        Parameters
+        ----------
+        n_heads : int (default: 8)
+            The number of simultaneous attention heads to use. Note that the
+            larger `n_heads`, the smaller the dimensionality of any single
+            head, since `latent_dim` = `kqv_dim` / `n_heads`.
+        dropout_p : float in [0, 1)
+            The dropout propbability during training, applied to the output of
+            the softmax in each dot-product attention head. If 0, no dropout is
+            applied.
+        init : str (default: 'glorot_uniform')
+            The weight initialization strategy. Valid entries are
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+        optimizer : str or `OptimizerBase` instance (default: None)
+            The optimization strategy to use when performing gradient updates
+            within the `update` method.  If `None`, use the `SGD` optimizer with
+            default parameters.
+        """
+
+        self.init = init
+        self.kqv_dim = None
+        self.projections = {}
+        self.n_heads = n_heads
+        self.optimizer = optimizer
+        self.dropout_p = dropout_p
+        self.is_initialized = False
+
+    def _init_params(self):
+        self._dv = {}
+
+        # assume dim(keys) = dim(query) = dim(values)
+        assert self.kqv_dim % self.n_heads == 0
+        self.latent_dim = self.kqv_dim // self.n_heads
+
+        self.attention = DotProductAttention(scale=True, dropout_p=self.dropout_p)
+        self.projections = {
+            k: Dropout(
+                FullyConnected(
+                    init=self.init,
+                    n_out=self.kqv_dim,
+                    optimizer=self.optimizer,
+                    act_fn="Affine(slope=1, intercept=0)",
+                ),
+                self.dropout_p,
+            )
+            for k in ["Q", "K", "V", "O"]
+        }
+
+        self.is_initialized = True
+
+    def forward(self, Q, K, V):
+        if not self.is_initialized:
+            self.kqv_dim = Q.shape[-1]
+            self._init_params()
+
+        # project queries, keys, and values into the `latent_dim`-dimensional subspace
+        n_ex = Q.shape[0]
+        for k, x in zip(["Q", "K", "V"], [Q, K, V]):
+            proj = self.projections[k].forward(x)
+            proj = proj.reshape(n_ex, -1, self.n_heads, self.latent_dim).swapaxes(1, 2)
+            self._dv["{}_proj".format(k)] = proj
+
+        dv = self.derived_variables
+        Q_proj, K_proj, V_proj = dv["Q_proj"], dv["K_proj"], dv["V_proj"]
+
+        # apply scaled dot-product attention to the projected vectors
+        attn = self.attention
+        attn_out = attn.forward(Q_proj, K_proj, V_proj)
+        self._dv["attention_weights"] = attn.derived_variables["attention_weights"]
+
+        # concatenate the different heads using `reshape` to create an
+        # `kqv_dim`-dim vector
+        attn_out = attn_out.swapaxes(1, 2).reshape(n_ex, self.kqv_dim)
+        self._dv["attention_out"] = attn_out.reshape(n_ex, -1, self.kqv_dim)
+
+        # apply the final output projection
+        Y = self.projections["O"].forward(attn_out)
+        Y = Y.reshape(n_ex, -1, self.kqv_dim)
+        return Y
+
+    def backward(self, dLdy):
+        n_ex = dLdy.shape[0]
+        dLdy = dLdy.reshape(n_ex, self.kqv_dim)
+        dLdX = self.projections["O"].backward(dLdy)
+        dLdX = dLdX.reshape(n_ex, self.n_heads, -1, self.latent_dim)
+
+        dLdQ_proj, dLdK_proj, dLdV_proj = self.attention.backward(dLdX)
+
+        self._dv["dQ_proj"] = dLdQ_proj
+        self._dv["dK_proj"] = dLdK_proj
+        self._dv["dV_proj"] = dLdV_proj
+
+        dLdQ_proj = dLdQ_proj.reshape(n_ex, self.kqv_dim)
+        dLdK_proj = dLdK_proj.reshape(n_ex, self.kqv_dim)
+        dLdV_proj = dLdV_proj.reshape(n_ex, self.kqv_dim)
+
+        dLdQ = self.projections["Q"].backward(dLdQ_proj)
+        dLdK = self.projections["K"].backward(dLdK_proj)
+        dLdV = self.projections["V"].backward(dLdV_proj)
+        return dLdQ, dLdK, dLdV
+
+    @property
+    def derived_variables(self):
+        dv = {
+            "Q_proj": None,
+            "K_proj": None,
+            "V_proj": None,
+            "components": {
+                "Q": self.projections["Q"].derived_variables,
+                "K": self.projections["K"].derived_variables,
+                "V": self.projections["V"].derived_variables,
+                "O": self.projections["O"].derived_variables,
+                "attention": self.attention.derived_variables,
+            },
+        }
+        dv.update(self._dv)
+        return dv
+
+    @property
+    def gradients(self):
+        return {
+            "components": {
+                "Q": self.projections["Q"].gradients,
+                "K": self.projections["K"].gradients,
+                "V": self.projections["V"].gradients,
+                "O": self.projections["O"].gradients,
+                "attention": self.attention.gradients,
+            }
+        }
+
+    @property
+    def parameters(self):
+        return {
+            "components": {
+                "Q": self.projections["Q"].parameters,
+                "K": self.projections["K"].parameters,
+                "V": self.projections["V"].parameters,
+                "O": self.projections["O"].parameters,
+                "attention": self.attention.parameters,
+            }
+        }
+
+    @property
+    def hyperparameters(self):
+        return {
+            "layer": "MultiHeadedAttentionModule",
+            "init": self.init,
+            "kqv_dim": self.kqv_dim,
+            "latent_dim": self.latent_dim,
+            "n_heads": self.n_heads,
+            "dropout_p": self.dropout_p,
+            "component_ids": ["attention", "Q", "K", "V", "O"],
+            "components": {
+                "Q": self.projections["Q"].hyperparameters,
+                "K": self.projections["K"].hyperparameters,
+                "V": self.projections["V"].hyperparameters,
+                "O": self.projections["O"].hyperparameters,
+                "attention": self.attention.hyperparameters,
             },
         }
