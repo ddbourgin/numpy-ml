@@ -38,6 +38,7 @@ from .torch_models import (
     torch_gradient_generator,
     TorchSkipConnectionConv,
     TorchSkipConnectionIdentity,
+    TorchMultiHeadedAttentionModule,
 )
 
 
@@ -237,6 +238,10 @@ def test_utils(N=50):
 
 
 def test_modules(N=50):
+    print("Testing MultiHeadedAttentionModule")
+    time.sleep(1)
+    test_MultiHeadedAttentionModule(N)
+
     print("Testing BidirectionalLSTM module")
     time.sleep(1)
     test_BidirectionalLSTM(N)
@@ -583,6 +588,8 @@ def test_relu_grad(N=None):
 def test_softmax_grad(N=None):
     from layers import Softmax
     from functools import partial
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
     p_soft = partial(F.softmax, dim=1)
@@ -1153,8 +1160,8 @@ def test_DPAttention(N=None):
         K = random_tensor((n_ex, d_k), standardize=True)
         V = random_tensor((n_ex, d_v), standardize=True)
 
-        # initialize Conv2D layer
-        mine = DotProductAttention(scale=True)
+        # initialize DotProductAttention layer
+        mine = DotProductAttention(scale=True, dropout_p=0)
 
         # forward prop
         y_pred = mine.forward(Q, K, V)
@@ -1171,12 +1178,8 @@ def test_DPAttention(N=None):
             (mine.X[0][0], "Q"),
             (mine.X[0][1], "K"),
             (mine.X[0][2], "V"),
-            (mine.derived_variables["scores"], "scores"),
-            (mine.derived_variables["attention_weights"][0], "weights"),
             (y_pred, "Y"),
             (dLdV, "dLdV"),
-            (mine.derived_variables["dWeights"], "dWeights"),
-            (mine.derived_variables["dScores"], "dScores"),
             (dLdK, "dLdK"),
             (dLdQ, "dLdQ"),
         ]
@@ -1528,6 +1531,92 @@ def grad_check_RNN(model, loss_func, param_name, n_t, X, epsilon=1e-7):
 #######################################################################
 #                               Modules                               #
 #######################################################################
+
+
+def test_MultiHeadedAttentionModule(N=None):
+    from modules import MultiHeadedAttentionModule
+
+    N = np.inf if N is None else N
+    np.random.seed(12345)
+
+    i = 1
+    while i < N + 1:
+        n_ex = np.random.randint(1, 10)
+        latent_dim = np.random.randint(1, 20)
+        n_heads = np.random.randint(2, 10)
+        d_k = d_v = n_heads * latent_dim
+
+        Q = random_tensor((n_ex, d_k), standardize=True)
+        K = random_tensor((n_ex, d_k), standardize=True)
+        V = random_tensor((n_ex, d_v), standardize=True)
+
+        mine = MultiHeadedAttentionModule(n_heads=n_heads, dropout_p=0)
+
+        # forward prop
+        y_pred = mine.forward(Q, K, V)
+
+        # backprop
+        dLdy = np.ones_like(y_pred)
+        dLdQ, dLdK, dLdV = mine.backward(dLdy)
+
+        # get gold standard gradients
+        params = mine.parameters
+        hparams = mine.hyperparameters
+        gold_mod = TorchMultiHeadedAttentionModule(params, hparams)
+        golds = gold_mod.extract_grads(Q, K, V)
+
+        dv = mine.derived_variables
+        params = mine.parameters["components"]
+        grads = mine.gradients["components"]
+        params = [
+            (Q, "Q"),
+            (K, "K"),
+            (V, "V"),
+            (mine.n_heads, "n_heads"),
+            (mine.latent_dim, "latent_dim"),
+            (params["O"]["W"], "O_W"),
+            (params["K"]["W"], "K_W"),
+            (params["V"]["W"], "V_W"),
+            (params["Q"]["W"], "Q_W"),
+            (params["O"]["b"], "O_b"),
+            (params["K"]["b"], "K_b"),
+            (params["V"]["b"], "V_b"),
+            (params["Q"]["b"], "Q_b"),
+            (dv["Q_proj"], "Q_proj"),
+            (dv["K_proj"], "K_proj"),
+            (dv["V_proj"], "V_proj"),
+            (dv["attention_weights"][0], "weights"),
+            (dv["attention_out"], "attn_out"),
+            (y_pred, "Y"),
+            (dLdy, "dLdy"),
+            (dv["dQ_proj"], "dQ_proj"),
+            (dv["dK_proj"], "dK_proj"),
+            (dv["dV_proj"], "dV_proj"),
+            (grads["O"]["W"], "dO_W"),
+            (grads["V"]["W"], "dV_W"),
+            (grads["K"]["W"], "dK_W"),
+            (grads["Q"]["W"], "dQ_W"),
+            (grads["O"]["b"], "dO_b"),
+            (grads["V"]["b"], "dV_b"),
+            (grads["K"]["b"], "dK_b"),
+            (grads["Q"]["b"], "dQ_b"),
+            (dLdQ, "dQ"),
+            (dLdK, "dK"),
+            (dLdV, "dV"),
+        ]
+
+        print("\nTrial {}".format(i))
+        print(
+            "n_ex={} d_k=d_v={} latent_dim={} n_heads={}".format(
+                n_ex, d_k, latent_dim, n_heads
+            )
+        )
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=4
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
 
 
 def test_SkipConnectionIdentityModule(N=None):

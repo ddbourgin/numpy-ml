@@ -1589,7 +1589,6 @@ class TorchSDPAttentionLayer(nn.Module):
         self.V.retain_grad()
 
         self.d_k = self.Q.size(-1)
-
         self.scores = torch.matmul(self.Q, self.K.transpose(-2, -1)) / np.sqrt(self.d_k)
         if mask is not None:
             self.scores = self.scores.masked_fill(mask == 0, -1e9)
@@ -1599,6 +1598,7 @@ class TorchSDPAttentionLayer(nn.Module):
         self.weights.retain_grad()
         self.Y = torch.matmul(self.weights, self.V)
         self.Y.retain_grad()
+        return self.Y, self.weights
 
     def extract_grads(self, Q, K, V, mask=None):
         self.forward(Q, K, V, mask=mask)
@@ -1617,6 +1617,156 @@ class TorchSDPAttentionLayer(nn.Module):
             "dScores": self.scores.grad.numpy(),
             "dLdQ": self.Q.grad.numpy(),
             "dLdK": self.K.grad.numpy(),
+        }
+        return grads
+
+
+class TorchMultiHeadedAttentionModule(nn.Module):
+    def __init__(self, params, hparams):
+        "Take in model size and number of heads."
+        super(TorchMultiHeadedAttentionModule, self).__init__()
+        assert hparams["kqv_dim"] % hparams["n_heads"] == 0
+        self.n_heads = hparams["n_heads"]
+        self.latent_dim = hparams["kqv_dim"] // hparams["n_heads"]
+        self.p_dropout = hparams["dropout_p"]
+        self.projections = {
+            "Q": nn.Linear(hparams["kqv_dim"], hparams["kqv_dim"]),
+            "K": nn.Linear(hparams["kqv_dim"], hparams["kqv_dim"]),
+            "V": nn.Linear(hparams["kqv_dim"], hparams["kqv_dim"]),
+            "O": nn.Linear(hparams["kqv_dim"], hparams["kqv_dim"]),
+        }
+        self.projections["Q"].weight = nn.Parameter(
+            torch.FloatTensor(params["components"]["Q"]["W"].T)
+        )
+        self.projections["Q"].bias = nn.Parameter(
+            torch.FloatTensor(params["components"]["Q"]["b"])
+        )
+        self.projections["K"].weight = nn.Parameter(
+            torch.FloatTensor(params["components"]["K"]["W"].T)
+        )
+        self.projections["K"].bias = nn.Parameter(
+            torch.FloatTensor(params["components"]["K"]["b"])
+        )
+        self.projections["V"].weight = nn.Parameter(
+            torch.FloatTensor(params["components"]["V"]["W"].T)
+        )
+        self.projections["V"].bias = nn.Parameter(
+            torch.FloatTensor(params["components"]["V"]["b"])
+        )
+        self.projections["O"].weight = nn.Parameter(
+            torch.FloatTensor(params["components"]["O"]["W"].T)
+        )
+        self.projections["O"].bias = nn.Parameter(
+            torch.FloatTensor(params["components"]["O"]["b"])
+        )
+
+        self.attn = None
+        self.dropout = nn.Dropout(p=hparams["dropout_p"])
+
+    def forward(self, Q, K, V, mask=None):
+        self.Q = Q
+        self.K = K
+        self.V = V
+
+        if not isinstance(self.Q, torch.Tensor):
+            self.Q = torchify(self.Q)
+        if not isinstance(self.K, torch.Tensor):
+            self.K = torchify(self.K)
+        if not isinstance(self.V, torch.Tensor):
+            self.V = torchify(self.V)
+
+        self.Q.retain_grad()
+        self.K.retain_grad()
+        self.V.retain_grad()
+
+        if mask is not None:
+            # Same mask applied to all h heads.
+            mask = mask.unsqueeze(1)
+        n_ex = self.Q.size(0)
+
+        self.Q_proj = (
+            self.projections["Q"](self.Q)
+            .view(n_ex, -1, self.n_heads, self.latent_dim)
+            .transpose(1, 2)
+        )
+
+        self.K_proj = (
+            self.projections["K"](self.K)
+            .view(n_ex, -1, self.n_heads, self.latent_dim)
+            .transpose(1, 2)
+        )
+
+        self.V_proj = (
+            self.projections["V"](self.V)
+            .view(n_ex, -1, self.n_heads, self.latent_dim)
+            .transpose(1, 2)
+        )
+
+        self.Q_proj.retain_grad()
+        self.K_proj.retain_grad()
+        self.V_proj.retain_grad()
+
+        # 2) Apply attention on all the projected vectors in batch.
+        self.attn_out, self.attn = TorchSDPAttentionLayer().forward(
+            self.Q_proj, self.K_proj, self.V_proj, mask=mask
+        )
+        self.attn.retain_grad()
+        self.attn_out.retain_grad()
+
+        # 3) "Concat" using a view and apply a final linear transformation
+        self.attn_out_reshaped = (
+            self.attn_out.transpose(1, 2)
+            .contiguous()
+            .view(n_ex, -1, self.n_heads * self.latent_dim)
+        )
+        self.attn_out_reshaped.retain_grad()
+        print(self.attn_out_reshaped.shape)
+        self.Y = self.projections["O"](self.attn_out_reshaped)
+        print(self.Y.shape)
+        self.Y.retain_grad()
+
+    def extract_grads(self, Q, K, V, mask=None):
+        self.forward(Q, K, V, mask=mask)
+        self.loss1 = self.Y.sum()
+        self.loss1.backward()
+        grads = {
+            "Q": self.Q.detach().numpy(),
+            "K": self.K.detach().numpy(),
+            "V": self.V.detach().numpy(),
+            "O_W": self.projections["O"].weight.detach().numpy().T,
+            "V_W": self.projections["V"].weight.detach().numpy().T,
+            "K_W": self.projections["K"].weight.detach().numpy().T,
+            "Q_W": self.projections["Q"].weight.detach().numpy().T,
+            "O_b": self.projections["O"].bias.detach().numpy(),
+            "V_b": self.projections["V"].bias.detach().numpy(),
+            "K_b": self.projections["K"].bias.detach().numpy(),
+            "Q_b": self.projections["Q"].bias.detach().numpy(),
+            "latent_dim": self.latent_dim,
+            "n_heads": self.n_heads,
+            "Q_proj": self.Q_proj.detach().numpy(),  # .reshape(self.Q_proj.shape[0], -1),
+            "K_proj": self.K_proj.detach().numpy(),  # .reshape(self.K_proj.shape[0], -1),
+            "V_proj": self.V_proj.detach().numpy(),  # .reshape(self.V_proj.shape[0], -1),
+            "weights": self.attn.detach().numpy(),
+            "attn_out": self.attn_out_reshaped.detach().numpy(),  # .squeeze(),
+            #  .reshape(self.attn_out_reshaped.shape[0], -1),
+            "Y": self.Y.detach().numpy(),
+            "dO_W": self.projections["O"].weight.grad.numpy().T,
+            "dV_W": self.projections["V"].weight.grad.numpy().T,
+            "dK_W": self.projections["K"].weight.grad.numpy().T,
+            "dQ_W": self.projections["Q"].weight.grad.numpy().T,
+            "dO_b": self.projections["O"].bias.grad.numpy(),
+            "dV_b": self.projections["V"].bias.grad.numpy(),
+            "dK_b": self.projections["K"].bias.grad.numpy(),
+            "dQ_b": self.projections["Q"].bias.grad.numpy(),
+            "dLdy": self.Y.grad.numpy(),
+            "dAttn_out": self.attn_out_reshaped.grad.numpy(),
+            "dWeights": self.attn.grad.numpy(),
+            "dQ_proj": self.Q_proj.grad.numpy(),
+            "dK_proj": self.K_proj.grad.numpy(),
+            "dV_proj": self.V_proj.grad.numpy(),
+            "dQ": self.Q.grad.numpy(),
+            "dK": self.K.grad.numpy(),
+            "dV": self.V.grad.numpy(),
         }
         return grads
 
