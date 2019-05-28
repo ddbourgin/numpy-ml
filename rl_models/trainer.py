@@ -1,9 +1,6 @@
 from time import time
 import numpy as np
 
-import matplotlib
-
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -21,8 +18,13 @@ class Trainer(object):
 
     def _train_episode(self, max_steps, render_every=None):
         t0 = time()
-        reward, n_steps = self.agent.run_episode(max_steps)
-        self.agent.update()
+        if "train_episode" in dir(self.agent):
+            # online training updates over the course of the episode
+            reward, n_steps = self.agent.train_episode(max_steps)
+        else:
+            # offline training updates upon completion of the episode
+            reward, n_steps = self.agent.run_episode(max_steps)
+            self.agent.update()
         duration = time() - t0
         return reward, duration, n_steps
 
@@ -93,5 +95,5 @@ class Trainer(object):
         ax.set_xlabel("Episode")
         ax.set_ylabel("Cumulative reward")
         ax.set_title("{} on '{}'".format(agent, env))
-        plt.savefig("{}-{}.png".format(agent, env))
+        plt.savefig("img/{}-{}.png".format(agent, env))
         plt.close("all")
