@@ -92,9 +92,11 @@ This repo includes code for the following models:
         - Unknown mean, unknown variance (Normal-Gamma / Normal-Inverse-Wishart prior)
 
 7. **Reinforcement learning models**
-    - Cross-entropy agent
+    - Cross-entropy method agent
     - First visit on-policy Monte Carlo agent
     - Weighted incremental importance sampling Monte Carlo agent
+    - Expected SARSA agent
+    - TD-0 Q-learning agent
 
 6. **Preprocessing**
     - Discrete Fourier transform (1D signals)
