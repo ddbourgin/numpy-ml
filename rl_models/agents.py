@@ -743,12 +743,14 @@ class TemporalDifferenceAgent(AgentBase):
     def __init__(
         self,
         env,
-        lr=0.05,
+        lr=0.4,
         epsilon=0.1,
         n_tilings=8,
+        obs_max=None,
+        obs_min=None,
         grid_dims=[8, 8],
         off_policy=False,
-        temporal_discount=0.9,
+        temporal_discount=0.99,
     ):
         """
         A temporal difference learning agent with expected SARSA (on-policy) or
@@ -768,6 +770,16 @@ class TemporalDifferenceAgent(AgentBase):
         n_tilings : int (default: 8)
             The number of overlapping tilings to use if the env observation
             space is continuous. Unused if observation space is discrete.
+        obs_max : float or np.ndarray (default: None)
+            The value to treat as the max value of the observation space when
+            calculating the grid widths if the observation space is continuous.
+            If `None`, use `env.observation_space.high`. Unused if observation
+            space is discrete.
+        obs_min : float or np.ndarray (default: None)
+            The value to treat as the min value of the observation space when
+            calculating grid widths if the observation space is continuous. If
+            `None`, use `env.observation_space.low`. Unused if observation
+            space is discrete.
         grid_dims : list (default: [8, 8])
            The number of rows and columns in each tiling grid if the env
            observation space is continuous. Unused if observation space is
@@ -783,6 +795,8 @@ class TemporalDifferenceAgent(AgentBase):
         super().__init__(env)
 
         self.lr = lr
+        self.obs_max = obs_max
+        self.obs_min = obs_min
         self.epsilon = epsilon
         self.n_tilings = n_tilings
         self.grid_dims = grid_dims
@@ -802,6 +816,8 @@ class TemporalDifferenceAgent(AgentBase):
                 self.env_info,
                 self.n_tilings,
                 state_action=False,
+                obs_max=self.obs_max,
+                obs_min=self.obs_min,
                 grid_size=self.grid_dims,
             )
 
@@ -822,6 +838,8 @@ class TemporalDifferenceAgent(AgentBase):
         self.hyperparameters = {
             "agent": "TemporalDifferenceAgent",
             "lr": self.lr,
+            "obs_max": self.obs_max,
+            "obs_min": self.obs_min,
             "epsilon": self.epsilon,
             "n_tilings": self.n_tilings,
             "grid_dims": self.grid_dims,

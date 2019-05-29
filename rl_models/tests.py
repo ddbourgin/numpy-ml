@@ -46,26 +46,32 @@ def test_monte_carlo_agent():
 def test_temporal_difference_agent():
     seed = 12345
     max_steps = 200
-    n_episodes = 1000
+    n_episodes = 5000
 
     lr = 0.4
-    n_tilings = 8
+    n_tilings = 10
     epsilon = 0.10
     off_policy = True
-    grid_dims = [8, 8]
+    grid_dims = [100, 100]
     smooth_factor = 0.005
     temporal_discount = 0.999
-    env = gym.make("Taxi-v2")
+    #  env = gym.make("Taxi-v2")
+    env = gym.make("LunarLander-v2")
+    obs_max = 1
+    obs_min = -1
 
     agent = TemporalDifferenceAgent(
         env,
         lr=lr,
+        obs_max=obs_max,
+        obs_min=obs_min,
         epsilon=epsilon,
         n_tilings=n_tilings,
         grid_dims=grid_dims,
         off_policy=off_policy,
         temporal_discount=temporal_discount,
     )
+
     trainer = Trainer(agent, env)
     trainer.train(
         n_episodes,
