@@ -97,6 +97,7 @@ This repo includes code for the following models:
     - Weighted incremental importance sampling Monte Carlo agent
     - Expected SARSA agent
     - TD-0 Q-learning agent
+    - Dyna-Q / Dyna-Q+ with prioritized sweeping
 
 6. **Preprocessing**
     - Discrete Fourier transform (1D signals)
