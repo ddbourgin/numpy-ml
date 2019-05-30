@@ -1,6 +1,6 @@
 import copy
 from itertools import product
-from collections import Hashable
+from collections import Hashable, defaultdict
 
 import numpy as np
 import pandas as pd
@@ -12,31 +12,140 @@ from tiles.tiles3 import tiles, IHT
 
 class Dict(dict):
     """
-    A dictionary subclass which returns the key value if not already in the dict
+    A dictionary subclass which returns the key value if it is not already in
+    the dict. Also allows for an optional `encoder` function which will
+    translate a key into an intermediate representation before adding it to the
+    dictionary.
     """
 
     def __init__(self, encoder=None):
         super(Dict, self).__init__()
-        self.encoder = encoder
+        self._encoder = encoder
+        self._id_max = 0
 
     def __setitem__(self, key, value):
-        if self.encoder is not None:
-            key = self.encoder(key)
+        if self._encoder is not None:
+            key = self._encoder(key)
         elif not isinstance(key, Hashable):
             key = tuple(key)
         super(Dict, self).__setitem__(key, value)
 
+    def _encode_key(self, key):
+        D = super(Dict, self)
+        enc_key = self._encoder(key)
+        if D.__contains__(enc_key):
+            val = D.__getitem__(enc_key)
+        else:
+            val = self._id_max
+            D.__setitem__(enc_key, val)
+            self._id_max += 1
+        return val
+
     def __getitem__(self, key):
         self._key = copy.deepcopy(key)
-        if self.encoder is not None:
-            val = self.encoder(key)
-            return val
+        if self._encoder is not None:
+            return self._encode_key(key)
         elif not isinstance(key, Hashable):
             key = tuple(key)
         return super(Dict, self).__getitem__(key)
 
     def __missing__(self, key):
         return self._key
+
+
+class EnvModel(object):
+    """
+    A simple tabular environment model that maintains the counts of each
+    reward-outcome pair given the state and action that preceded them. The
+    model can be queried with
+
+        >>> M = EnvModel()
+        >>> M[(state, action, reward, next_state)] += 1
+        >>> M[(state, action, reward, next_state)]
+        1
+        >>> M.state_action_pairs()
+        [(state, action)]
+        >>> M.outcome_probs(state, action)
+        [(next_state, 1)]
+    """
+
+    def __init__(self):
+        super(EnvModel, self).__init__()
+        self._model = defaultdict(lambda: defaultdict(lambda: 0))
+
+    def __setitem__(self, key, value):
+        s, a, r, s_ = key
+        self._model[(s, a)][(r, s_)] = value
+
+    def __getitem__(self, key):
+        s, a, r, s_ = key
+        return self._model[(s, a)][(r, s_)]
+
+    def __contains__(self, key):
+        s, a, r, s_ = key
+        p1 = (s, a) in self.state_action_pairs()
+        p2 = (r, s_) in self.reward_outcome_pairs()
+        return p1 and p2
+
+    def state_action_pairs(self):
+        """
+        Return all (state, action) pairs in the environment model
+        """
+        return list(self._model.keys())
+
+    def reward_outcome_pairs(self, s, a):
+        """
+        Return all (reward, next_state) pairs associated with taking action `a`
+        in state `s`.
+        """
+        return list(self._model[(s, a)].keys())
+
+    def outcome_probs(self, s, a):
+        """
+        Return the probability under the environment model of each outcome
+        state after taking action `a` in state `s`.
+
+        Parameters
+        ----------
+        s : int as returned by `self._obs2num`
+            The id for the state/observation
+        a : int as returned by `self._action2num`
+            The id for the action taken from state `s`
+
+        Returns
+        -------
+        outcome_probs : list of (state, prob) tuples
+            A list of each possible outcome and its associated probability
+            under the model
+        """
+        items = list(self._model[(s, a)].items())
+        total_count = np.sum([c for (_, c) in items])
+        outcome_probs = [c / total_count for (_, c) in items]
+        outcomes = [p for (p, _) in items]
+        return list(zip(outcomes, outcome_probs))
+
+    def state_action_pairs_leading_to_outcome(self, outcome):
+        """
+        Return all (state, action) pairs that have a nonzero probability of
+        producing `outcome` under the current model
+
+        Parameters
+        ----------
+        outcome : int
+            The outcome state
+
+        Returns
+        -------
+        pairs : list of (state, action) tuples
+            A list of all (state, action) pairs with a nonzero probability of
+            producing `outcome` under the model
+        """
+        pairs = []
+        for sa in self.state_action_pairs():
+            outcomes = [o for (r, o) in self.reward_outcome_pairs(*sa)]
+            if outcome in outcomes:
+                pairs.append(sa)
+        return pairs
 
 
 def tile_state_space(
