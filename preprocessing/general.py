@@ -13,6 +13,44 @@ except ImportError:
     _SCIPY = False
 
 
+def minibatch(X, batchsize=256, shuffle=True):
+    """
+    Compute the minibatch indices for a training dataset.
+
+    Parameters
+    ----------
+    X : numpy array of shape (N, ...)
+        The dataset to divide into minibatches. Assumes the first dimension
+        represents the number of training examples.
+    batchsize : int (default: 256)
+        The desired size of each minibatch. Note, however, that if X.shape[0] %
+        batchsize > 0 then the final batch will contain fewer than batchsize
+        entries.
+    shuffle : bool (default: True)
+        Whether to shuffle the entries in the dataset before dividing into
+        minibatches
+
+    Returns
+    -------
+    mb_generator : generator
+        A generator which yields the indices into X for each batch
+    n_batches: int
+        The number of batches
+    """
+    N = X.shape[0]
+    ix = np.arange(N)
+    n_batches = int(np.ceil(N / batchsize))
+
+    if shuffle:
+        np.random.shuffle(ix)
+
+    def mb_generator():
+        for i in range(n_batches):
+            yield ix[i * batchsize : (i + 1) * batchsize]
+
+    return mb_generator(), n_batches
+
+
 class FeatureHasher:
     def __init__(self, n_dim=256, sparse=True):
         """
