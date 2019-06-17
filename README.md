@@ -91,6 +91,11 @@ This repo includes code for the following models:
         - Unknown mean, known variance (Gaussian prior)
         - Unknown mean, unknown variance (Normal-Gamma / Normal-Inverse-Wishart prior)
 
+7. **n-Gram sequence models**
+    - Maximum likelihood scores
+    - Additive/Lidstone smoothing
+    - Simple Good-Turing smoothing
+
 7. **Reinforcement learning models**
     - Cross-entropy method agent
     - First visit on-policy Monte Carlo agent
@@ -99,12 +104,14 @@ This repo includes code for the following models:
     - TD-0 Q-learning agent
     - Dyna-Q / Dyna-Q+ with prioritized sweeping
 
-6. **Preprocessing**
+8. **Preprocessing**
     - Discrete Fourier transform (1D signals)
     - Bilinear interpolation (2D signals)
     - Nearest neighbor interpolation (1D and 2D signals)
-    - Signal windowing
     - Autocorrelation (1D signals)
+    - Signal windowing
+    - Text tokenization
+    - Feature hashing
 
 ## Contributing
 
