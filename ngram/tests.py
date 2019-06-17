@@ -35,6 +35,7 @@ class MLEGold:
         H = self.hyperparameters
         models, counts = {}, {}
         grams = {n: [] for n in range(1, N + 1)}
+        gg = {n: [] for n in range(1, N + 1)}
         filter_punc, filter_stop = H["filter_punctuation"], H["filter_stopwords"]
 
         n_words = 0
@@ -51,10 +52,22 @@ class MLEGold:
                     continue
 
                 n_words += len(words)
+                tokens.update(words)
 
                 # calculate n, n-1, ... 1-grams
                 for n in range(1, N + 1):
                     grams[n].append(
+                        nltk.ngrams(
+                            words,
+                            n,
+                            pad_left=True,
+                            pad_right=True,
+                            left_pad_symbol="<bol>",
+                            right_pad_symbol="<eol>",
+                        )
+                    )
+
+                    gg[n].extend(
                         list(
                             nltk.ngrams(
                                 words,
@@ -67,11 +80,9 @@ class MLEGold:
                         )
                     )
 
-                tokens.update(words)
-
         for n in range(1, N + 1):
-            counts[n] = nltk.FreqDist(grams[n])
-            models[n] = nltk.lm.MLE(n)
+            counts[n] = nltk.FreqDist(gg[n])
+            models[n] = nltk.lm.MLE(order=n)
             models[n].fit(grams[n], tokens)
 
         self.counts = counts
@@ -125,7 +136,7 @@ class AdditiveGold:
         filter_punc, filter_stop = H["filter_punctuation"], H["filter_stopwords"]
 
         n_words = 0
-        tokens = set([])
+        tokens = set()
 
         with open(corpus_fp, "r", encoding=encoding) as text:
             for line in text:
@@ -172,8 +183,8 @@ class AdditiveGold:
             models[n].fit(grams[n], tokens)
 
         self.counts = counts
-        self.n_words = n_words
         self._models = models
+        self.n_words = n_words
         self.n_tokens = len(vocab) if vocab is not None else len(tokens)
 
     def log_prob(self, words, N):
@@ -205,6 +216,11 @@ def test_mle():
         if k[0] == k[1] and k[0] in ("<bol>", "<eol>"):
             continue
 
+        err_str = "{}, mine: {}, gold: {}"
+        assert mine.counts[N][k] == gold.counts[N][k], err_str.format(
+            k, mine.counts[N][k], gold.counts[N][k]
+        )
+
         M = mine.log_prob(k, N)
         G = gold.log_prob(k, N) / np.log2(np.e)  # convert to log base e
         np.testing.assert_allclose(M, G)
@@ -213,7 +229,7 @@ def test_mle():
 
 def test_additive():
     K = np.random.rand()
-    N = np.random.randint(1, 5)
+    N = np.random.randint(2, 5)
     gold = AdditiveGold(
         N, K, unk=True, filter_stopwords=False, filter_punctuation=False
     )
@@ -227,6 +243,12 @@ def test_additive():
     for k in mine.counts[N].keys():
         if k[0] == k[1] and k[0] in ("<bol>", "<eol>"):
             continue
+
+        err_str = "{}, mine: {}, gold: {}"
+        assert mine.counts[N][k] == gold.counts[N][k], err_str.format(
+            k, mine.counts[N][k], gold.counts[N][k]
+        )
+
         M = mine.log_prob(k, N)
         G = gold.log_prob(k, N) / np.log2(np.e)  # convert to log base e
         np.testing.assert_allclose(M, G)

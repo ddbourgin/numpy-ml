@@ -7,6 +7,7 @@ sys.path.append("..")
 
 import numpy as np
 
+from linear_models.lm import LinearRegression
 from preprocessing.nlp import tokenize_words, ngrams
 
 
@@ -46,10 +47,18 @@ class NGramBase(ABC):
             The path to a newline-separated text corpus file
         vocab : `preprocessing.nlp.Vocabulary` instance (default: None)
             If not `None`, only the words in `vocab` will be used to construct
-            the language model
+            the language model; all out-of-vocabulary words will either be
+            mappend to <unk> (if self.unk = True) or removed (if self.unk =
+            False).
         encoding : str (default: None)
             Specifies the text encoding for corpus. Common entries are 'utf-8',
             'utf-8-sig', 'utf-16'.
+        """
+        return self._train(corpus_fp, vocab=vocab, encoding=encoding)
+
+    def _train(self, corpus_fp, vocab=None, encoding=None):
+        """
+        Actual N-gram training logic
         """
         H = self.hyperparameters
         grams = {N: [] for N in range(1, self.N + 1)}
@@ -146,13 +155,15 @@ class NGramBase(ABC):
         words = seed_words.copy()
         while counter < n_sentences:
             nextw, probs = zip(*self.completions(words, N))
-            next_word = np.random.choice(nextw, p=np.exp(probs))
+            probs = np.exp(probs) / np.exp(probs).sum()  # renormalize probs if smoothed
+            next_word = np.random.choice(nextw, p=probs)
 
             # if we reach the end of a sentence, save it and start a new one
             if next_word == "<eol>":
                 S = " ".join([w for w in words if w != "<bol>"])
                 S = textwrap.fill(S, 90, initial_indent="", subsequent_indent="   ")
                 print(S)
+                words.append(next_word)
                 sentences.append(words)
                 words = seed_words.copy()
                 counter += 1
@@ -160,6 +171,64 @@ class NGramBase(ABC):
 
             words.append(next_word)
         return sentences
+
+    def perplexity(self, words, N):
+        """
+        Calculate the model perplexity on a sequence of words. Perplexity,
+        PP, is defined as
+
+                PP(W) = ( 1 / p(W) ) ^ (1 / n)
+            log PP(W) = (1 / n) * log(1 / p(W))
+                      = -(1 / n) * log p(W)
+                PP(W) = np.exp(-(1 / n) * log p(W))
+                      = np.exp(cross_entropy(W))
+
+        where n is the number of `N`-grams in W.
+
+        The higher the conditional probability of the word sequence, the lower
+        the perplexity. Thus, minimizing perplexity is equivalent to maximizing
+        the probability of `words` under the `N`-gram model.
+
+        Perplexity is equivalent to the average branching factor in predicting
+        the next word.
+
+        Parameters
+        ----------
+        N : int
+            The gram-size of the model to calculate perplexity with
+        words : list or tuple of strings
+            The sequence of words to compute perplexity on
+
+        Returns
+        -------
+        perplexity : float
+            The model perlexity for the words in `words`
+        """
+        return np.exp(self.cross_entropy(words, N))
+
+    def cross_entropy(self, words, N):
+        """
+        Calculate the model cross-entropy on a sequence of words. Cross-entropy,
+        XE, is defined as
+
+                XE(W) = -(1 / n) * log p(W)
+
+        where n is the number of N-grams in W.
+
+        Parameters
+        ----------
+        N : int
+            The gram-size of the model to calculate cross-entropy on
+        words : list or tuple of strings
+            The sequence of words to compute cross-entropy on
+
+        Returns
+        -------
+        cross_entropy : float
+            The model cross-entropy for the words in `words`
+        """
+        n_ngrams = len(ngrams(words, N))
+        return -(1 / n_ngrams) * self.log_prob(words, N)
 
     def _log_prob(self, words, N):
         """Calculate the log probability of a sequence of words under the `N`-gram model"""
@@ -334,7 +403,205 @@ class AdditiveNGram(NGramBase):
         counts, n_words, n_tokens = self.counts, self.n_words[1], self.n_tokens[1]
 
         ctx = ngram[:-1]
-        ctx_count = counts[N - 1][ctx] if N > 1 else n_words
         num = counts[N][ngram] + K
+        ctx_count = counts[N - 1][ctx] if N > 1 else n_words
         den = ctx_count + K * n_tokens
         return np.log(num / den) if den != 0 else -np.inf
+
+
+class GoodTuringNGram(NGramBase):
+    def __init__(
+        self, N, conf=1.96, unk=True, filter_stopwords=True, filter_punctuation=True
+    ):
+        """
+        An N-Gram model with smoothed probabilities calculated with the simple
+        Good-Turing estimator from Gale (2001).
+
+        Parameters
+        ----------
+        N : int
+            The maximum length (in words) of the context-window to use in the
+            langauge model. Model will compute all n-grams from 1, ..., N
+        conf: float (default: 1.96)
+            The multiplier of the standard deviation of the empirical smoothed
+            count (the default, 1.96, corresponds to a 95% confidence
+            interval). Controls how many datapoints are smoothed using the
+            log-linear model.
+        unk : bool (default: True)
+            Whether to include the <unk> (unknown) token in the LM
+        filter_stopwords : bool (default: True)
+            Whether to remove stopwords before training
+        filter_punctuation : bool (default: True)
+            Whether to remove punctuation before training
+        """
+        super().__init__(N, unk, filter_stopwords, filter_punctuation)
+        self.hyperparameters["id"] = "GoodTuringNGram"
+        self.hyperparameters["conf"] = conf
+
+    def train(self, corpus_fp, vocab=None, encoding=None):
+        """
+        Compile the n-gram counts for the text(s) in `corpus_fp`. Upon
+        completion the `self.counts` attribute will store dictionaries of the
+        N, N-1, ..., 1-gram counts.
+
+        Parameters
+        ----------
+        corpus_fp : str
+            The path to a newline-separated text corpus file
+        vocab : `preprocessing.nlp.Vocabulary` instance (default: None)
+            If not `None`, only the words in `vocab` will be used to construct
+            the language model; all out-of-vocabulary words will either be
+            mappend to <unk> (if self.unk = True) or removed (if self.unk =
+            False).
+        encoding : str (default: None)
+            Specifies the text encoding for corpus. Common entries are 'utf-8',
+            'utf-8-sig', 'utf-16'.
+        """
+        self._train(corpus_fp, vocab=None, encoding=None)
+        self._calc_smoothed_counts()
+
+    def log_prob(self, words, N):
+        """
+        Compute the smoothed log probability of a sequence of words under the
+        `N`-gram language model with Good-Turing smoothing.  For a bigram,
+        this amounts to:
+
+            P(w_i | w_{i-1}) = C* / Count(w_{i-1})
+
+        where C* is the Good-Turing smoothed estimate of the bigram count:
+
+            C* = [ (c + 1) * NumCounts(c + 1, 2) ] / NumCounts(c, 2)
+
+        where
+
+            c = Count(w_{i-1}, w_i)
+            NumCounts(r, k) = |{ k-gram : Count(k-gram) = r }|
+
+        In words, the probability of an N-gram that occurs r times in the
+        corpus is estimated by dividing up the probability mass occupied by
+        N-grams that occur r+1 times.
+
+        For large values of r, NumCounts becomes unreliable. In this case, we
+        compute a smoothed version of NumCounts using a power law function,
+        log(NumCounts(r)) = a * log(r) + b.
+
+        Under the Good-Turing estimator, the total probability assigned to
+        unseen N-grams is equal to the relative occurrence of N-grams that
+        appear only once.
+
+        Parameters
+        ----------
+        words : list of strings
+            A sequence of words
+        N : int
+            The gram-size of the language model to use when calculating the log
+            probabilities of the sequence
+
+        Returns
+        -------
+        total_prob : float
+            The total log-probability of the sequence `words` under the
+            `N`-gram language model
+        """
+        return self._log_prob(words, N)
+
+    def _calc_smoothed_counts(self):
+        use_interp = False
+        counts = self.counts
+        NC = self._num_grams_with_count
+        conf = self.hyperparameters["conf"]
+
+        totals = {N: 0 for N in range(1, self.N + 1)}
+        smooth_counts = {N: {} for N in range(1, self.N + 1)}
+
+        # calculate the probability of all <unk> (i.e., unseen) n-grams
+        self._p0 = {n: NC(1, n) / sum(counts[n].values()) for n in range(1, self.N + 1)}
+
+        # fit log-linear models for predicting smoothed counts in absence of
+        # real data
+        self._fit_count_models()
+
+        LM = self._count_models
+        for N in range(1, self.N + 1):
+            for C in sorted(set(counts[N].values())):
+
+                # estimate the interpolated count using the log-linear model
+                c1_lm = np.exp(LM[N].predict(np.c_[np.log(C + 1)])).item()
+                c0_lm = np.exp(LM[N].predict(np.c_[np.log(C)])).item()
+                count_interp = ((C + 1) * c1_lm) / c0_lm
+
+                # if we have previously been using the interpolated count, or
+                # if the number of ocurrences of C+1 is 0, use the interpolated
+                # count as the smoothed count value C*
+                c1, c0 = NC(C + 1, N), NC(C, N)
+                if use_interp or c1 == 0:
+                    use_interp = True
+                    smooth_counts[N][C] = count_interp
+                    totals[N] += c0 * smooth_counts[N][C]
+                    continue
+
+                # estimate the smoothed count C* empirically if the number of
+                # terms with count C + 1 > 0
+                count_emp = ((C + 1) * c1) / c0
+
+                # compute the approximate variance of the empirical smoothed
+                # count C* given C
+                t = conf * np.sqrt((C + 1) ** 2 * (c1 / c0 ** 2) * (1 + c1 / c0))
+
+                # if the difference between the empirical and interpolated
+                # smoothed counts is greater than t, the empirical estimate
+                # tends to be more accurate. otherwise, use interpolated
+                if np.abs(count_interp - count_emp) > t:
+                    smooth_counts[N][C] = count_emp
+                    totals[N] += c0 * smooth_counts[N][C]
+                    continue
+
+                use_interp = True
+                smooth_counts[N][C] = count_interp
+                totals[N] += c0 * smooth_counts[N][C]
+
+        self._smooth_totals = totals
+        self._smooth_counts = smooth_counts
+
+    def _log_ngram_prob(self, ngram):
+        """Return the smoothed log probability of the ngram"""
+        N = len(ngram)
+        sc, T = self._smooth_counts[N], self._smooth_totals[N]
+        n_tokens, n_seen = self.n_tokens[N], len(self.counts[N])
+
+        # approx. prob of an out-of-vocab ngram (i.e., a fraction of p0)
+        n_unseen = max((n_tokens ** N) - n_seen, 1)
+        prob = np.log(self._p0[N] / n_unseen)
+
+        if ngram in self.counts[N]:
+            C = self.counts[N][ngram]
+            prob = np.log(1 - self._p0[N]) + np.log(sc[C]) - np.log(T)
+        return prob
+
+    def _fit_count_models(self):
+        """
+        Perform the averaging transform proposed by Church and Gale (1991):
+        estimate the expected count-of-counts by the *density* of
+        count-of-count values.
+        """
+        self._count_models = {}
+        NC = self._num_grams_with_count
+        for N in range(1, self.N + 1):
+            X, Y = [], []
+            sorted_counts = sorted(set(self.counts[N].values()))  # r
+
+            for ix, j in enumerate(sorted_counts):
+                i = 0 if ix == 0 else sorted_counts[ix - 1]
+                k = 2 * j - i if ix == len(sorted_counts) - 1 else sorted_counts[ix + 1]
+                y = 2 * NC(j, N) / (k - i)
+                X.append(j)
+                Y.append(y)
+
+            # fit log-linear model: log(counts) ~ log(average_transform(counts))
+            self._count_models[N] = LinearRegression(fit_intercept=True)
+            self._count_models[N].fit(np.log(X), np.log(Y))
+            b, a = self._count_models[N].beta
+
+            if a > -1:
+                fstr = "[Warning] Log-log averaging transform has slope > -1 for N={}"
+                print(fstr.format(N))
