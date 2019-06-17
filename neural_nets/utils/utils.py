@@ -13,7 +13,7 @@ def minibatch(X, batchsize=256, shuffle=True):
     ----------
     X : numpy array of shape (N, ...)
         The dataset to divide into minibatches. Assumes the first dimension
-        specifies the number of training examples.
+        represents the number of training examples.
     batchsize : int (default: 256)
         The desired size of each minibatch. Note, however, that if X.shape[0] %
         batchsize > 0 then the final batch will contain fewer than batchsize
