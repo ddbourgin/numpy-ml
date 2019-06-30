@@ -1,5 +1,7 @@
 import re
+import heapq
 import os.path as op
+from collections import Counter
 
 import numpy as np
 
@@ -370,6 +372,132 @@ def strip_punctuation(line):
 
 
 #######################################################################
+#                            Huffman Tree                             #
+#######################################################################
+
+
+class Node(object):
+    def __init__(self, key, val):
+        self.key = key
+        self.val = val
+        self.left = None
+        self.right = None
+
+    def __gt__(self, other):
+        if not isinstance(other, Node):
+            return -1
+        return self.val > other.val
+
+    def __ge__(self, other):
+        if not isinstance(other, Node):
+            return -1
+        return self.val >= other.val
+
+    def __lt__(self, other):
+        if not isinstance(other, Node):
+            return -1
+        return self.val < other.val
+
+    def __le__(self, other):
+        if not isinstance(other, Node):
+            return -1
+        return self.val <= other.val
+
+
+class HuffmanEncoder(object):
+    """Encode text into a variable-length bit string using a Huffman tree"""
+
+    def fit(self, text):
+        """
+        Build a Huffman tree for the tokens in `text` and compute each token's
+        binary encoding.
+
+        Parameters
+        ----------
+        text: list of strs or `Vocabulary` instance
+            The tokenized text to encode or a pretrained Vocabulary object
+        """
+        self._build_tree(text)
+        self._generate_codes()
+
+    def transform(self, text):
+        if isinstance(text, str):
+            text = [text]
+        for token in set(text):
+            if token not in self._item2code:
+                raise Warning("Token '{}' not in Huffman tree. Skipping".format(token))
+        return [self._item2code.get(t, None) for t in text]
+
+    def inverse_transform(self, codes):
+        if isinstance(codes, str):
+            codes = [codes]
+        for code in set(codes):
+            if code not in self._code2item:
+                raise Warning("Code '{}' not in Huffman tree. Skipping".format(code))
+        return [self._code2item.get(c, None) for c in codes]
+
+    @property
+    def tokens(self):
+        return list(self._item2code.keys())
+
+    @property
+    def codes(self):
+        return list(self._code2item.keys())
+
+    def _counter(self, text):
+        counts = {}
+        for item in text:
+            counts[item] = counts.get(item, 0) + 1
+        return counts
+
+    def _build_tree(self, text):
+        """Construct Huffman Tree"""
+        PQ = []
+
+        if isinstance(text, Vocabulary):
+            counts = text.counts
+        else:
+            counts = self._counter(text)
+
+        for (k, c) in counts.items():
+            PQ.append(Node(k, c))
+
+        # create a priority queue with priority = item frequency
+        heapq.heapify(PQ)
+
+        while len(PQ) > 1:
+            node1 = heapq.heappop(PQ)  # item with smallest frequency
+            node2 = heapq.heappop(PQ)  # item with second smallest frequency
+
+            parent = Node(None, node1.val + node2.val)
+            parent.left = node1
+            parent.right = node2
+
+            heapq.heappush(PQ, parent)
+
+        self._root = heapq.heappop(PQ)
+
+    def _generate_codes(self):
+        current_code = ""
+        self._item2code = {}
+        self._code2item = {}
+        self._build_code(self._root, current_code)
+
+    def _build_code(self, root, current_code):
+        if root is None:
+            return
+
+        if root.key is not None:
+            self._item2code[root.key] = current_code
+            self._code2item[current_code] = root.key
+            return
+
+        # 0 = move left, 1 = move right
+        self._build_code(root.left, current_code + "0")
+        self._build_code(root.right, current_code + "1")
+
+
+#######################################################################
 #                             Containers                              #
 #######################################################################
 
@@ -387,9 +515,9 @@ class Vocabulary:
     def __init__(
         self,
         corpus_fp,
-        encoding=None,
         min_count=None,
         max_tokens=None,
+        encoding="utf-8-sig",
         filter_stopwords=True,
         filter_punctuation=True,
     ):
@@ -399,10 +527,9 @@ class Vocabulary:
         Parameters
         ----------
         corpus_fp : str
-            The filepath to the text to be encoded
-        encoding : str (default: None)
-            Specifies the text encoding for corpus. Common entries are either
-            'utf-8' (no header byte), or 'utf-8-sig' (header byte).
+            The filepath to the text to be encoded. The corpus is expected to
+            be encoded as newline-separated strings of text, with adjacent
+            tokens separated by a whitespace character.
         min_count : int (default: None)
             Minimum number of times a token must occur in order to be included
             in vocab. If `None`, include all tokens from `corpus_fp` in vocab.
@@ -410,6 +537,9 @@ class Vocabulary:
             Only add the `max_tokens` most frequent tokens that occur more
             than `min_count` to the vocabulary.  If None, add all tokens
             greater that occur more than than `min_count`.
+        encoding : str (default: 'utf-8-sig')
+            Specifies the text encoding for corpus. Common entries are either
+            'utf-8' (no header byte), or 'utf-8-sig' (header byte).
         filter_stopwords : bool (default: True)
             Whether to remove stopwords before encoding the words in the corpus
         filter_punctuation : bool (default: True)
@@ -419,6 +549,7 @@ class Vocabulary:
         assert op.isfile(corpus_fp), "{} does not exist".format(corpus_fp)
 
         self.hyperparameters = {
+            "id": "Vocabulary",
             "encoding": encoding,
             "corpus_fp": corpus_fp,
             "min_count": min_count,
@@ -433,7 +564,7 @@ class Vocabulary:
         return len(self._tokens)
 
     def __iter__(self):
-        return iter(self._tokens)
+        return iter(self._tokens.word)
 
     def __contains__(self, word):
         return word in self._word2idx
@@ -445,31 +576,39 @@ class Vocabulary:
             return self._tokens[key]
 
     @property
-    def words(self):
-        """A list of all the words in the vocabulary"""
-        return list(self._word2idx.keys())
+    def n_tokens(self):
+        """The number of unique word tokens in the vocabulary"""
+        return len(self._word2idx)
+
+    @property
+    def n_words(self):
+        """The total number of words in the corpus"""
+        return sum(self.counts.values())
 
     @property
     def shape(self):
-        """The number of word tokens in the vocabulary"""
+        """The number of unique word tokens in the vocabulary"""
         return self._tokens.shape
 
-    def indices(self):
-        """Return all valid token indices"""
-        return list(self._idx2word.keys())
+    def most_common(self, n=5):
+        """Return the top `n` most common tokens in the corpus"""
+        return self.counts.most_common()[:n]
 
-    def filter_words(self, words, unk=True):
+    def words_with_count(self, k):
+        """Return all tokens that occur `k` times in the corpus"""
+        return [w for w, c in self.counts.items() if c == k]
+
+    def filter(self, words, unk=True):
         """
-        Filter out or replace any word in `words` that does not occur in
-        vocabulary
+        Filter or replace any word in `words` that does not occur in `Vocabulary`
 
         Parameters
         ----------
         words : list of strs
             A list of words to filter
         unk : bool (default: True)
-            Whether to either replace any out of vocabulary words in `words`
-            with the <unk> token or remove them entirely
+            Whether to replace any out of vocabulary words in `words` with the
+            <unk> token (unk = True) or skip them entirely (unk = False)
 
         Returns
         -------
@@ -517,31 +656,6 @@ class Vocabulary:
         unk = "<unk>"
         return [self._idx2word[i] if i in self._idx2word else unk for i in indices]
 
-    def unigram_counts(self, words):
-        """
-        Return the unigram counts in Vocabulary for each word in `words`. If a
-        word isn't in the vocabulary, return -1
-
-        Parameters
-        ----------
-        words : list of strs
-            A list of words to count
-
-        Returns
-        -------
-        counts : list of ints
-            The number of occurrences of each word in the corpus
-        """
-        counts = []
-        for word in words:
-            count = -1
-            word = word.lower()
-            if word in self:
-                ix = self._word2idx[word]
-                count = self._tokens[ix].count
-            counts.append(count)
-        return counts
-
     def _encode(self):
         tokens = []
         H = self.hyperparameters
@@ -553,7 +667,7 @@ class Vocabulary:
         max_tokens = H["max_tokens"]
         corpus_fp, min_count = H["corpus_fp"], H["min_count"]
 
-        # encode special characters
+        # encode special tokens
         for tt in ["<bol>", "<eol>", "<unk>"]:
             word2idx[tt] = len(tokens)
             idx2word[len(tokens)] = tt
@@ -592,6 +706,8 @@ class Vocabulary:
         if max_tokens is not None and len(tokens) > max_tokens:
             self._keep_top_n_tokens()
 
+        counts = {w: self._tokens[ix].count for w, ix in self._word2idx.items()}
+        self.counts = Counter(counts)
         self._tokens = np.array(self._tokens)
 
     def _keep_top_n_tokens(self):
@@ -625,7 +741,7 @@ class Vocabulary:
         self._word2idx = word2idx
         self._idx2word = idx2word
 
-        assert len(self._tokens) == N
+        assert len(self._tokens) <= N
 
     def _drop_low_freq_tokens(self):
         """
