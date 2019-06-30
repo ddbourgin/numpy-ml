@@ -96,7 +96,7 @@ This repo includes code for the following models:
     - Additive/Lidstone smoothing
     - Simple Good-Turing smoothing
 
-7. **Reinforcement learning models**
+8. **Reinforcement learning models**
     - Cross-entropy method agent
     - First visit on-policy Monte Carlo agent
     - Weighted incremental importance sampling Monte Carlo agent
@@ -104,7 +104,11 @@ This repo includes code for the following models:
     - TD-0 Q-learning agent
     - Dyna-Q / Dyna-Q+ with prioritized sweeping
 
-8. **Preprocessing**
+9. **Nonparameteric models**
+    - Nadaraya-Watson kernel regression
+    - k-Nearest neighbors classification and regression
+
+10. **Preprocessing**
     - Discrete Fourier transform (1D signals)
     - Bilinear interpolation (2D signals)
     - Nearest neighbor interpolation (1D and 2D signals)
@@ -112,10 +116,21 @@ This repo includes code for the following models:
     - Signal windowing
     - Text tokenization
     - Feature hashing
+    - Feature standardization
+    - One-hot encoding / decoding
+    - Huffman coding / decoding
+
+11. **Utilities**
+    - Similarity kernels
+    - Distance metrics
+    - Priority queues
+    - Ball tree
 
 ## Contributing
 
 Am I missing your favorite model? Is there something that could be cleaner /
 less confusing? Did I mess something up? Submit a PR! The only requirement is
-that your models are written with just the [Python standard library](https://docs.python.org/3/library/) and numpy.
-
+that your models are written with just the [Python standard
+library](https://docs.python.org/3/library/) and [numpy](https://www.numpy.org/). The
+[SciPy library](https://scipy.github.io/devdocs/) is also permitted under special
+circumstances ;)
