@@ -25,7 +25,7 @@ class GradientBoostedDecisionTree:
         f_m(X) = b(X) + lr * w_1 * g_1 + ... + lr * w_m * g_m
 
     where b is a fixed initial estimate for the targets, lr is a learning rate
-    paramter, and w* and g* denote the weights and learner predictions for
+    parameter, and w* and g* denote the weights and learner predictions for
     subsequent fits.
 
     We fit each w and g iteratively using a greedy strategy so that at each
@@ -35,7 +35,7 @@ class GradientBoostedDecisionTree:
 
     On each iteration we fit a new weak learner to predict the negative
     gradient of the loss with respect to the previous prediction, f_{i-1}(X).
-    We then use the elementwise product of the predictions of this weak
+    We then use the element-wise product of the predictions of this weak
     learner, g_i, with a weight, w_i, to compute the amount to adjust the
     predictions of our model at the previous iteration, f_{i-1}(X):
 
