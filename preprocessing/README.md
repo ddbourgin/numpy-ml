@@ -6,12 +6,16 @@ The preprocessing module implements common data preprocessing routines.
     - Word and character tokenization
     - Punctuation and stop-word removal
     - Vocabulary / unigram count objects
+    - [Huffman tree](https://en.wikipedia.org/wiki/Huffman_coding) encoding / decoding
+
 - `dsp.py`: Routines for handling audio and image data.
     - Signal windowing
     - Signal autocorrelation
     - Discrete Fourier transform    
     - Signal resampling via (bi-)linear interpolation and nearest neighbor
     
-- `general.py`: General data preprocessing functions.
+- `general.py`: General data preprocessing objects and functions.
     - Feature hashing ([Moody, 1989](http://papers.nips.cc/paper/175-fast-learning-in-multi-resolution-hierarchies.pdf))
     - Mini-batch generators
+    - One-hot encoding / decoding
+    - Feature standardization
