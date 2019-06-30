@@ -1,0 +1,177 @@
+import sys
+
+sys.path.append("..")
+
+import numpy as np
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# https://seaborn.pydata.org/generated/seaborn.set_context.html
+# https://seaborn.pydata.org/generated/seaborn.set_style.html
+sns.set_style("white")
+sns.set_context("paper", font_scale=0.5)
+
+from linear_models.lm import LinearRegression
+from kernel_regression import KernelRegression
+from knn import KNN
+
+from sklearn.model_selection import train_test_split
+from sklearn.datasets import make_regression
+
+
+def random_regression_problem(n_ex, n_in, n_out, d=3, intercept=0, std=1, seed=0):
+    coef = np.random.uniform(0, 50, size=d)
+    coef[-1] = intercept
+
+    y = []
+    X = np.random.uniform(-100, 100, size=(n_ex, n_in))
+    for x in X:
+        val = np.polyval(coef, x) + np.random.normal(0, std)
+        y.append(val)
+    y = np.array(y)
+
+    #  X, y, coef = make_regression(
+    #      n_samples=n_ex,
+    #      n_features=n_in,
+    #      n_targets=n_out,
+    #      bias=intercept,
+    #      noise=std,
+    #      coef=True,
+    #      random_state=seed,
+    #  )
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.3, random_state=seed
+    )
+    return X_train, y_train, X_test, y_test, coef
+
+
+def plot_regression():
+    np.random.seed(12345)
+    fig, axes = plt.subplots(4, 4)
+    for i, ax in enumerate(axes.flatten()):
+        n_in = 1
+        n_out = 1
+        d = np.random.randint(1, 5)
+        n_ex = np.random.randint(5, 500)
+        std = np.random.randint(0, 1000)
+        intercept = np.random.rand() * np.random.randint(-300, 300)
+        X_train, y_train, X_test, y_test, coefs = random_regression_problem(
+            n_ex, n_in, n_out, d=d, intercept=intercept, std=std, seed=i
+        )
+
+        LR = LinearRegression(fit_intercept=True)
+        LR.fit(X_train, y_train)
+        y_pred = LR.predict(X_test)
+        loss = np.mean((y_test.flatten() - y_pred.flatten()) ** 2)
+
+        d = 3
+        best_loss = np.inf
+        for gamma in np.linspace(1e-10, 1, 100):
+            for c0 in np.linspace(-1, 1000, 100):
+                kernel = "PolynomialKernel(d={}, gamma={}, c0={})".format(d, gamma, c0)
+                KR_poly = KernelRegression(kernel=kernel)
+                KR_poly.fit(X_train, y_train)
+                y_pred_poly = KR_poly.predict(X_test)
+                loss_poly = np.mean((y_test.flatten() - y_pred_poly.flatten()) ** 2)
+                if loss_poly <= best_loss:
+                    KR_poly_best = kernel
+                    best_loss = loss_poly
+
+        print("Best kernel: {} || loss: {:.4f}".format(KR_poly_best, best_loss))
+        KR_poly = KernelRegression(kernel=KR_poly_best)
+        KR_poly.fit(X_train, y_train)
+
+        KR_rbf = KernelRegression(kernel="RBFKernel(gamma=0.01)")
+        KR_rbf.fit(X_train, y_train)
+        y_pred_rbf = KR_rbf.predict(X_test)
+        loss_rbf = np.mean((y_test.flatten() - y_pred_rbf.flatten()) ** 2)
+
+        xmin = min(X_test) - 0.1 * (max(X_test) - min(X_test))
+        xmax = max(X_test) + 0.1 * (max(X_test) - min(X_test))
+        X_plot = np.linspace(xmin, xmax, 100)
+        y_plot = LR.predict(X_plot)
+        y_plot_poly = KR_poly.predict(X_plot)
+        y_plot_rbf = KR_rbf.predict(X_plot)
+
+        ax.scatter(X_test, y_test, alpha=0.5)
+        ax.plot(X_plot, y_plot, label="OLS", alpha=0.5)
+        ax.plot(
+            X_plot, y_plot_poly, label="KR (poly kernel, d={})".format(d), alpha=0.5
+        )
+        ax.plot(X_plot, y_plot_rbf, label="KR (rbf kernel)", alpha=0.5)
+        ax.legend()
+        #  ax.set_title(
+        #      "MSE\nLR: {:.2f} KR (poly): {:.2f}\nKR (rbf): {:.2f}".format(
+        #          loss, loss_poly, loss_rbf
+        #      )
+        #  )
+
+        ax.xaxis.set_ticklabels([])
+        ax.yaxis.set_ticklabels([])
+
+    plt.tight_layout()
+    plt.savefig("img/kr_plots.png", dpi=300)
+    plt.close("all")
+
+
+def plot_knn():
+    np.random.seed(12345)
+    fig, axes = plt.subplots(4, 4)
+    for i, ax in enumerate(axes.flatten()):
+        n_in = 1
+        n_out = 1
+        d = np.random.randint(1, 5)
+        n_ex = np.random.randint(5, 500)
+        std = np.random.randint(0, 1000)
+        intercept = np.random.rand() * np.random.randint(-300, 300)
+        X_train, y_train, X_test, y_test, coefs = random_regression_problem(
+            n_ex, n_in, n_out, d=d, intercept=intercept, std=std, seed=i
+        )
+
+        LR = LinearRegression(fit_intercept=True)
+        LR.fit(X_train, y_train)
+        y_pred = LR.predict(X_test)
+        loss = np.mean((y_test.flatten() - y_pred.flatten()) ** 2)
+
+        knn_1 = KNN(k=1, classifier=False, leaf_size=10, weights="uniform")
+        knn_1.fit(X_train, y_train)
+        y_pred_1 = knn_1.predict(X_test)
+        loss_1 = np.mean((y_test.flatten() - y_pred_1.flatten()) ** 2)
+
+        knn_5 = KNN(k=5, classifier=False, leaf_size=10, weights="uniform")
+        knn_5.fit(X_train, y_train)
+        y_pred_5 = knn_5.predict(X_test)
+        loss_5 = np.mean((y_test.flatten() - y_pred_5.flatten()) ** 2)
+
+        knn_10 = KNN(k=10, classifier=False, leaf_size=10, weights="uniform")
+        knn_10.fit(X_train, y_train)
+        y_pred_10 = knn_10.predict(X_test)
+        loss_10 = np.mean((y_test.flatten() - y_pred_10.flatten()) ** 2)
+
+        xmin = min(X_test) - 0.1 * (max(X_test) - min(X_test))
+        xmax = max(X_test) + 0.1 * (max(X_test) - min(X_test))
+        X_plot = np.linspace(xmin, xmax, 100)
+        y_plot = LR.predict(X_plot)
+        y_plot_1 = knn_1.predict(X_plot)
+        y_plot_5 = knn_5.predict(X_plot)
+        y_plot_10 = knn_10.predict(X_plot)
+
+        ax.scatter(X_test, y_test, alpha=0.5)
+        ax.plot(X_plot, y_plot, label="OLS", alpha=0.5)
+        ax.plot(X_plot, y_plot_1, label="KNN (k=1)", alpha=0.5)
+        ax.plot(X_plot, y_plot_5, label="KNN (k=5)", alpha=0.5)
+        ax.plot(X_plot, y_plot_10, label="KNN (k=10)", alpha=0.5)
+        ax.legend()
+        #  ax.set_title(
+        #      "MSE\nLR: {:.2f} KR (poly): {:.2f}\nKR (rbf): {:.2f}".format(
+        #          loss, loss_poly, loss_rbf
+        #      )
+        #  )
+
+        ax.xaxis.set_ticklabels([])
+        ax.yaxis.set_ticklabels([])
+
+    plt.tight_layout()
+    plt.savefig("img/knn_plots.png", dpi=300)
+    plt.close("all")
