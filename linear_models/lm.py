@@ -2,12 +2,117 @@ import numbers
 import numpy as np
 
 
-class BayesianLinearRegressionUnknownVariance:
+class LinearRegression:
     """
-    Recall the simple linear regression model
+    The simple linear regression model is
 
+        y = bX + e  where e ~ N(0, sigma^2 * I)
+
+    In probabilistic terms this corresponds to
+
+        y - bX ~ N(0, sigma^2 * I)
         y | X, b ~ N(bX, sigma^2 * I)
 
+    The MLE for the model parameters b can be computed in closed form via the
+    normal equation:
+
+        b = (X^T X)^{-1} X^T y
+
+    where (X^T X)^{-1} X^T is sometimes called the pseudoinverse or the
+    Moore-Penrose inverse.
+    """
+
+    def __init__(self, fit_intercept=True):
+        self.beta = None
+        self.fit_intercept = fit_intercept
+
+    def fit(self, X, y):
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+
+        pseudo_inverse = np.dot(np.linalg.inv(np.dot(X.T, X)), X.T)
+        self.beta = np.dot(pseudo_inverse, y)
+
+    def predict(self, X):
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+        return np.dot(X, self.beta)
+
+
+class LogisticRegression:
+    def __init__(self, penalty="l2", gamma=0, fit_intercept=True):
+        """
+        A simple logistic regression model fit via gradient descent on the
+        penalized negative log likelihood.
+
+        Parameters
+        ----------
+        penalty : str (default: 'l2')
+            The type of regularization penalty to apply on the coefficients
+            `beta`. Valid entries are {'l2', 'l1'}.
+        gamma : float in [0, 1] (default: 0)
+            The regularization weight. Larger values correspond to larger
+            regularization penalties, and a value of 0 indicates no penalty.
+        fit_intercept : bool (default: True)
+            Whether to fit an intercept term in addition to the coefficients in
+            b. If True, the estimates for `beta` will have M+1 dimensions,
+            where the first dimension corresponds to the intercept
+        """
+        err_msg = "penalty must be 'l1' or 'l2', but got: {}".format(penalty)
+        assert penalty in ["l2", "l1"], err_msg
+        self.beta = None
+        self.gamma = gamma
+        self.penalty = penalty
+        self.fit_intercept = fit_intercept
+
+    def fit(self, X, y, lr=0.01, tol=1e-7, max_iter=1e7):
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+
+        l_prev = np.inf
+        self.beta = np.random.rand(X.shape[1])
+        for _ in range(int(max_iter)):
+            y_pred = sigmoid(np.dot(X, self.beta))
+            loss = self._NLL(X, y, y_pred)
+            if l_prev - loss < tol:
+                return
+            l_prev = loss
+            self.beta -= lr * self._NLL_grad(X, y, y_pred)
+
+    def _NLL(self, X, y, y_pred):
+        """
+        Penalized negative log likelihood of the targets under the current
+        model.
+
+        NLL = -1/N ([sum_{i=0}^N y_i log(y_pred_i) + (1-y_i) log(1-y_pred_i)] - (gamma ||b||) / 2)
+        """
+        N, M = X.shape
+        order = 2 if self.penalty == "l2" else 1
+        nll = -np.log(y_pred[y == 1]).sum() - np.log(1 - y_pred[y == 0]).sum()
+        penalty = 0.5 * self.gamma * np.linalg.norm(self.beta, ord=order)
+        return (penalty + nll) / N
+
+    def _NLL_grad(self, X, y, y_pred):
+        """ Gradient of the penalized negative log likelihood wrt beta """
+        N, M = X.shape
+        p = self.penalty
+        beta = self.beta
+        gamma = self.gamma
+        d_penalty = gamma * beta if p == "l2" else gamma * np.sign(beta)
+        return -(np.dot(y - y_pred, X) + d_penalty) / N
+
+    def predict(self, X):
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+        return sigmoid(np.dot(X, self.beta))
+
+
+class BayesianLinearRegressionUnknownVariance:
+    """
     Bayesian linear regression extends the simple linear regression model by
     introducing priors on model parameters b and/or sigma.
 
@@ -181,10 +286,6 @@ class BayesianLinearRegressionUnknownVariance:
 
 class BayesianLinearRegressionKnownVariance:
     """
-    Recall the simple linear regression model
-
-        y | X, b ~ N(bX, sigma^2 * I)
-
     Bayesian linear regression extends the simple linear regression model by
     introducing priors on model parameters b and/or sigma.
 
@@ -235,6 +336,10 @@ class BayesianLinearRegressionKnownVariance:
         conjugate Gaussian prior on b
 
             b | b_mean, sigma^2, b_V ~ N(b_mean, sigma^2 * b_V)
+
+        Ridge regression is a special case of this model where b_mean = 0,
+        sigma = 1 and b_V = I (ie., the prior on b is a zero-mean, unit
+        covariance Gaussian).
 
         Parameters
         ----------
@@ -315,118 +420,6 @@ class BayesianLinearRegressionKnownVariance:
         # predictive distribution
         self.posterior_predictive = {"dist": "Gaussian", "mu": mu, "cov": cov}
         return mu
-
-
-class LogisticRegression:
-    """
-    """
-
-    def __init__(self, penalty="l2", gamma=0, fit_intercept=True):
-        """
-        A simple logistic regression model fit via gradient descent on the
-        penalized negative log likelihood.
-
-        Parameters
-        ----------
-        penalty : str (default: 'l2')
-            The type of regularization penalty to apply on the coefficients
-            `beta`. Valid entries are {'l2', 'l1'}.
-        gamma : float in [0, 1] (default: 0)
-            The regularization weight. Larger values correspond to larger
-            regularization penalties, and a value of 0 indicates no penalty.
-        fit_intercept : bool (default: True)
-            Whether to fit an intercept term in addition to the coefficients in
-            b. If True, the estimates for `beta` will have M+1 dimensions,
-            where the first dimension corresponds to the intercept
-        """
-        err_msg = "penalty must be 'l1' or 'l2'. Current val: {}".format(penalty)
-        assert penalty in ["l2", "l1"], err_msg
-        self.beta = None
-        self.gamma = gamma
-        self.penalty = penalty
-        self.fit_intercept = fit_intercept
-
-    def fit(self, X, y, lr=0.01, tol=1e-7, max_iter=1e7):
-        # convert X to a design matrix if we're fitting an intercept
-        if self.fit_intercept:
-            X = np.c_[np.ones(X.shape[0]), X]
-
-        l_prev = np.inf
-        self.beta = np.random.rand(X.shape[1])
-        for _ in range(int(max_iter)):
-            y_pred = sigmoid(np.dot(X, self.beta))
-            loss = self._NLL(X, y, y_pred)
-            if l_prev - loss < tol:
-                return
-            l_prev = loss
-            self.beta -= lr * self._NLL_grad(X, y, y_pred)
-
-    def _NLL(self, X, y, y_pred):
-        """
-        Penalized negative log likelihood of the targets under the current
-        model.
-
-        NLL = -1/N ([sum_{i=0}^N y_i log(y_pred_i) + (1-y_i) log(1-y_pred_i)] - (gamma ||b||) / 2)
-        """
-        N, M = X.shape
-        order = 2 if self.penalty == "l2" else 1
-        nll = -np.log(y_pred[y == 1]).sum() - np.log(1 - y_pred[y == 0]).sum()
-        penalty = 0.5 * self.gamma * np.linalg.norm(self.beta, ord=order)
-        return (penalty + nll) / N
-
-    def _NLL_grad(self, X, y, y_pred):
-        """ Gradient of the penalized negative log likelihood wrt beta """
-        N, M = X.shape
-        p = self.penalty
-        beta = self.beta
-        gamma = self.gamma
-        d_penalty = gamma * beta if p == "l2" else gamma * np.sign(beta)
-        return -(np.dot(y - y_pred, X) + d_penalty) / N
-
-    def predict(self, X):
-        # convert X to a design matrix if we're fitting an intercept
-        if self.fit_intercept:
-            X = np.c_[np.ones(X.shape[0]), X]
-        return sigmoid(np.dot(X, self.beta))
-
-
-class LinearRegression:
-    """
-    The simple linear regression model is
-
-        y = bX + e  where e ~ N(0, sigma^2 * I)
-
-    In probabilistic terms this corresponds to
-
-        y - bX ~ N(0, sigma^2 * I)
-        y | X, b ~ N(bX, sigma^2 * I)
-
-    The MLE for the model parameters b can be computed in closed form via the
-    normal equation:
-
-        b = (X^T X)^{-1} X^T y
-
-    where (X^T X)^{-1} X^T is sometimes called the pseudoinverse or the
-    Moore-Penrose inverse.
-    """
-
-    def __init__(self, fit_intercept=True):
-        self.beta = None
-        self.fit_intercept = fit_intercept
-
-    def fit(self, X, y):
-        # convert X to a design matrix if we're fitting an intercept
-        if self.fit_intercept:
-            X = np.c_[np.ones(X.shape[0]), X]
-
-        pseudo_inverse = np.dot(np.linalg.inv(np.dot(X.T, X)), X.T)
-        self.beta = np.dot(pseudo_inverse, y)
-
-    def predict(self, X):
-        # convert X to a design matrix if we're fitting an intercept
-        if self.fit_intercept:
-            X = np.c_[np.ones(X.shape[0]), X]
-        return np.dot(X, self.beta)
 
 
 #######################################################################
