@@ -1,5 +1,8 @@
-import numbers
+import sys
 import numpy as np
+
+sys.path.append("..")
+from utils.testing import is_symmetric_positive_definite, is_number
 
 
 class LinearRegression:
@@ -13,13 +16,18 @@ class LinearRegression:
         y - bX ~ N(0, sigma^2 * I)
         y | X, b ~ N(bX, sigma^2 * I)
 
+    The loss for the model is simply the squared error between the model
+    predictions and the true values:
+
+        Loss = ||y - bX||^2
+
     The MLE for the model parameters b can be computed in closed form via the
     normal equation:
 
         b = (X^T X)^{-1} X^T y
 
-    where (X^T X)^{-1} X^T is sometimes called the pseudoinverse or the
-    Moore-Penrose inverse.
+    where (X^T X)^{-1} X^T is known as the pseudoinverse / Moore-Penrose
+    inverse.
     """
 
     def __init__(self, fit_intercept=True):
@@ -33,6 +41,62 @@ class LinearRegression:
 
         pseudo_inverse = np.dot(np.linalg.inv(np.dot(X.T, X)), X.T)
         self.beta = np.dot(pseudo_inverse, y)
+
+    def predict(self, X):
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+        return np.dot(X, self.beta)
+
+
+class RidgeRegression:
+    """
+    Ridge regression uses the same simple linear regression model but adds an
+    additional penalty on the L2-norm of the coefficients to the loss function.
+    This is sometimes known as Tikhonov regularization.
+
+    In particular, the ridge model is still simply
+
+        y = bX + e  where e ~ N(0, sigma^2 * I)
+
+    except now the error for the model is calcualted as
+
+        RidgeLoss = ||y - bX||^2 + alpha * ||b||^2
+
+    The MLE for the model parameters b can be computed in closed form via the
+    adjusted normal equation:
+
+        b = (X^T X + alpha I)^{-1} X^T y
+
+    where (X^T X + alpha I)^{-1} X^T is the pseudoinverse / Moore-Penrose
+    inverse adjusted for the L2 penalty on the model coefficients.
+    """
+
+    def __init__(self, alpha=1, fit_intercept=True):
+        """
+        A ridge regression model fit via the normal equation.
+
+        Parameters
+        ----------
+        alpha : float (default: 1)
+            L2 regularization coefficient. Higher values correspond to larger
+            penalty on the l2 norm of the model coefficients
+        fit_intercept : bool (default: True)
+            Whether to fit an additional intercept term in addition to the
+            model coefficients
+        """
+        self.beta = None
+        self.alpha = alpha
+        self.fit_intercept = fit_intercept
+
+    def fit(self, X, y):
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+
+        A = self.alpha * np.eye(X.shape[1])
+        pseudo_inverse = np.dot(np.linalg.inv(X.T @ X + A), X.T)
+        self.beta = pseudo_inverse @ y
 
     def predict(self, X):
         # convert X to a design matrix if we're fitting an intercept
@@ -87,7 +151,10 @@ class LogisticRegression:
         Penalized negative log likelihood of the targets under the current
         model.
 
-        NLL = -1/N ([sum_{i=0}^N y_i log(y_pred_i) + (1-y_i) log(1-y_pred_i)] - (gamma ||b||) / 2)
+            NLL = -1/N * (
+                [sum_{i=0}^N y_i log(y_pred_i) + (1-y_i) log(1-y_pred_i)] -
+                (gamma ||b||) / 2
+            )
         """
         N, M = X.shape
         order = 2 if self.penalty == "l2" else 1
@@ -113,29 +180,11 @@ class LogisticRegression:
 
 class BayesianLinearRegressionUnknownVariance:
     """
-    Bayesian linear regression extends the simple linear regression model by
-    introducing priors on model parameters b and/or sigma.
-
-    If both b and error variance sigma^2 are unknown, the conjugate prior
-    for the Gaussian likelihood is the Normal-Gamma distribution (univariate
-    likelihood) or the Normal-Inverse-Wishart distribution (multivariate
-    likelihood).
-
-        Univariate:
-            b, sigma^2 ~ NG(b_mean, b_V, alpha, beta)
-
-            sigma^2 ~ InverseGamma(alpha, beta)
-            b | sigma^2 ~ N(b_mean, sigma^2 * b_V)
-
-            where alpha, beta, b_V, and mu are hyperparameters of the prior.
-
-        Multivariate:
-            b, Sigma ~ NIW(b_mean, lambda, Psi, rho)
-
-            Sigma ~ N(b_mean, 1/lambda * Sigma)
-            b | Sigma ~ W^{-1}(Psi, rho)
-
-            where mu, lambda, Psi, and rho are hyperparameters of the prior.
+    Bayesian Linear Regression
+    --------------------------
+    In its general form, Bayesian linear regression extends the simple linear
+    regression model by introducing priors on model parameters b and/or the
+    error variance sigma^2.
 
     The introduction of a prior allows us to quantify the uncertainty in our
     parameter estimates for b by replacing the MLE point estimate in simple
@@ -154,8 +203,32 @@ class BayesianLinearRegressionUnknownVariance:
     these cases, it is common to use approximations, either via MCMC or
     variational inference.
 
-    Thankfully, however, for the above prior we *can* compute the posterior
-    distributions for the model parameters in closed form:
+    Bayesian Regression w/ unknown variance
+    ---------------------------------------
+    If *both* b and the error variance sigma^2 are unknown, the conjugate prior
+    for the Gaussian likelihood is the Normal-Gamma distribution (univariate
+    likelihood) or the Normal-Inverse-Wishart distribution (multivariate
+    likelihood).
+
+        Univariate:
+            b, sigma^2 ~ NG(b_mean, b_V, alpha, beta)
+
+            sigma^2 ~ InverseGamma(alpha, beta)
+            b | sigma^2 ~ N(b_mean, sigma^2 * b_V)
+
+            where alpha, beta, b_V, and b_mean are parameters of the prior.
+
+        Multivariate:
+            b, Sigma ~ NIW(b_mean, lambda, Psi, rho)
+
+            Sigma ~ N(b_mean, 1/lambda * Sigma)
+            b | Sigma ~ W^{-1}(Psi, rho)
+
+            where b_mean, lambda, Psi, and rho are parameters of the prior.
+
+    Due to the conjugacy of the above priors with the Gaussian likelihood of
+    the linear regression model we can compute the posterior distributions for
+    the model parameters in closed form:
 
         B = (y - X b_mean)
         shape = N + alpha
@@ -169,7 +242,7 @@ class BayesianLinearRegressionUnknownVariance:
 
         b | X, y, sigma^2 ~ N(mu_b, cov_b)
 
-    which allows us a closed form for the posterior predictive distribution as
+    This allows us a closed form for the posterior predictive distribution as
     well:
 
         y* | X*, X, Y ~ N(X* mu_b, X* cov_b X*^T + I)
@@ -286,17 +359,11 @@ class BayesianLinearRegressionUnknownVariance:
 
 class BayesianLinearRegressionKnownVariance:
     """
-    Bayesian linear regression extends the simple linear regression model by
-    introducing priors on model parameters b and/or sigma.
-
-    If we happen to already know the error variance sigma^2, the conjugate
-    prior on b is Gaussian. A common parameterization is:
-
-        b | sigma, b_V ~ N(b_mean, sigma^2 * b_V)
-
-    where b_mean, sigma and b_V are hyperparameters. Ridge regression is a
-    special case of this model where b_mean = 0, sigma = 1 and b_V = I (ie.,
-    the prior on b is a zero-mean, unit covariance Gaussian).
+    Bayesian Linear Regression
+    --------------------------
+    In its general form, Bayesian linear regression extends the simple linear
+    regression model by introducing priors on model parameters b and/or the
+    error variance sigma^2.
 
     The introduction of a prior allows us to quantify the uncertainty in our
     parameter estimates for b by replacing the MLE point estimate in simple
@@ -315,8 +382,20 @@ class BayesianLinearRegressionKnownVariance:
     these cases, it is common to use approximations, either via MCMC or
     variational inference.
 
-    Thankfully, however, for the above prior we *can* compute the posterior
-    distribution over the model parameters in closed form:
+    Bayesian linear regression with known variance
+    ----------------------------------------------
+    If we happen to already know the error variance sigma^2, the conjugate
+    prior on b is Gaussian. A common parameterization is:
+
+        b | sigma, b_V ~ N(b_mean, sigma^2 * b_V)
+
+    where b_mean, sigma and b_V are hyperparameters. Ridge regression is a
+    special case of this model where b_mean = 0, sigma = 1 and b_V = I (ie.,
+    the prior on b is a zero-mean, unit covariance Gaussian).
+
+    Due to the conjugacy of the above prior with the Gaussian likelihood in the
+    linear regression model, we can compute the posterior distribution over the
+    model parameters in closed form:
 
         A     = (b_V^{-1} + X^T X)^{-1}
         mu_b  = A b_V^{-1} b_mean + A X^T y
@@ -429,27 +508,3 @@ class BayesianLinearRegressionKnownVariance:
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
-
-
-def is_symmetric(X):
-    return np.allclose(X, X.T)
-
-
-def is_number(x):
-    return isinstance(x, numbers.Number)
-
-
-def is_symmetric_positive_definite(X):
-    """
-    Check that X is a symmetric, positive-definite matrix
-    """
-    if is_symmetric(X):
-        try:
-            # if matrix is symmetric, check whether the Cholesky decomposition
-            # (defined only for symmetric/Hermitian positive definite matrices)
-            # exists
-            np.linalg.cholesky(X)
-            return True
-        except np.linalg.LinAlgError:
-            return False
-    return False

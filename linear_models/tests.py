@@ -20,6 +20,7 @@ sns.set_context("paper", font_scale=0.5)
 
 
 from lm import (
+    RidgeRegression,
     LinearRegression,
     BayesianLinearRegressionKnownVariance,
     BayesianLinearRegressionUnknownVariance,
@@ -133,6 +134,11 @@ def plot_bayes():
     y_pred = LR.predict(X_test)
     loss = np.mean((y_test - y_pred) ** 2)
 
+    ridge = RidgeRegression(alpha=1, fit_intercept=True)
+    ridge.fit(X_train, y_train)
+    y_pred = ridge.predict(X_test)
+    loss_ridge = np.mean((y_test - y_pred) ** 2)
+
     LR_var = BayesianLinearRegressionKnownVariance(
         b_mean=np.c_[intercept, coefs][0],
         b_sigma=np.sqrt(std),
@@ -154,11 +160,13 @@ def plot_bayes():
     xmax = max(X_test) + 0.1 * (max(X_test) - min(X_test))
     X_plot = np.linspace(xmin, xmax, 100)
     y_plot = LR.predict(X_plot)
+    y_plot_ridge = ridge.predict(X_plot)
     y_plot_var = LR_var.predict(X_plot)
     y_plot_novar = LR_novar.predict(X_plot)
 
     y_true = [np.dot(x, coefs) + intercept for x in X_plot]
-    fig, axes = plt.subplots(1, 3)
+    fig, axes = plt.subplots(1, 4)
+
     axes = axes.flatten()
     axes[0].scatter(X_test, y_test)
     axes[0].plot(X_plot, y_plot, label="MLE")
@@ -167,22 +175,17 @@ def plot_bayes():
     axes[0].legend()
     #  axes[0].fill_between(X_plot, y_plot - error, y_plot + error)
 
-    axes[1].plot(X_plot, y_plot_var, label="MAP")
-    mu, cov = LR_var.posterior["b"]["mu"], LR_var.posterior["b"]["cov"]
-    for k in range(200):
-        b_samp = np.random.multivariate_normal(mu, cov)
-        y_samp = [np.dot(x, b_samp[1]) + b_samp[0] for x in X_plot]
-        axes[1].plot(X_plot, y_samp, c="green", alpha=0.05)
     axes[1].scatter(X_test, y_test)
+    axes[1].plot(X_plot, y_plot_ridge, label="MLE")
     axes[1].plot(X_plot, y_true, label="True fn")
-    axes[1].legend()
     axes[1].set_title(
-        "Bayesian Regression (known variance)\nMAP Test MSE: {:.2f}".format(loss_var)
+        "Ridge Regression (alpha=1)\nMLE Test MSE: {:.2f}".format(loss_ridge)
     )
+    axes[1].legend()
+    print("plotted ridge.. {:.2f} MSE".format(loss_ridge))
 
-    axes[2].plot(X_plot, y_plot_novar, label="MAP")
-    mu = LR_novar.posterior["b | sigma**2"]["mu"]
-    cov = LR_novar.posterior["b | sigma**2"]["cov"]
+    axes[2].plot(X_plot, y_plot_var, label="MAP")
+    mu, cov = LR_var.posterior["b"]["mu"], LR_var.posterior["b"]["cov"]
     for k in range(200):
         b_samp = np.random.multivariate_normal(mu, cov)
         y_samp = [np.dot(x, b_samp[1]) + b_samp[0] for x in X_plot]
@@ -191,6 +194,20 @@ def plot_bayes():
     axes[2].plot(X_plot, y_true, label="True fn")
     axes[2].legend()
     axes[2].set_title(
+        "Bayesian Regression (known variance)\nMAP Test MSE: {:.2f}".format(loss_var)
+    )
+
+    axes[3].plot(X_plot, y_plot_novar, label="MAP")
+    mu = LR_novar.posterior["b | sigma**2"]["mu"]
+    cov = LR_novar.posterior["b | sigma**2"]["cov"]
+    for k in range(200):
+        b_samp = np.random.multivariate_normal(mu, cov)
+        y_samp = [np.dot(x, b_samp[1]) + b_samp[0] for x in X_plot]
+        axes[3].plot(X_plot, y_samp, c="green", alpha=0.05)
+    axes[3].scatter(X_test, y_test)
+    axes[3].plot(X_plot, y_true, label="True fn")
+    axes[3].legend()
+    axes[3].set_title(
         "Bayesian Regression (unknown variance)\nMAP Test MSE: {:.2f}".format(
             loss_novar
         )
@@ -201,7 +218,7 @@ def plot_bayes():
         ax.yaxis.set_ticklabels([])
 
     #  plt.tight_layout()
-    fig.set_size_inches(7, 2.5)
+    fig.set_size_inches(10, 2.5)
     plt.savefig("plot_bayes.png", dpi=300)
     plt.close("all")
 
