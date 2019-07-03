@@ -85,6 +85,7 @@ This repo includes code for the following models:
     - [Boosting] Gradient-boosted decision trees
 
 6. **Linear models**
+    - Ridge regression
     - Logistic regression
     - Ordinary least squares 
     - Bayesian linear regression w/ conjugate priors
@@ -119,12 +120,13 @@ This repo includes code for the following models:
     - Feature standardization
     - One-hot encoding / decoding
     - Huffman coding / decoding
+    - Term frequency-inverse document frequency encoding
 
 11. **Utilities**
     - Similarity kernels
     - Distance metrics
     - Priority queues
-    - Ball tree
+    - Ball tree data structure
 
 ## Contributing
 
