@@ -41,26 +41,6 @@ from .torch_models import (
     TorchMultiHeadedAttentionModule,
 )
 
-
-#######################################################################
-#                               Asserts                               #
-#######################################################################
-
-
-def assert_is_binary(a):
-    msg = "Matrix should be one-hot binary"
-    assert np.array_equal(a, a.astype(bool)), msg
-    assert np.allclose(np.sum(a, axis=1), np.ones(a.shape[0])), msg
-    return True
-
-
-def assert_is_stochastic(a):
-    msg = "Array should be stochastic along the columns"
-    assert len(a[a < 0]) == len(a[a > 1]) == 0, msg
-    assert np.allclose(np.sum(a, axis=1), np.ones(a.shape[0])), msg
-    return True
-
-
 #######################################################################
 #                           Data Generators                           #
 #######################################################################
@@ -87,11 +67,6 @@ def random_tensor(shape, standardize=False):
 
     if standardize:
         X = (X - X.mean(axis=0)) / (X.std(axis=0) + eps)
-    return X
-
-
-def random_binary_tensor(shape, sparsity=0.5):
-    X = (np.random.rand(*shape) >= (1 - sparsity)).astype(float)
     return X
 
 
