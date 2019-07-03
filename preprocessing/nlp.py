@@ -340,23 +340,26 @@ def ngrams(sequence, N):
     return list(zip(*[sequence[i:] for i in range(N)]))
 
 
-def tokenize_words(line, filter_punctuation=True, filter_stopwords=True):
+def tokenize_words(
+    line, lowercase=True, filter_punctuation=True, filter_stopwords=True
+):
     """
     Split a string into individual lower-case words, optionally removing
     punctuation and stop-words in the process
     """
     line = strip_punctuation(line) if filter_punctuation else line
-    words = line.lower().split()
+    words = line.lower().split() if lowercase else line.split()
     return remove_stop_words(words) if filter_stopwords else words
 
 
-def tokenize_chars(line, filter_punctuation=True):
+def tokenize_chars(line, lowercase=True, filter_punctuation=True):
     """
     Split a string into individual lower-case words, optionally removing
     punctuation and stop-words in the process
     """
+    line = line.lower() if lowercase else line
     line = strip_punctuation(line) if filter_punctuation else line
-    chars = list(re.sub(" {2,}", " ", line.lower()).strip())
+    chars = list(re.sub(" {2,}", " ", line).strip())
     return chars
 
 
@@ -405,7 +408,25 @@ class Node(object):
 
 
 class HuffmanEncoder(object):
-    """Encode text into a variable-length bit string using a Huffman tree"""
+    """
+    Encode the tokens in a text using variable-length bit strings (a prefix
+    code) computed via a Huffman tree.
+
+    In a Huffman code, tokens that occur more frequently are (generally)
+    represented using fewer bits. Huffman codes produce the minimum expected
+    codeword length among all methods for encoding tokens individually.
+
+    Huffman codes correspond to paths through a binary tree, with 1
+    corresponding to "move right" and 0 corresponding to "move left". In
+    contrast to standard binary trees, the Huffman tree is constructed from the
+    bottom up.  Construction begins by initializing a min-heap priority queue
+    consisting of each token in the corpus, with priority corresponding to the
+    token frequency. At each step, the two most infrequent tokens in the corpus
+    are removed and become the children of a parent pseudotoken whose
+    "frequency" is the sum of the frequencies of its children. This new parent
+    pseudotoken is added to the priority queue and the process is repeated
+    recursively until no tokens remain.
+    """
 
     def fit(self, text):
         """
@@ -511,13 +532,368 @@ class Token:
         return "Token(word='{}', count={})".format(self.word, self.count)
 
 
+class TFIDFEncoder:
+    def __init__(
+        self,
+        vocab=None,
+        lowercase=True,
+        min_count=None,
+        smooth_idf=True,
+        max_tokens=None,
+        input_type="filename",
+        filter_stopwords=True,
+        filter_punctuation=True,
+    ):
+        """
+        An object for compiling and encoding the term-frequency
+        inverse-document-frequency (TF-IDF) representation of the tokens in a
+        text corpus.
+
+        TF-IDF is intended to reflect how important a word is to a document in
+        a collection or corpus. For a word token `w` in a document `d`, and a
+        corpus, D = {d1, ..., dN}, we have:
+
+            TF(w, d) = # of occurences of `w` in document `d`
+            IDF(w, D) = log [ |D| / |{ d in D: t in d }| ]
+
+        Parameters
+        ----------
+        input_type : {'files', 'strings'}
+            If 'files', the sequence input to `fit` is expected to be a list
+            of filepaths. If 'strings', the input is expected to be a list of
+            lists, each sublist containing the raw strings for a single
+            document in the corpus.
+        vocab : `Vocabulary` instance or list-like (default: None)
+            An existing vocabulary to filter the tokens in the corpus against.
+        lowercase : bool (default: True)
+            Whether to convert each string to lowercase before tokenization
+        min_count : int (default: None)
+            Minimum number of times a token must occur in order to be included
+            in vocab. If `None`, include all tokens from `corpus_fp` in vocab.
+        smooth_idf : bool (default: True)
+            Whether to add 1 to the denominator of the IDF calculation to avoid
+            divide-by-zero errors.
+        max_tokens : int (default: None)
+            Only add the `max_tokens` most frequent tokens that occur more
+            than `min_count` to the vocabulary.  If None, add all tokens
+            greater that occur more than than `min_count`.
+        filter_stopwords : bool (default: True)
+            Whether to remove stopwords before encoding the words in the corpus
+        filter_punctuation : bool (default: True)
+            Whether to remove punctuation before encoding the words in the
+            corpus
+        """
+        # create a function to filter against words in the vocab
+        self._filter_vocab = lambda words: words
+        if isinstance(vocab, Vocabulary):
+            self._filter_vocab = vocab.filter
+        elif isinstance(vocab, (list, np.ndarray, set)):
+            vocab = set(vocab)
+            self._filter_vocab = lambda words: [
+                w if w in vocab else "<unk>" for w in words
+            ]
+
+        if input_type not in ["files", "strings"]:
+            fstr = "`input_type` must be either 'files' or 'strings', but got {}"
+            raise ValueError(fstr.format(input_type))
+
+        self._tokens = None
+        self._idx2doc = None
+        self.term_freq = None
+        self.idx2token = None
+        self.token2idx = None
+        self.inv_doc_freq = None
+
+        self.hyperparameters = {
+            "id": "TFIDFEncoder",
+            "encoding": None,
+            "vocab": vocab
+            if not isinstance(vocab, Vocabulary)
+            else vocab.hyperparameters,
+            "lowercase": lowercase,
+            "min_count": min_count,
+            "input_type": input_type,
+            "max_tokens": max_tokens,
+            "smooth_idf": smooth_idf,
+            "filter_stopwords": filter_stopwords
+            if not isinstance(vocab, Vocabulary)
+            else vocab.hyperparameters["filter_stopwords"],
+            "filter_punctuation": filter_punctuation
+            if not isinstance(vocab, Vocabulary)
+            else vocab.hyperparameters["filter_punctuation"],
+        }
+
+    def fit(self, corpus_seq, encoding="utf-8-sig"):
+        """
+        Compute term-frequencies and inverse document frequencies on a
+        collection of documents.
+
+        Parameters
+        ----------
+        corpus_seq : str or list of strs
+            The filepath / list of filepaths / raw string contents of the
+            document(s) to be encoded, in accordance with the `input_type`
+            parameter passed to the `__init__` method. Each document is
+            expected to be a newline-separated strings of text, with adjacent
+            tokens separated by a whitespace character.
+        encoding : str (default: 'utf-8-sig')
+            Specifies the text encoding for corpus if `input_type` is `files`.
+            Common entries are either 'utf-8' (no header byte), or 'utf-8-sig'
+            (header byte).
+        """
+        H = self.hyperparameters
+
+        if isinstance(corpus_seq, str):
+            corpus_seq = [corpus_seq]
+
+        if H["input_type"] == "files":
+            for corpus_fp in corpus_seq:
+                assert op.isfile(corpus_fp), "{} does not exist".format(corpus_fp)
+
+        tokens = []
+        idx2word, word2idx = {}, {}
+
+        # encode special tokens
+        for tt in ["<bol>", "<eol>", "<unk>"]:
+            word2idx[tt] = len(tokens)
+            idx2word[len(tokens)] = tt
+            tokens.append(Token(tt))
+
+        max_tokens = H["max_tokens"]
+        min_count = H["min_count"]
+        H["encoding"] = encoding
+
+        bol_ix = word2idx["<bol>"]
+        eol_ix = word2idx["<eol>"]
+        idx2doc, doc_counts = {}, {}
+
+        # encode the text in `corpus_fps` without any filtering ...
+        for d_ix, doc in enumerate(corpus_seq):
+            doc_count = {}
+            idx2doc[d_ix] = doc if H["input_type"] == "files" else None
+            word2idx, idx2word, tokens, doc_count = self._encode_document(
+                doc, word2idx, idx2word, tokens, doc_count, bol_ix, eol_ix
+            )
+            doc_counts[d_ix] = doc_count
+
+        self._tokens = tokens
+        self._idx2doc = idx2doc
+        self.token2idx = word2idx
+        self.idx2token = idx2word
+        self.term_freq = doc_counts
+
+        # ... replace all words occurring less than `min_count` by <unk> ...
+        if min_count is not None:
+            self._drop_low_freq_tokens()
+
+        # ... retain only the top `max_tokens` most frequent tokens, coding
+        # everything else as <unk> ...
+        if max_tokens is not None and len(tokens) > max_tokens:
+            self._keep_top_n_tokens()
+
+        # ... finally, calculate inverse document frequency
+        self._calc_idf()
+        self._tokens = np.array(self._tokens)
+
+    def _encode_document(
+        self, doc, word2idx, idx2word, tokens, doc_count, bol_ix, eol_ix
+    ):
+        """
+        Perform tokenization and compute token counts for a single document
+        """
+        H = self.hyperparameters
+        lowercase = H["lowercase"]
+        filter_stop = H["filter_stopwords"]
+        filter_punc = H["filter_punctuation"]
+
+        if H["input_type"] == "files":
+            with open(doc, "r", encoding=H["encoding"]) as handle:
+                doc = handle.read()
+
+        for line in doc.split("\n"):
+            words = tokenize_words(line, lowercase, filter_punc, filter_stop)
+            words = self._filter_vocab(words)
+            #  words = words if H["vocab"] is None else self.vocab.filter(words)
+            for ww in words:
+                if ww not in word2idx:
+                    word2idx[ww] = len(tokens)
+                    idx2word[len(tokens)] = ww
+                    tokens.append(Token(ww))
+
+                t_idx = word2idx[ww]
+                tokens[t_idx].count += 1
+                doc_count[t_idx] = doc_count.get(t_idx, 0) + 1
+
+            # wrap line in <bol> and <eol> tags
+            tokens[bol_ix].count += 1
+            tokens[eol_ix].count += 1
+
+            doc_count[bol_ix] = doc_count.get(bol_ix, 0) + 1
+            doc_count[eol_ix] = doc_count.get(eol_ix, 0) + 1
+        return word2idx, idx2word, tokens, doc_count
+
+    def _calc_idf(self):
+        """
+        Compute the (smoothed-) inverse-document frequency for each token in
+        the corpus.
+
+        For a word token `w`, the IDF is simply
+
+            IDF(w) = log ( |D| / |{ d in D: w in d }| )
+
+        where D is the set of all documents in the corpus,
+
+            D = {d1, d2, ..., dD}
+
+        If `smooth_idf` is True, we perform additive smoothing on the number of
+        documents containing a given word, equivalent to pretending that there
+        exists a final D+1st document that contains every word in the corpus:
+
+            SmoothedIDF(w) = log ( |D| / [1 + |{ d in D: w in d }|] )
+        """
+        inv_doc_freq = {}
+        D = len(self._idx2doc)
+        smooth_idf = self.hyperparameters["smooth_idf"]
+        tf, doc_idxs = self.term_freq, self._idx2doc.keys()
+        for word, w_ix in self.token2idx.items():
+            d_count = 0 if not smooth_idf else 1
+            d_count += np.sum([1 if w_ix in tf[d_ix] else 0 for d_ix in doc_idxs])
+            inv_doc_freq[w_ix] = np.log(D / d_count)
+        self.inv_doc_freq = inv_doc_freq
+
+    def transform(self, ignore_special_chars=True):
+        """
+        Generate the term-frequency inverse-document-frequency encoding of a
+        text corpus.
+
+        Parameters
+        ----------
+        ignore_special_chars : bool (default: True)
+            Whether to drop columns corresponding to "<eol>", "<bol>", and
+            "<unk>" tokens from the final tfidf encoding.
+
+        Returns
+        -------
+        tfidf : numpy array of shape (D, M [- 3])
+            The encoded corpus, with each row corresponding to a single
+            document, and each column corresponding to a token id. The mapping
+            between column numbers and tokens is stored in the `idx2token`
+            attribute IFF `ignore_special_chars` is False. Otherwise, the
+            mappings are not accurate.
+        """
+        D, N = len(self._idx2doc), len(self._tokens)
+        tf = np.zeros((D, N))
+        idf = np.zeros((D, N))
+
+        for d_ix in self._idx2doc.keys():
+            words, counts = zip(*self.term_freq[d_ix].items())
+            docs = np.ones(len(words), dtype=int) * d_ix
+            tf[docs, words] = counts
+
+        words = sorted(self.idx2token.keys())
+        idf = np.tile(np.array([self.inv_doc_freq[w] for w in words]), (D, 1))
+        tfidf = tf * idf
+
+        if ignore_special_chars:
+            idxs = [
+                self.token2idx["<unk>"],
+                self.token2idx["<eol>"],
+                self.token2idx["<bol>"],
+            ]
+            tfidf = np.delete(tfidf, idxs, 1)
+
+        return tfidf
+
+    def _keep_top_n_tokens(self):
+        N = self.hyperparameters["max_tokens"]
+        doc_counts, word2idx, idx2word = {}, {}, {}
+        tokens = sorted(self._tokens, key=lambda x: x.count, reverse=True)
+
+        # reindex the top-N tokens...
+        unk_ix = None
+        for idx, tt in enumerate(tokens[:N]):
+            word2idx[tt.word] = idx
+            idx2word[idx] = tt.word
+
+            if tt.word == "<unk>":
+                unk_ix = idx
+
+        # ... if <unk> isn't in the top-N, add it, replacing the Nth
+        # most-frequent word and adjust the <unk> count accordingly ...
+        if unk_ix is None:
+            unk_ix = self.token2idx["<unk>"]
+            old_count = tokens[N - 1].count
+            tokens[N - 1] = self._tokens[unk_ix]
+            tokens[N - 1].count += old_count
+            word2idx["<unk>"] = N - 1
+            idx2word[N - 1] = "<unk>"
+
+        # ... and recode all dropped tokens as "<unk>"
+        for tt in tokens[N:]:
+            tokens[unk_ix].count += tt.count
+
+        # ... finally, reindex the word counts for each document
+        doc_counts = {}
+        for d_ix in self.term_freq.keys():
+            doc_counts[d_ix] = {}
+            for old_ix, d_count in self.term_freq[d_ix].items():
+                word = self.idx2token[old_ix]
+                new_ix = word2idx.get(word, unk_ix)
+                doc_counts[d_ix][new_ix] = doc_counts[d_ix].get(new_ix, 0) + d_count
+
+        self._tokens = tokens[:N]
+        self.token2idx = word2idx
+        self.idx2token = idx2word
+        self.term_freq = doc_counts
+
+        assert len(self._tokens) <= N
+
+    def _drop_low_freq_tokens(self):
+        """
+        Replace all tokens that occur less than `min_count` with the `<unk>`
+        token.
+        """
+        unk_idx = 0
+        unk_token = self._tokens[self.token2idx["<unk>"]]
+        eol_token = self._tokens[self.token2idx["<eol>"]]
+        bol_token = self._tokens[self.token2idx["<bol>"]]
+
+        H = self.hyperparameters
+        tokens = [unk_token, eol_token, bol_token]
+        word2idx = {"<unk>": 0, "<eol>": 1, "<bol>": 2}
+        idx2word = {0: "<unk>", 1: "<eol>", 2: "<bol>"}
+        special = set(["<eol>", "<bol>", "<unk>"])
+
+        for tt in self._tokens:
+            if tt.word not in special:
+                if tt.count < H["min_count"]:
+                    tokens[unk_idx].count += tt.count
+                else:
+                    word2idx[tt.word] = len(tokens)
+                    idx2word[len(tokens)] = tt.word
+                    tokens.append(tt)
+
+        # reindex document counts
+        doc_counts = {}
+        for d_idx in self.term_freq.keys():
+            doc_counts[d_idx] = {}
+            for old_idx, d_count in self.term_freq[d_idx].items():
+                word = self.idx2token[old_idx]
+                new_idx = word2idx.get(word, unk_idx)
+                doc_counts[d_idx][new_idx] = doc_counts[d_idx].get(new_idx, 0) + d_count
+
+        self._tokens = tokens
+        self.token2idx = word2idx
+        self.idx2token = idx2word
+        self.term_freq = doc_counts
+
+
 class Vocabulary:
     def __init__(
         self,
-        corpus_fp,
+        lowercase=True,
         min_count=None,
         max_tokens=None,
-        encoding="utf-8-sig",
         filter_stopwords=True,
         filter_punctuation=True,
     ):
@@ -526,10 +902,8 @@ class Vocabulary:
 
         Parameters
         ----------
-        corpus_fp : str
-            The filepath to the text to be encoded. The corpus is expected to
-            be encoded as newline-separated strings of text, with adjacent
-            tokens separated by a whitespace character.
+        lowercase : bool (default: True)
+            Whether to convert each string to lowercase before tokenization
         min_count : int (default: None)
             Minimum number of times a token must occur in order to be included
             in vocab. If `None`, include all tokens from `corpus_fp` in vocab.
@@ -537,28 +911,22 @@ class Vocabulary:
             Only add the `max_tokens` most frequent tokens that occur more
             than `min_count` to the vocabulary.  If None, add all tokens
             greater that occur more than than `min_count`.
-        encoding : str (default: 'utf-8-sig')
-            Specifies the text encoding for corpus. Common entries are either
-            'utf-8' (no header byte), or 'utf-8-sig' (header byte).
         filter_stopwords : bool (default: True)
             Whether to remove stopwords before encoding the words in the corpus
         filter_punctuation : bool (default: True)
             Whether to remove punctuation before encoding the words in the
             corpus
         """
-        assert op.isfile(corpus_fp), "{} does not exist".format(corpus_fp)
-
         self.hyperparameters = {
             "id": "Vocabulary",
-            "encoding": encoding,
-            "corpus_fp": corpus_fp,
+            "corpus_fps": None,
+            "encoding": None,
+            "lowercase": lowercase,
             "min_count": min_count,
             "max_tokens": max_tokens,
             "filter_stopwords": filter_stopwords,
             "filter_punctuation": filter_punctuation,
         }
-
-        self._encode()
 
     def __len__(self):
         return len(self._tokens)
@@ -567,18 +935,18 @@ class Vocabulary:
         return iter(self._tokens.word)
 
     def __contains__(self, word):
-        return word in self._word2idx
+        return word in self.token2idx
 
     def __getitem__(self, key):
         if isinstance(key, str):
-            return self._tokens[self._word2idx[key]]
+            return self._tokens[self.token2idx[key]]
         if isinstance(key, int):
             return self._tokens[key]
 
     @property
     def n_tokens(self):
         """The number of unique word tokens in the vocabulary"""
-        return len(self._word2idx)
+        return len(self.token2idx)
 
     @property
     def n_words(self):
@@ -600,7 +968,8 @@ class Vocabulary:
 
     def filter(self, words, unk=True):
         """
-        Filter or replace any word in `words` that does not occur in `Vocabulary`
+        Filter or replace any word in `words` that does not occur in
+        `Vocabulary`
 
         Parameters
         ----------
@@ -634,14 +1003,15 @@ class Vocabulary:
         indices : list of ints
             The token indices for each word in `words`
         """
-        unk_ix = self._word2idx["<unk>"]
-        words = [w.lower() for w in words]
-        return [self._word2idx[w] if w in self else unk_ix for w in words]
+        unk_ix = self.token2idx["<unk>"]
+        lowercase = self.hyperparameters["lowercase"]
+        words = [w.lower() for w in words] if lowercase else words
+        return [self.token2idx[w] if w in self else unk_ix for w in words]
 
     def indices_to_words(self, indices):
         """
-        Convert the indices in `indices` to their word values. If an index is not
-        in the vocabulary, return the the <unk> token
+        Convert the indices in `indices` to their word values. If an index is
+        not in the vocabulary, return the the <unk> token
 
         Parameters
         ----------
@@ -654,18 +1024,41 @@ class Vocabulary:
             The word strings corresponding to each token index in `indices`
         """
         unk = "<unk>"
-        return [self._idx2word[i] if i in self._idx2word else unk for i in indices]
+        return [self.idx2token[i] if i in self.idx2token else unk for i in indices]
 
-    def _encode(self):
+    def fit(self, corpus_fps, encoding="utf-8-sig"):
+        """
+        Compute the vocabulary across a collection of documents
+
+        Parameters
+        ----------
+        corpus_fps : str or list of strs
+            The filepath / list of filepaths to the document(s) to be encoded.
+            Each document is expected to be encoded as newline-separated
+            strings of text, with adjacent tokens separated by a whitespace
+            character.
+        encoding : str (default: 'utf-8-sig')
+            Specifies the text encoding for corpus. Common entries are either
+            'utf-8' (no header byte), or 'utf-8-sig' (header byte).
+        """
+        if isinstance(corpus_fps, str):
+            corpus_fps = [corpus_fps]
+
+        for corpus_fp in corpus_fps:
+            assert op.isfile(corpus_fp), "{} does not exist".format(corpus_fp)
+
         tokens = []
         H = self.hyperparameters
         idx2word, word2idx = {}, {}
 
+        lowercase = H["lowercase"]
+        max_tokens = H["max_tokens"]
         filter_stop = H["filter_stopwords"]
         filter_punc = H["filter_punctuation"]
-
-        max_tokens = H["max_tokens"]
         corpus_fp, min_count = H["corpus_fp"], H["min_count"]
+
+        H["encoding"] = encoding
+        H["corpus_fps"] = corpus_fps
 
         # encode special tokens
         for tt in ["<bol>", "<eol>", "<unk>"]:
@@ -676,26 +1069,27 @@ class Vocabulary:
         bol_ix = word2idx["<bol>"]
         eol_ix = word2idx["<eol>"]
 
-        with open(corpus_fp, "r", encoding=H["encoding"]) as text:
-            for line in text:
-                words = tokenize_words(line, filter_punc, filter_stop)
+        for d_ix, doc_fp in enumerate(corpus_fps):
+            with open(doc_fp, "r", encoding=H["encoding"]) as doc:
+                for line in doc:
+                    words = tokenize_words(line, lowercase, filter_punc, filter_stop)
 
-                for ww in words:
-                    if ww not in word2idx:
-                        word2idx[ww] = len(tokens)
-                        idx2word[len(tokens)] = ww
-                        tokens.append(Token(ww))
+                    for ww in words:
+                        if ww not in word2idx:
+                            word2idx[ww] = len(tokens)
+                            idx2word[len(tokens)] = ww
+                            tokens.append(Token(ww))
 
-                    t_idx = word2idx[ww]
-                    tokens[t_idx].count += 1
+                        t_idx = word2idx[ww]
+                        tokens[t_idx].count += 1
 
-                # wrap line in <bol> and <eol> tags
-                tokens[bol_ix].count += 1
-                tokens[eol_ix].count += 1
+                    # wrap line in <bol> and <eol> tags
+                    tokens[bol_ix].count += 1
+                    tokens[eol_ix].count += 1
 
         self._tokens = tokens
-        self._word2idx = word2idx
-        self._idx2word = idx2word
+        self.token2idx = word2idx
+        self.idx2token = idx2word
 
         # replace all words occurring less than `min_count` by <unk>
         if min_count is not None:
@@ -706,7 +1100,7 @@ class Vocabulary:
         if max_tokens is not None and len(tokens) > max_tokens:
             self._keep_top_n_tokens()
 
-        counts = {w: self._tokens[ix].count for w, ix in self._word2idx.items()}
+        counts = {w: self._tokens[ix].count for w, ix in self.token2idx.items()}
         self.counts = Counter(counts)
         self._tokens = np.array(self._tokens)
 
@@ -727,39 +1121,48 @@ class Vocabulary:
         # ... if <unk> isn't in the top-N, add it, replacing the Nth
         # most-frequent word and adjusting the <unk> count accordingly ...
         if unk_ix is None:
-            unk_ix = self._word2idx["<unk>"]
+            unk_ix = self.token2idx["<unk>"]
             old_count = tokens[N - 1].count
             tokens[N - 1] = self._tokens[unk_ix]
             tokens[N - 1].count += old_count
-            unk_ix = N - 1
+            word2idx["<unk>"] = N - 1
+            idx2word[N - 1] = "<unk>"
 
         # ... and recode all dropped tokens as "<unk>"
         for tt in tokens[N:]:
             tokens[unk_ix].count += tt.count
 
         self._tokens = tokens[:N]
-        self._word2idx = word2idx
-        self._idx2word = idx2word
+        self.token2idx = word2idx
+        self.idx2token = idx2word
 
         assert len(self._tokens) <= N
 
     def _drop_low_freq_tokens(self):
         """
-        Replace all tokens that occur less than `min_count` with the `<unk>` token.
+        Replace all tokens that occur less than `min_count` with the `<unk>`
+        token.
         """
         unk_idx = 0
+        unk_token = self._tokens[self.token2idx["<unk>"]]
+        eol_token = self._tokens[self.token2idx["<eol>"]]
+        bol_token = self._tokens[self.token2idx["<bol>"]]
+
         H = self.hyperparameters
-        tokens = [Token("<unk>")]
-        word2idx, idx2word = {}, {}
+        tokens = [unk_token, eol_token, bol_token]
+        word2idx = {"<unk>": 0, "<eol>": 1, "<bol>": 2}
+        idx2word = {0: "<unk>", 1: "<eol>", 2: "<bol>"}
+        special = set(["<eol>", "<bol>", "<unk>"])
 
         for tt in self._tokens:
-            if tt.count < H["min_count"]:
-                tokens[unk_idx].count += tt.count
-            else:
-                word2idx[tt.word] = len(tokens)
-                idx2word[len(tokens)] = tt.word
-                tokens.append(tt)
+            if tt.word not in special:
+                if tt.count < H["min_count"]:
+                    tokens[unk_idx].count += tt.count
+                else:
+                    word2idx[tt.word] = len(tokens)
+                    idx2word[len(tokens)] = tt.word
+                    tokens.append(tt)
 
         self._tokens = tokens
-        self._word2idx = word2idx
-        self._idx2word = idx2word
+        self.token2idx = word2idx
+        self.idx2token = idx2word
