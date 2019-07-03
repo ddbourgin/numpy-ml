@@ -87,7 +87,7 @@ def generalized_cosine(window_len, coefs):
 
 
 class WindowInitializer:
-    def __init__(self, window):
+    def __call__(self, window):
         if window == "hamming":
             return hamming
         elif window == "blackman_harris":
