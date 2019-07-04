@@ -7,6 +7,7 @@ The preprocessing module implements common data preprocessing routines.
     - Punctuation and stop-word removal
     - Vocabulary / unigram count objects
     - [Huffman tree](https://en.wikipedia.org/wiki/Huffman_coding) encoding / decoding
+    - Term frequency-inverse document frequency ([tf-idf](https://en.wikipedia.org/wiki/Tf%E2%80%93idf)) encoding
 
 - `dsp.py`: Routines for handling audio and image data.
     - Signal windowing

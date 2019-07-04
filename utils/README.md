@@ -3,7 +3,7 @@
 The utilities module implements a number of useful functions and objects that
 power other ML algorithms across the repo.
 
-- `data_structures.py` implements several "advanced" data structures
+- `data_structures.py` implements a few useful data structures
     - A max- and min-heap ordered priority queue
     - A [ball tree](https://en.wikipedia.org/wiki/Ball_tree) with the KNS1 algorithm ([Omohundro, 1989](http://ftp.icsi.berkeley.edu/ftp/pub/techreports/1989/tr-89-063.pdf); [Moore & Gray, 2006](http://people.ee.duke.edu/~lcarin/liu06a.pdf))
 
@@ -18,3 +18,12 @@ power other ML algorithms across the repo.
     - Chebyshev (L-infinity) distance
     - Minkowski-p distance
     - Hamming distance
+
+- `windows.py` implements several common windowing functions
+    - Hann
+    - Hamming
+    - Blackman-Harris
+    - Generalized cosine
+
+- `testing.py` implements helper functions that prove useful when writing unit
+  tests, including data generators and various assert statements
