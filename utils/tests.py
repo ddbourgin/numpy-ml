@@ -1,10 +1,12 @@
 import numpy as np
 
 import scipy
+
 from sklearn.neighbors import BallTree as sk_BallTree
 from sklearn.metrics.pairwise import rbf_kernel as sk_rbf
 from sklearn.metrics.pairwise import linear_kernel as sk_linear
 from sklearn.metrics.pairwise import polynomial_kernel as sk_poly
+
 
 from distance_metrics import euclidean
 from kernels import LinearKernel, PolynomialKernel, RBFKernel

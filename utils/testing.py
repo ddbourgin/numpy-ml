@@ -2,6 +2,11 @@ import numbers
 import numpy as np
 
 
+#######################################################################
+#                             Assertions                              #
+#######################################################################
+
+
 def is_symmetric(X):
     return np.allclose(X, X.T)
 
@@ -72,3 +77,36 @@ def random_tensor(shape, standardize=False):
 
 def random_binary_tensor(shape, sparsity=0.5):
     return (np.random.rand(*shape) >= (1 - sparsity)).astype(float)
+
+
+def random_paragraph(n_words, vocab=None):
+    if vocab is None:
+        vocab = [
+            "at",
+            "stet",
+            "accusam",
+            "aliquyam",
+            "clita",
+            "lorem",
+            "ipsum",
+            "dolor",
+            "dolore",
+            "dolores",
+            "sit",
+            "amet",
+            "consetetur",
+            "sadipscing",
+            "elitr",
+            "sed",
+            "diam",
+            "nonumy",
+            "eirmod",
+            "duo",
+            "ea",
+            "eos",
+            "erat",
+            "est",
+            "et",
+            "gubergren",
+        ]
+    return [np.random.choice(vocab) for _ in range(n_words)]
