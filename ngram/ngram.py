@@ -12,9 +12,9 @@ from preprocessing.nlp import tokenize_words, ngrams
 
 
 class NGramBase(ABC):
-    def __init__(self, N, unk=True, filter_stopwords=True, filter_punctuation=True):
+    def __init__(self, N, unk=True, filter_stopwords=True):
         """
-        A simple N-gram language model.
+        A simple word-level N-gram language model.
 
         NB. This is not optimized code and will be slow for large corpora. To
         see how industry-scale NGram models are handled, see the SRLIM-format:
@@ -24,13 +24,11 @@ class NGramBase(ABC):
         self.N = N
         self.unk = unk
         self.filter_stopwords = filter_stopwords
-        self.filter_punctuation = filter_punctuation
 
         self.hyperparameters = {
             "N": N,
             "unk": unk,
             "filter_stopwords": filter_stopwords,
-            "filter_punctuation": filter_punctuation,
         }
 
         super().__init__()
@@ -63,7 +61,7 @@ class NGramBase(ABC):
         H = self.hyperparameters
         grams = {N: [] for N in range(1, self.N + 1)}
         counts = {N: Counter() for N in range(1, self.N + 1)}
-        filter_punc, filter_stop = H["filter_punctuation"], H["filter_stopwords"]
+        filter_stop = H["filter_stopwords"]
 
         _n_words = 0
         tokens = set(["<unk>"])
@@ -71,7 +69,7 @@ class NGramBase(ABC):
 
         with open(corpus_fp, "r", encoding=encoding) as text:
             for line in text:
-                words = tokenize_words(line, filter_punc, filter_stop)
+                words = tokenize_words(line, filter_stopwords=filter_stop)
 
                 if vocab is not None:
                     words = vocab.filter(words, H["unk"])
