@@ -17,7 +17,7 @@ def plot_activations():
     fig, axes = plt.subplots(2, 3, sharex=True, sharey=True)
     fns = [Affine(), Tanh(), Sigmoid(), ReLU(), LeakyReLU()]
     for ax, fn in zip(axes.flatten(), fns):
-        X = np.linspace(-3, 3, 100).astype(float)
+        X = np.linspace(-3, 3, 100).astype(float).reshape(100,1)
         ax.plot(X, fn(X), label=r"$y$", alpha=0.7)
         ax.plot(X, fn.grad(X), label=r"$\frac{dy}{dx}$", alpha=0.7)
         ax.plot(X, fn.grad2(X), label=r"$\frac{d^2 y}{dx^2}$", alpha=0.7)
