@@ -128,3 +128,22 @@ class Affine(ActivationBase):
 
     def grad2(self, x):
         return np.zeros_like(x)
+
+
+class Elu(ActivationBase):
+    def __init__(self, alpha=1.0):
+        self.alpha = alpha
+        super().__init__()
+
+    def __str__(self):
+        return "Elu(alpha={})".format(self.alpha)
+
+    def fn(self, z):
+        _z = z * (z > 0) + self.alpha * (np.exp(z) - 1.) * (z < 0)
+        return _z
+
+    def grad(self, x):
+        return 1 if x >= 0 else self.fn(x) + self.alpha
+
+    def grad2(self, x):
+        return np.zeros_like(x)
