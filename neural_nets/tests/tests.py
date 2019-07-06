@@ -467,6 +467,26 @@ def test_sigmoid_activation(N=None):
         i += 1
 
 
+def test_elu_activation(N=None):
+    from activations import ELU
+
+    N = np.inf if N is None else N
+
+    i = 0
+    while i < N:
+        n_dims = np.random.randint(1, 10)
+        z = random_tensor((1, n_dims))
+
+        alpha = np.random.uniform(0, 10)
+
+        mine = ELU(alpha)
+        gold = lambda z, a: F.elu(torch.from_numpy(z), alpha).numpy()
+
+        assert_almost_equal(mine.fn(z), gold(z, alpha))
+        print("PASSED")
+        i += 1
+
+
 def test_softmax_activation(N=None):
     from layers import Softmax
 
@@ -519,6 +539,25 @@ def test_sigmoid_grad(N=None):
         n_ex = np.random.randint(1, 100)
         n_dims = np.random.randint(1, 100)
         z = random_tensor((n_ex, n_dims))
+        assert_almost_equal(mine.grad(z), gold(z))
+        print("PASSED")
+        i += 1
+
+
+def test_elu_grad(N=None):
+    from activations import ELU
+
+    N = np.inf if N is None else N
+
+    i = 0
+    while i < N:
+        n_ex = np.random.randint(1, 10)
+        n_dims = np.random.randint(1, 10)
+        alpha = np.random.uniform(0, 10)
+        z = random_tensor((n_ex, n_dims))
+
+        mine = ELU(alpha)
+        gold = torch_gradient_generator(F.elu, alpha=alpha)
         assert_almost_equal(mine.grad(z), gold(z))
         print("PASSED")
         i += 1
