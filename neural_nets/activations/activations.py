@@ -130,7 +130,7 @@ class Affine(ActivationBase):
         return np.zeros_like(x)
 
 
-class Elu(ActivationBase):
+class ELU(ActivationBase):
     def __init__(self, alpha=1.0):
         self.alpha = alpha
         super().__init__()
