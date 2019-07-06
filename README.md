@@ -136,3 +136,5 @@ that your models are written with just the [Python standard
 library](https://docs.python.org/3/library/) and [numpy](https://www.numpy.org/). The
 [SciPy library](https://scipy.github.io/devdocs/) is also permitted under special
 circumstances ;)
+
+See full contributing guidelines [here](./contributing.md). 
