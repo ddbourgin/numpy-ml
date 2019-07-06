@@ -143,7 +143,7 @@ class Elu(ActivationBase):
         return _z
 
     def grad(self, x):
-        return 1 if x >= 0 else self.fn(x) + self.alpha
+        return np.where(x >= 0, np.ones_like(x), self.fn(x) + self.alpha)
 
     def grad2(self, x):
         return np.zeros_like(x)
