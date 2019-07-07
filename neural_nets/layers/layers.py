@@ -134,7 +134,6 @@ class DotProductAttention(LayerBase):
         self.init = init
         self.scale = scale
         self.dropout_p = dropout_p
-        self.optimizer = self.optimizer
         self._init_params()
 
     def _init_params(self):
