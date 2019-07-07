@@ -10,7 +10,7 @@ emphasize conceptual understanding over flexibility.
     - Hyperbolic tangent (tanh)
     - Logistic sigmoid
     - Affine
-    - Exponential linear units (ELU) [Clevert et al., 2016](http://arxiv.org/abs/1511.07289)
+    - Exponential linear units (ELU) ([Clevert, Unterthiner, & Hochreiter, 2016](http://arxiv.org/abs/1511.07289))
 
 2. **Losses**. Common loss functions. Includes:
     - Squared error
