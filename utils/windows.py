@@ -1,7 +1,12 @@
 import numpy as np
 
+"""
+In DSP, windowing functions are useful to counteract the assumption made by the
+FFT that the data is infinite and to reduce spectral leakage.
+"""
 
-def blackman_harris(window_len):
+
+def blackman_harris(window_len, symmetric=False):
     """
     The Blackman-Harris window, an instance of the more general class of
     cosine-sum windows where K=3. Additional coefficients extend the Hamming
@@ -22,11 +27,22 @@ def blackman_harris(window_len):
     window_len : int
         The length of the window in samples. Should be equal to the
         `frame_width` if applying to a windowed signal.
+    symmetric : bool (default: False)
+        If False, create a 'periodic' window that can be used in with an FFT /
+        in spectral analysis.  If True, generate a symmetric window that can be
+        used in, e.g., filter design.
+
+    Returns
+    -------
+    window : numpy array of shape (window_len,)
+        The window
     """
-    return generalized_cosine(window_len, [0.35875, 0.48829, 0.14128, 0.01168])
+    return generalized_cosine(
+        window_len, [0.35875, 0.48829, 0.14128, 0.01168], symmetric
+    )
 
 
-def hamming(window_len):
+def hamming(window_len, symmetric=False):
     """
     The Hamming window, an instance of the more general class of cosine-sum
     windows where K=1 and a0 = 0.54. Coefficients selected to minimize the
@@ -39,11 +55,20 @@ def hamming(window_len):
     window_len : int
         The length of the window in samples. Should be equal to the
         `frame_width` if applying to a windowed signal.
+    symmetric : bool (default: False)
+        If False, create a 'periodic' window that can be used in with an FFT /
+        in spectral analysis.  If True, generate a symmetric window that can be
+        used in, e.g., filter design.
+
+    Returns
+    -------
+    window : numpy array of shape (window_len,)
+        The window
     """
-    return generalized_cosine(window_len, [0.54, 1 - 0.54])
+    return generalized_cosine(window_len, [0.54, 1 - 0.54], symmetric)
 
 
-def hann(window_len):
+def hann(window_len, symmetric=False):
     """
     The Hann window, an instance of the more general class of cosine-sum
     windows where K=1 and a0 = 0.5. Unlike the Hamming window, the end points
@@ -56,11 +81,20 @@ def hann(window_len):
     window_len : int
         The length of the window in samples. Should be equal to the
         `frame_width` if applying to a windowed signal.
+    symmetric : bool (default: False)
+        If False, create a 'periodic' window that can be used in with an FFT /
+        in spectral analysis.  If True, generate a symmetric window that can be
+        used in, e.g., filter design.
+
+    Returns
+    -------
+    window : numpy array of shape (window_len,)
+        The window
     """
-    return generalized_cosine(window_len, [0.5, 0.5])
+    return generalized_cosine(window_len, [0.5, 0.5], symmetric)
 
 
-def generalized_cosine(window_len, coefs):
+def generalized_cosine(window_len, coefs, symmetric=False):
     """
     The generalized cosine family of window functions. Reflects a simple
     weighted sum of cosine terms.
@@ -76,14 +110,20 @@ def generalized_cosine(window_len, coefs):
         `frame_width` if applying to a windowed signal.
     coefs: list of floats
         The a_k coefficient values
+    symmetric : bool (default: False)
+        If False, create a 'periodic' window that can be used in with an FFT /
+        in spectral analysis.  If True, generate a symmetric window that can be
+        used in, e.g., filter design.
 
     Returns
     -------
     window : numpy array of shape (window_len,)
         The window
     """
+    window_len += 1 if not symmetric else 0
     entries = np.linspace(-np.pi, np.pi, window_len)  # (-1)^k * 2pi*n / window_len
-    return np.sum([ak * np.cos(k * entries) for k, ak in enumerate(coefs)], axis=0)
+    window = np.sum([ak * np.cos(k * entries) for k, ak in enumerate(coefs)], axis=0)
+    return window[:-1] if not symmetric else window
 
 
 class WindowInitializer:
