@@ -143,6 +143,11 @@ def test_activations(N=50):
     test_relu_activation(N)
     test_relu_grad(N)
 
+    print("Testing ELU activation")
+    time.sleep(1)
+    test_elu_activation(N)
+    test_elu_grad(N)
+
 
 def test_layers(N=50):
     print("Testing FullyConnected layer")
