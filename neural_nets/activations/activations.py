@@ -258,3 +258,31 @@ class Softmax(ActivationBase):
 
     def grad2(self, x):
         return self.grad(x) * (1 - self.fn(x)) - self.fn(x) * self.grad(x)
+
+
+class Hard_Sigmoid(ActivationBase):
+    """Hard sigmoid activation function.
+    Faster to compute than sigmoid activation.
+    # Arguments
+        x: Input tensor.
+    # Returns
+        Hard sigmoid activation:
+        - `0` if `x < -2.5`
+        - `1` if `x > 2.5`
+        - `0.2 * x + 0.5` if `-2.5 <= x <= 2.5`.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "Hard Sigmoid"
+
+    def fn(self, z):
+        return np.clip((0.2 * z) + 0.5, 0.0, 1.0)
+
+    def grad(self, x):
+        return np.where(-2.5 <= x <= 2.5, x, np.zeros_like(x))
+
+    def grad2(self, x):
+        return np.zeros_like(x)
+
