@@ -168,10 +168,10 @@ class Linear(ActivationBase):
         return z
 
     def grad(self, x):
-        return 1.
+        return np.ones_like(x)
 
     def grad2(self, x):
-        return 0.
+        return np.zeros_like(x)
 
 
 class Exponential(ActivationBase):
