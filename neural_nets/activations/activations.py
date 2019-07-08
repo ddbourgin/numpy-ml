@@ -195,3 +195,40 @@ class Exponential(ActivationBase):
 
     def grad2(self, x):
         return np.exp(x)
+
+
+class SELU(ActivationBase):
+    """Scaled Exponential Linear Unit (SELU).
+    SELU is equal to: `scale * elu(x, alpha)`, where alpha and scale
+    are predefined constants. The values of `alpha` and `scale` are
+    chosen so that the mean and variance of the inputs are preserved
+    between two consecutive layers as long as the weights are initialized
+    correctly and the number of inputs is "large enough"
+    (see references for more information).
+    # Arguments
+        z: A tensor or variable to compute the activation function for.
+    # Returns
+       The scaled exponential unit activation: `scale * elu(x, alpha)`.
+    # Note
+        - To be used together with the initialization "lecun_normal".
+        - To be used together with the dropout variant "AlphaDropout".
+    # References
+        - [Self-Normalizing Neural Networks](https://arxiv.org/abs/1706.02515)
+    """
+    def __init__(self):
+        self.alpha = 1.6732632423543772848170429916717
+        self.scale = 1.0507009873554804934193349852946
+        self.elu = ELU(alpha=self.alpha)
+        super().__init__()
+
+    def __str__(self):
+        return "SELU"
+
+    def fn(self, z):
+        return self.scale * self.elu.fn(z)
+
+    def grad(self, x):
+        return np.where(x >= 0, np.ones_like(x) * self.scale, np.exp(x) * self.alpha * self.scale)
+
+    def grad2(self, x):
+        return np.where(x >= 0, np.zeros_like(x), np.exp(x) * self.alpha * self.scale)
