@@ -66,6 +66,7 @@ This repo includes code for the following models:
         - ReLU
         - Tanh
         - Affine
+        - Linear
         - Sigmoid
         - Leaky ReLU
         - ELU
