@@ -174,6 +174,21 @@ class Affine(ActivationBase):
         return np.zeros_like(x)
 
 
+class Linear(Affine):
+    """Linear (i.e. identity) activation function.
+    A specific version of Affine(slope=1, intercept=0).
+    # Arguments
+        z: Input Array.
+    # Returns
+        Unchanged Input Array.
+    """
+    def __init__(self):
+        super().__init__(slope=1, intercept=0)
+
+    def __str__(self):
+        return "Linear"
+
+
 class ELU(ActivationBase):
     """Exponential linear unit.
     # Arguments
