@@ -173,3 +173,25 @@ class Linear(ActivationBase):
     def grad2(self, x):
         return 0.
 
+
+class Exponential(ActivationBase):
+    """Exponential (base e) activation function.
+    # Arguments
+        z: Input tensor.
+    # Returns
+        Exponential activation: `exp(x)`.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "Exponential"
+
+    def fn(self, z):
+        return np.exp(z)
+
+    def grad(self, x):
+        return np.exp(x)
+
+    def grad2(self, x):
+        return np.exp(x)
