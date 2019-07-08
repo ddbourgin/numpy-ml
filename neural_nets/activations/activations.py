@@ -232,3 +232,29 @@ class SELU(ActivationBase):
 
     def grad2(self, x):
         return np.where(x >= 0, np.zeros_like(x), np.exp(x) * self.alpha * self.scale)
+
+
+class Softmax(ActivationBase):
+    """Softmax activation function.
+    # Arguments
+        z: Input tensor.
+        axis: Integer, axis along which the softmax normalization is applied.
+    # Returns
+        Tensor, output of softmax transformation.
+    # Raises
+        ValueError: In case `dim(x) == 1`.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "Softmax"
+
+    def fn(self, z, axis=-1):
+        return np.exp(z) / np.sum(np.exp(z), axis=axis)
+
+    def grad(self, x):
+        return self.fn(x) * (1 - self.fn(x))
+
+    def grad2(self, x):
+        return self.grad(x) * (1 - self.fn(x)) - self.fn(x) * self.grad(x)
