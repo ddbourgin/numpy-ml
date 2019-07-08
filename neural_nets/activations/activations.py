@@ -331,6 +331,7 @@ class Hard_Sigmoid(ActivationBase):
         - `1` if `x > 2.5`
         - `0.2 * x + 0.5` if `-2.5 <= x <= 2.5`.
     """
+
     def __init__(self):
         super().__init__()
 
