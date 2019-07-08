@@ -22,13 +22,8 @@ class ActivationBase(ABC):
 
 
 class Sigmoid(ActivationBase):
-    """Softmax activation function.
-    # Arguments
-        z: Input Array.
-    # Returns
-        Array, output of softmax transformation.
-    # Raises
-        ValueError: In case `dim(x) == 1`.
+    """
+    Sigmoid activation function.
     """
 
     def __init__(self):
@@ -48,18 +43,17 @@ class Sigmoid(ActivationBase):
 
 
 class ReLU(ActivationBase):
-    """Rectified Linear Unit.
+    """
+    Rectified Linear Unit.
     With default values, it returns element-wise `max(x, 0)`.
     Otherwise, it follows:
     `f(x) = max_value` for `x >= max_value`,
     `f(x) = x` for `threshold <= x < max_value`,
     `f(x) = alpha * (x - threshold)` otherwise.
-    # Arguments
-        z: Input array.
-    # Returns
-        An Array.
-    # Reference
-        ReLU units can be fragile during training and can "die". For example, a
+
+    Reference
+    ----------
+    ReLU units can be fragile during training and can "die". For example, a
     large gradient flowing through a ReLU neuron could cause the weights to
     update in such a way that the neuron will never activate on any datapoint
     again. If this happens, then the gradient flowing through the unit will
@@ -67,12 +61,12 @@ class ReLU(ActivationBase):
     irreversibly die during training since they can get knocked off the data
     manifold.
 
-        For example, you may find that as much as 40% of your network can be "dead"
+    For example, you may find that as much as 40% of your network can be "dead"
     (i.e. neurons that never activate across the entire training dataset) if
     the learning rate is set too high. With a proper setting of the learning
     rate this is less frequently an issue.
 
-        - Andrej Karpathy
+    - Andrej Karpathy
     """
 
     def __init__(self):
@@ -92,21 +86,21 @@ class ReLU(ActivationBase):
 
 
 class LeakyReLU(ActivationBase):
-    """Leaky version of a Rectified Linear Unit.
+    """
+    Leaky version of a Rectified Linear Unit.
     It allows a small gradient when the unit is not active:
     `f(x) = alpha * x for x < 0`,
     `f(x) = x for x >= 0`.
-    # Input shape
-        Arbitrary. Use the keyword argument `input_shape`
-        (tuple of integers, does not include the samples axis)
-        when using this layer as the first layer in a model.
-    # Output shape
-        Same shape as the input.
-    # Arguments
-        alpha: float >= 0. Negative slope coefficient.
-    # References
-        - [Rectifier Nonlinearities Improve Neural Network Acoustic Models](
-           https://ai.stanford.edu/~amaas/papers/relu_hybrid_icml2013_final.pdf)
+
+    Parameters
+    ----------
+    alpha: float
+        `alpha` >= 0, Negative slope coefficient.
+
+    References
+    ----------
+    - [Rectifier Nonlinearities Improve Neural Network Acoustic Models](
+    https://ai.stanford.edu/~amaas/papers/relu_hybrid_icml2013_final.pdf)
     """
 
     def __init__(self, alpha=0.3):
@@ -131,12 +125,8 @@ class LeakyReLU(ActivationBase):
 
 
 class Tanh(ActivationBase):
-    """Hyperbolic tangent activation function.
-    # Arguments
-        z: Input array.
-    # Returns
-        The hyperbolic activation:
-        `tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))`
+    """
+    Hyperbolic tangent activation function.
     """
 
     def __init__(self):
@@ -156,6 +146,16 @@ class Tanh(ActivationBase):
 
 
 class Affine(ActivationBase):
+    """
+    Affine activation function.
+
+    Parameters
+    ----------
+    slope: float
+        slope of Affine Function
+    intercept: float
+        intercept of Affine Function
+    """
     def __init__(self, slope=1, intercept=0):
         self.slope = slope
         self.intercept = intercept
@@ -175,12 +175,10 @@ class Affine(ActivationBase):
 
 
 class Linear(Affine):
-    """Linear (i.e. identity) activation function.
+    """
+    Linear (i.e. identity) activation function.
+
     A specific version of Affine(slope=1, intercept=0).
-    # Arguments
-        z: Input Array.
-    # Returns
-        Unchanged Input Array.
     """
     def __init__(self):
         super().__init__(slope=1, intercept=0)
@@ -190,16 +188,17 @@ class Linear(Affine):
 
 
 class ELU(ActivationBase):
-    """Exponential linear unit.
-    # Arguments
-        z: Input tensor.
-        alpha: A scalar, slope of negative section.
-    # Returns
-        The exponential linear activation: `x` if `x > 0` and
-        `alpha * (exp(x)-1)` if `x < 0`.
-    # References
-        - [Fast and Accurate Deep Network Learning by Exponential
-           Linear Units (ELUs)](https://arxiv.org/abs/1511.07289)
+    """
+    Exponential linear unit.
+
+    Parameters
+    ----------
+    alpha: float
+        A scalar, slope of negative section.
+
+    References
+    ----------
+    - [Fast and Accurate Deep Network Learning by Exponential Linear Units (ELUs)](https://arxiv.org/abs/1511.07289)
     """
 
     def __init__(self, alpha=1.0):
@@ -223,11 +222,8 @@ class ELU(ActivationBase):
 
 
 class Exponential(ActivationBase):
-    """Exponential (base e) activation function.
-    # Arguments
-        z: Input Array.
-    # Returns
-        Exponential activation: `exp(x)`.
+    """
+    Exponential (base e) activation function.
     """
 
     def __init__(self):
@@ -247,22 +243,24 @@ class Exponential(ActivationBase):
 
 
 class SELU(ActivationBase):
-    """Scaled Exponential Linear Unit (SELU).
+    """
+    Scaled Exponential Linear Unit (SELU).
+
     SELU is equal to: `scale * elu(x, alpha)`, where alpha and scale
     are predefined constants. The values of `alpha` and `scale` are
     chosen so that the mean and variance of the inputs are preserved
     between two consecutive layers as long as the weights are initialized
     correctly and the number of inputs is "large enough"
     (see references for more information).
-    # Arguments
-        z: A Array or variable to compute the activation function for.
-    # Returns
-       The scaled exponential unit activation: `scale * elu(x, alpha)`.
-    # Note
-        - To be used together with the initialization "lecun_normal".
-        - To be used together with the dropout variant "AlphaDropout".
-    # References
-        - [Self-Normalizing Neural Networks](https://arxiv.org/abs/1706.02515)
+
+    Note
+    ----------
+    - To be used together with the initialization "lecun_normal".
+    - To be used together with the dropout variant "AlphaDropout".
+
+    References
+    ----------
+    - [Self-Normalizing Neural Networks](https://arxiv.org/abs/1706.02515)
     """
 
     def __init__(self):
@@ -285,15 +283,14 @@ class SELU(ActivationBase):
 
 
 class Hard_Sigmoid(ActivationBase):
-    """Hard sigmoid activation function.
+    """
+    Hard sigmoid activation function.
+
     Faster to compute than sigmoid activation.
-    # Arguments
-        x: Input Array.
-    # Returns
-        Hard sigmoid activation:
-        - `0` if `x < -2.5`
-        - `1` if `x > 2.5`
-        - `0.2 * x + 0.5` if `-2.5 <= x <= 2.5`.
+
+    - `0` if `x < -2.5`
+    - `1` if `x > 2.5`
+    - `0.2 * x + 0.5` if `-2.5 <= x <= 2.5`.
     """
 
     def __init__(self):
@@ -313,30 +310,23 @@ class Hard_Sigmoid(ActivationBase):
 
 
 class PReLU(ActivationBase):
-    """Parametric Rectified Linear Unit.
+    """
+    Parametric Rectified Linear Unit.
+
     It follows:
     `f(x) = alpha * x for x < 0`,
     `f(x) = x for x >= 0`,
     where `alpha` is a learned array with the same shape as x.
-    # Input shape
-        z: Input Array
-    # Output shape
-        Same shape as the input.
-    # Arguments
-        alpha_initializer: initializer function for the weights.
-        alpha_regularizer: regularizer for the weights.
-        alpha_constraint: constraint for the weights.
-        shared_axes: the axes along which to share learnable
-            parameters for the activation function.
-            For example, if the incoming feature maps
-            are from a 2D convolution
-            with output shape `(batch, height, width, channels)`,
-            and you wish to share parameters across space
-            so that each filter only has one set of parameters,
-            set `shared_axes=[1, 2]`.
-    # References
-        - [Delving Deep into Rectifiers: Surpassing Human-Level Performance on
-           ImageNet Classification](https://arxiv.org/abs/1502.01852)
+
+    Arguments
+    ----------
+    alpha: float
+        Initial number.
+
+    References
+    ----------
+    - [Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification](
+    https://arxiv.org/abs/1502.01852)
     """
 
     def __init__(self, alpha=0.3):
