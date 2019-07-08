@@ -250,8 +250,8 @@ class Softmax(ActivationBase):
     def __str__(self):
         return "Softmax"
 
-    def fn(self, z, axis=-1):
-        return np.exp(z) / np.sum(np.exp(z), axis=axis)
+    def fn(self, z):
+        return np.exp(z) / np.sum(np.exp(z))
 
     def grad(self, x):
         return self.fn(x) * (1 - self.fn(x))
@@ -281,7 +281,7 @@ class Hard_Sigmoid(ActivationBase):
         return np.clip((0.2 * z) + 0.5, 0.0, 1.0)
 
     def grad(self, x):
-        return np.where(-2.5 <= x <= 2.5, x, np.zeros_like(x))
+        return np.ones_like(x) * 0.2
 
     def grad2(self, x):
         return np.zeros_like(x)
@@ -325,7 +325,7 @@ class PReLU(ActivationBase):
         return np.where(z < 0, self.alpha * z, z)
 
     def grad(self, x):
-        return np.where(x < 0, np.ones_like() * self.alpha, np.ones_like())
+        return np.where(x < 0, np.ones_like(x) * self.alpha, np.ones_like(x))
 
     def grad2(self, x):
         return np.zeros_like(x)
