@@ -149,3 +149,27 @@ class ELU(ActivationBase):
     def grad2(self, x):
         # 0 if x >= 0 else alpha * e^(z)
         return np.where(x >= 0, np.zeros_like(x), self.alpha * np.exp(x))
+
+
+class Linear(ActivationBase):
+    """Linear (i.e. identity) activation function.
+    # Arguments
+        z: Input tensor.
+    # Returns
+        Unchanged Input tensor.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "Linear"
+
+    def fn(self, z):
+        return z
+
+    def grad(self, x):
+        return 1.
+
+    def grad2(self, x):
+        return 0.
+
