@@ -22,6 +22,15 @@ class ActivationBase(ABC):
 
 
 class Sigmoid(ActivationBase):
+    """Softmax activation function.
+    # Arguments
+        z: Input Array.
+    # Returns
+        Array, output of softmax transformation.
+    # Raises
+        ValueError: In case `dim(x) == 1`.
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -39,8 +48,18 @@ class Sigmoid(ActivationBase):
 
 
 class ReLU(ActivationBase):
-    """
-    ReLU units can be fragile during training and can "die". For example, a
+    """Rectified Linear Unit.
+    With default values, it returns element-wise `max(x, 0)`.
+    Otherwise, it follows:
+    `f(x) = max_value` for `x >= max_value`,
+    `f(x) = x` for `threshold <= x < max_value`,
+    `f(x) = alpha * (x - threshold)` otherwise.
+    # Arguments
+        z: Input array.
+    # Returns
+        An Array.
+    # Reference
+        ReLU units can be fragile during training and can "die". For example, a
     large gradient flowing through a ReLU neuron could cause the weights to
     update in such a way that the neuron will never activate on any datapoint
     again. If this happens, then the gradient flowing through the unit will
@@ -48,12 +67,12 @@ class ReLU(ActivationBase):
     irreversibly die during training since they can get knocked off the data
     manifold.
 
-    For example, you may find that as much as 40% of your network can be "dead"
+        For example, you may find that as much as 40% of your network can be "dead"
     (i.e. neurons that never activate across the entire training dataset) if
     the learning rate is set too high. With a proper setting of the learning
     rate this is less frequently an issue.
 
-    - Andrej Karpathy
+        - Andrej Karpathy
     """
 
     def __init__(self):
@@ -73,6 +92,23 @@ class ReLU(ActivationBase):
 
 
 class LeakyReLU(ActivationBase):
+    """Leaky version of a Rectified Linear Unit.
+    It allows a small gradient when the unit is not active:
+    `f(x) = alpha * x for x < 0`,
+    `f(x) = x for x >= 0`.
+    # Input shape
+        Arbitrary. Use the keyword argument `input_shape`
+        (tuple of integers, does not include the samples axis)
+        when using this layer as the first layer in a model.
+    # Output shape
+        Same shape as the input.
+    # Arguments
+        alpha: float >= 0. Negative slope coefficient.
+    # References
+        - [Rectifier Nonlinearities Improve Neural Network Acoustic Models](
+           https://ai.stanford.edu/~amaas/papers/relu_hybrid_icml2013_final.pdf)
+    """
+
     def __init__(self, alpha=0.3):
         self.alpha = alpha
         super().__init__()
@@ -95,6 +131,14 @@ class LeakyReLU(ActivationBase):
 
 
 class Tanh(ActivationBase):
+    """Hyperbolic tangent activation function.
+    # Arguments
+        z: Input array.
+    # Returns
+        The hyperbolic activation:
+        `tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))`
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -131,6 +175,18 @@ class Affine(ActivationBase):
 
 
 class ELU(ActivationBase):
+    """Exponential linear unit.
+    # Arguments
+        z: Input tensor.
+        alpha: A scalar, slope of negative section.
+    # Returns
+        The exponential linear activation: `x` if `x > 0` and
+        `alpha * (exp(x)-1)` if `x < 0`.
+    # References
+        - [Fast and Accurate Deep Network Learning by Exponential
+           Linear Units (ELUs)](https://arxiv.org/abs/1511.07289)
+    """
+
     def __init__(self, alpha=1.0):
         self.alpha = alpha
         super().__init__()
@@ -154,10 +210,11 @@ class ELU(ActivationBase):
 class Linear(ActivationBase):
     """Linear (i.e. identity) activation function.
     # Arguments
-        z: Input tensor.
+        z: Input Array.
     # Returns
-        Unchanged Input tensor.
+        Unchanged Input Array.
     """
+
     def __init__(self):
         super().__init__()
 
@@ -177,10 +234,11 @@ class Linear(ActivationBase):
 class Exponential(ActivationBase):
     """Exponential (base e) activation function.
     # Arguments
-        z: Input tensor.
+        z: Input Array.
     # Returns
         Exponential activation: `exp(x)`.
     """
+
     def __init__(self):
         super().__init__()
 
@@ -206,7 +264,7 @@ class SELU(ActivationBase):
     correctly and the number of inputs is "large enough"
     (see references for more information).
     # Arguments
-        z: A tensor or variable to compute the activation function for.
+        z: A Array or variable to compute the activation function for.
     # Returns
        The scaled exponential unit activation: `scale * elu(x, alpha)`.
     # Note
@@ -215,6 +273,7 @@ class SELU(ActivationBase):
     # References
         - [Self-Normalizing Neural Networks](https://arxiv.org/abs/1706.02515)
     """
+
     def __init__(self):
         self.alpha = 1.6732632423543772848170429916717
         self.scale = 1.0507009873554804934193349852946
@@ -237,13 +296,14 @@ class SELU(ActivationBase):
 class Softmax(ActivationBase):
     """Softmax activation function.
     # Arguments
-        z: Input tensor.
+        z: Input Array.
         axis: Integer, axis along which the softmax normalization is applied.
     # Returns
-        Tensor, output of softmax transformation.
+        Array, output of softmax transformation.
     # Raises
         ValueError: In case `dim(x) == 1`.
     """
+
     def __init__(self):
         super().__init__()
 
@@ -264,7 +324,7 @@ class Hard_Sigmoid(ActivationBase):
     """Hard sigmoid activation function.
     Faster to compute than sigmoid activation.
     # Arguments
-        x: Input tensor.
+        x: Input Array.
     # Returns
         Hard sigmoid activation:
         - `0` if `x < -2.5`
