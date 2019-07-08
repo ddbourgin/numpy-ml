@@ -69,6 +69,10 @@ This repo includes code for the following models:
         - Sigmoid
         - Leaky ReLU
         - ELU
+        - Exponential
+        - SELU
+        - Hard Sigmoid
+        - PReLU
     * Models
         - Bernoulli variational autoencoder
         - Wasserstein GAN with gradient penalty
