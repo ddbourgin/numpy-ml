@@ -10,12 +10,14 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("notebook", font_scale=0.7)
 
-from activations import Affine, ReLU, LeakyReLU, Tanh, Sigmoid, ELU
+from activations import Affine, ReLU, LeakyReLU, Tanh, Sigmoid, ELU, Linear, \
+    Exponential, SELU, Softmax, Hard_Sigmoid, PReLU
 
 
 def plot_activations():
-    fig, axes = plt.subplots(2, 3, sharex=True, sharey=True)
-    fns = [Affine(), Tanh(), Sigmoid(), ReLU(), LeakyReLU(), ELU()]
+    fig, axes = plt.subplots(3, 4, sharex=True, sharey=True)
+    fns = [Affine(), Tanh(), Sigmoid(), ReLU(), LeakyReLU(), ELU(),
+           Linear(), Exponential(), SELU(), Softmax(), Hard_Sigmoid(), PReLU()]
     for ax, fn in zip(axes.flatten(), fns):
         X = np.linspace(-3, 3, 100).astype(float).reshape(100, 1)
         ax.plot(X, fn(X), label=r"$y$", alpha=0.7)
