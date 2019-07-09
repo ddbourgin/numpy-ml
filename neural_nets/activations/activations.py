@@ -35,7 +35,9 @@ class Sigmoid(ActivationBase):
         return self.fn(x) * (1 - self.fn(x))
 
     def grad2(self, x):
-        return self.grad(x) * (1 - self.fn(x)) - self.fn(x) * self.grad(x)
+        return self.grad(x) * (1 - self.fn(x)) - self.fn(
+            x
+        ) * self.grad(x)
 
 
 class ReLU(ActivationBase):
@@ -118,7 +120,9 @@ class Affine(ActivationBase):
         super().__init__()
 
     def __str__(self):
-        return "Affine(slope={}, intercept={})".format(self.slope, self.intercept)
+        return "Affine(slope={}, intercept={})".format(
+            self.slope, self.intercept
+        )
 
     def fn(self, z):
         return self.slope * z + self.intercept
@@ -140,15 +144,21 @@ class ELU(ActivationBase):
 
     def fn(self, z):
         # z if z > 0  else alpha * (e^z - 1) """
-        return z * (z > 0) + self.alpha * (np.exp(z) - 1) * (z < 0)
+        return z * (z > 0) + self.alpha * (
+            np.exp(z) - 1
+        ) * (z < 0)
 
     def grad(self, x):
         # 1 if x >= 0 else alpha * e^(z)
-        return np.where(x >= 0, np.ones_like(x), self.fn(x) + self.alpha)
+        return np.where(
+            x >= 0, np.ones_like(x), self.fn(x) + self.alpha
+        )
 
     def grad2(self, x):
         # 0 if x >= 0 else alpha * e^(z)
-        return np.where(x >= 0, np.zeros_like(x), self.alpha * np.exp(x))
+        return np.where(
+            x >= 0, np.zeros_like(x), self.alpha * np.exp(x)
+        )
 
 
 class SELU(ActivationBase):
@@ -158,16 +168,30 @@ class SELU(ActivationBase):
         super().__init__()
 
     def __str__(self):
-        return "SELU(alpha={},scale={})".format(self.alpha, self.scale)
+        return "SELU(alpha={},scale={})".format(
+            self.alpha, self.scale
+        )
 
     def fn(self, z):
-        # scale*z if z > 0 else scale * (alpha * exp(z) - alpha) 
-        return self.scale *((z > 0)*z + (z <= 0) * (self.alpha * (np.exp(z) - self.alpha)))
+        # scale*z if z > 0 else scale * (alpha * exp(z) - alpha)
+        return self.scale * (
+            (z > 0) * z
+            + (z <= 0)
+            * (self.alpha * (np.exp(z) - self.alpha))
+        )
 
     def grad(self, x):
         # 1 if x >= 0 else scale*(alpha * e^(z))
-        return np.where(x >= 0, self.scale*np.ones_like(x), self.scale*(self.alpha * np.exp(x)))
+        return np.where(
+            x >= 0,
+            self.scale * np.ones_like(x),
+            self.scale * (self.alpha * np.exp(x)),
+        )
 
     def grad2(self, x):
         # 0 if x >= 0 else scale*(alpha * e^(z))
-        return np.where(x >= 0, np.zeros_like(x), self.scale*(self.alpha * np.exp(x)))
+        return np.where(
+            x >= 0,
+            np.zeros_like(x),
+            self.scale * (self.alpha * np.exp(x)),
+        )
