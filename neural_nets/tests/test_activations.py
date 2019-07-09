@@ -338,7 +338,7 @@ def test_selu_grad(N=None):
         n_ex = np.random.randint(1, 100)
         n_dims = np.random.randint(1, 100)
         z = random_tensor((n_ex, n_dims))
-        assert_almost_equal(mine.grad(z), gold(z))
+        assert_almost_equal(mine.grad(z), gold(z), decimal=6)
         print("PASSED")
         i += 1
 
