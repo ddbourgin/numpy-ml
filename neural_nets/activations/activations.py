@@ -282,7 +282,7 @@ class SELU(ActivationBase):
         return np.where(x >= 0, np.zeros_like(x), np.exp(x) * self.alpha * self.scale)
 
 
-class Hard_Sigmoid(ActivationBase):
+class HardSigmoid(ActivationBase):
     """
     Hard sigmoid activation function.
 
@@ -303,44 +303,11 @@ class Hard_Sigmoid(ActivationBase):
         return np.clip((0.2 * z) + 0.5, 0.0, 1.0)
 
     def grad(self, x):
-        return np.ones_like(x) * 0.2
-
-    def grad2(self, x):
-        return np.zeros_like(x)
-
-
-class PReLU(ActivationBase):
-    """
-    Parametric Rectified Linear Unit.
-
-    It follows:
-    `f(x) = alpha * x for x < 0`,
-    `f(x) = x for x >= 0`,
-    where `alpha` is a learned array with the same shape as x.
-
-    Arguments
-    ----------
-    alpha: float
-        Initial number.
-
-    References
-    ----------
-    - [Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification](
-    https://arxiv.org/abs/1502.01852)
-    """
-
-    def __init__(self, alpha=0.3):
-        self.alpha = alpha
-        super().__init__()
-
-    def __str__(self):
-        return "PReLU(alpha={})".format(self.alpha)
-
-    def fn(self, z):
-        return np.where(z < 0, self.alpha * z, z)
-
-    def grad(self, x):
-        return np.where(x < 0, np.ones_like(x) * self.alpha, np.ones_like(x))
+        arr = np.ones_like(x) * 0.2
+        for idx, num in enumerate(x):
+            if num < -2.5 or num > 2.5:
+                arr[idx] = 0.
+        return arr
 
     def grad2(self, x):
         return np.zeros_like(x)
