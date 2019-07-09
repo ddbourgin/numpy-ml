@@ -303,11 +303,7 @@ class HardSigmoid(ActivationBase):
         return np.clip((0.2 * z) + 0.5, 0.0, 1.0)
 
     def grad(self, x):
-        arr = np.ones_like(x) * 0.2
-        for idx, num in enumerate(x):
-            if num < -2.5 or num > 2.5:
-                arr[idx] = 0.
-        return arr
+        return np.where((x >= -2.5) & (x <= 2.5), 0.2, 0)
 
     def grad2(self, x):
         return np.zeros_like(x)
