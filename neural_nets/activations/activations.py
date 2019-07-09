@@ -210,11 +210,11 @@ class ELU(ActivationBase):
 
     def fn(self, z):
         # z if z > 0  else alpha * (e^z - 1) """
-        return z * (z > 0) + self.alpha * (np.exp(z) - 1) * (z < 0)
+        return np.where(z > 0, z, self.alpha * (np.exp(z) - 1))
 
     def grad(self, x):
         # 1 if x >= 0 else alpha * e^(z)
-        return np.where(x >= 0, np.ones_like(x), self.fn(x) + self.alpha)
+        return np.where(x >= 0, np.ones_like(x), self.alpha * np.exp(x))
 
     def grad2(self, x):
         # 0 if x >= 0 else alpha * e^(z)
