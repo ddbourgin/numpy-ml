@@ -149,3 +149,25 @@ class ELU(ActivationBase):
     def grad2(self, x):
         # 0 if x >= 0 else alpha * e^(z)
         return np.where(x >= 0, np.zeros_like(x), self.alpha * np.exp(x))
+
+
+class SELU(ActivationBase):
+    def __init__(self, alpha=1.67, scale=1.05):
+        self.alpha = alpha
+        self.scale = scale
+        super().__init__()
+
+    def __str__(self):
+        return "SELU(alpha={},scale={})".format(self.alpha, self.scale)
+
+    def fn(self, z):
+        # scale*z if z > 0 else scale * (alpha * exp(z) - alpha) 
+        return self.scale *((z > 0)*z + (z <= 0) * (self.alpha * (np.exp(z) - self.alpha)))
+
+    def grad(self, x):
+        # 1 if x >= 0 else scale*(alpha * e^(z))
+        return np.where(x >= 0, self.scale*np.ones_like(x), self.scale*(self.alpha * np.exp(x)))
+
+    def grad2(self, x):
+        # 0 if x >= 0 else scale*(alpha * e^(z))
+        return np.where(x >= 0, np.zeros_like(x), self.scale*(self.alpha * np.exp(x)))
