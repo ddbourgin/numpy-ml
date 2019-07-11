@@ -16,5 +16,5 @@ The `activations` module implements several common activation functions:
 
 ## Plots
 <p align="center">
-<img src="img/plot.png" align='center' height="550" />
+<img src="img/plot.png" align='center' height="450" />
 </p>
