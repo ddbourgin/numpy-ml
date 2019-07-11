@@ -120,7 +120,7 @@ class GMM(object):
             mu_c = self.mu[c, :]
             n_c = denoms[c]
 
-            outer = np.zeros((2, 2))
+            outer = np.zeros((self.d, self.d))
             for i in range(N):
                 wic = self.Q[i, c]
                 xi = self.X[i, :]
