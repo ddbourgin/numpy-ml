@@ -307,10 +307,10 @@ class HardSigmoid(ActivationBase):
     """
     A "hard" sigmoid activation function.
 
-    HardSigmoid(x) =
-        0               if x < -2.5
-        0.2 * x + 0.5   if -2.5 <= x <= 2.5.
-        1               if x > 2.5
+        HardSigmoid(x) =
+            0               if x < -2.5
+            0.2 * x + 0.5   if -2.5 <= x <= 2.5.
+            1               if x > 2.5
 
     The hard sigmoid is a piecewise linear approximation of the logistic
     sigmoid that is computationally more efficient to compute.
@@ -330,3 +330,30 @@ class HardSigmoid(ActivationBase):
 
     def grad2(self, x):
         return np.zeros_like(x)
+
+
+class SoftPlus(ActivationBase):
+    """
+    A softplus activation function.
+
+        SoftPlus(x) = log(1 + e^x)
+
+    In contrast to the ReLU function, softplus is differentiable everywhere
+    (including 0). It is, however, less computationally efficient to compute.
+    The derivative of the softplus activation is the logistic sigmoid.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "SoftPlus"
+
+    def fn(self, z):
+        return np.log(np.exp(z) + 1)
+
+    def grad(self, x):
+        return np.exp(x) / (np.exp(x) + 1)
+
+    def grad2(self, x):
+        return np.exp(x) / ((np.exp(x) + 1) ** 2)
