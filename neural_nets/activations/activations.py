@@ -22,6 +22,10 @@ class ActivationBase(ABC):
 
 
 class Sigmoid(ActivationBase):
+    """
+    A logistic sigmoid activation function.
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -40,6 +44,12 @@ class Sigmoid(ActivationBase):
 
 class ReLU(ActivationBase):
     """
+    A rectified linear activation function.
+
+    ReLU(x) =
+        x   if x > 0
+        0   otherwise
+
     ReLU units can be fragile during training and can "die". For example, a
     large gradient flowing through a ReLU neuron could cause the weights to
     update in such a way that the neuron will never activate on any datapoint
@@ -73,6 +83,27 @@ class ReLU(ActivationBase):
 
 
 class LeakyReLU(ActivationBase):
+    """
+    'Leaky' version of a rectified linear unit (ReLU).
+
+    f(x) =
+        alpha * x   if x < 0
+        x           otherwise
+
+    Leaky ReLUs are designed to address the vanishing gradient problem in ReLUs
+    by allowing a small non-zero gradient when x is negative.
+
+    Parameters
+    ----------
+    alpha: float (default: 0.3)
+        Activation slope when x < 0
+
+    References
+    ----------
+    - [Rectifier Nonlinearities Improve Neural Network Acoustic Models](
+    https://ai.stanford.edu/~amaas/papers/relu_hybrid_icml2013_final.pdf)
+    """
+
     def __init__(self, alpha=0.3):
         self.alpha = alpha
         super().__init__()
@@ -95,6 +126,10 @@ class LeakyReLU(ActivationBase):
 
 
 class Tanh(ActivationBase):
+    """
+    A hyperbolic tangent activation function.
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -112,6 +147,17 @@ class Tanh(ActivationBase):
 
 
 class Affine(ActivationBase):
+    """
+    An affine activation function.
+
+    Parameters
+    ----------
+    slope: float (default: 1)
+        Activation slope
+    intercept: float (default: 0)
+        Intercept/offset term
+    """
+
     def __init__(self, slope=1, intercept=0):
         self.slope = slope
         self.intercept = intercept
@@ -130,7 +176,47 @@ class Affine(ActivationBase):
         return np.zeros_like(x)
 
 
+class Identity(Affine):
+    """
+    Identity activation function
+    """
+
+    def __init__(self):
+        super().__init__(slope=1, intercept=0)
+
+    def __str__(self):
+        return "Identity"
+
+
 class ELU(ActivationBase):
+    """
+    Exponential linear unit.
+
+        ELU(x) =
+            x                   if x >= 0
+            alpha * (e^x - 1)   otherwise
+
+    ELUs are intended to address the fact that ReLUs are strictly nonnegative
+    and thus have an average activation > 0, increasing the chances of internal
+    covariate shift and slowing down learning. ELU units address this by (1)
+    allowing negative values when x < 0, which (2) are bounded by a value -1 *
+    `alpha`. Similar to leaky / parametric ReLUs, the negative activation
+    values help to push the average unit activation towards 0. Unlike leaky /
+    parametric ReLUs, however, the boundedness of the negative activation
+    allows for greater robustness in the face of large negative values,
+    allowing the function to avoid conveying the *degree* of "absence"
+    (negative activation) in the input.
+
+    Parameters
+    ----------
+    alpha : float (default: 1)
+        Slope of negative segment
+
+    References
+    ----------
+    - [Fast and Accurate Deep Network Learning by Exponential Linear Units (ELUs)](https://arxiv.org/abs/1511.07289)
+    """
+
     def __init__(self, alpha=1.0):
         self.alpha = alpha
         super().__init__()
@@ -140,12 +226,107 @@ class ELU(ActivationBase):
 
     def fn(self, z):
         # z if z > 0  else alpha * (e^z - 1) """
-        return z * (z > 0) + self.alpha * (np.exp(z) - 1) * (z < 0)
+        return np.where(z > 0, z, self.alpha * (np.exp(z) - 1))
 
     def grad(self, x):
         # 1 if x >= 0 else alpha * e^(z)
-        return np.where(x >= 0, np.ones_like(x), self.fn(x) + self.alpha)
+        return np.where(x >= 0, np.ones_like(x), self.alpha * np.exp(x))
 
     def grad2(self, x):
         # 0 if x >= 0 else alpha * e^(z)
         return np.where(x >= 0, np.zeros_like(x), self.alpha * np.exp(x))
+
+
+class Exponential(ActivationBase):
+    """
+    Exponential (base e) activation function.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "Exponential"
+
+    def fn(self, z):
+        return np.exp(z)
+
+    def grad(self, x):
+        return np.exp(x)
+
+    def grad2(self, x):
+        return np.exp(x)
+
+
+class SELU(ActivationBase):
+    """
+    Scaled exponential linear unit (SELU).
+
+        SELU(x) = scale * ELU(x, alpha)
+                = scale * x                     if x >= 0
+                = scale * [alpha * (e^x - 1)]   otherwise
+
+    SELU units, when used in conjunction with proper weight initialization and
+    regularization techniques, encourage neuron activations to converge to
+    zero-mean and unit variance without explicit use of e.g., batchnorm.
+
+    For SELU units, the `alpha` and `scale` values are constants chosen so that
+    the mean and variance of the inputs are preserved between consecutive
+    layers. As such the authors propose weights be initialized using
+    Lecun-Normal initialization: w ~ N(0, 1 / fan_in), and to use the dropout
+    variant `alpha-dropout` during regularization. See the reference for more
+    information (especially the appendix ;-) )
+
+    References
+    ----------
+    - [Self-Normalizing Neural Networks](https://arxiv.org/abs/1706.02515)
+    """
+
+    def __init__(self):
+        self.alpha = 1.6732632423543772848170429916717
+        self.scale = 1.0507009873554804934193349852946
+        self.elu = ELU(alpha=self.alpha)
+        super().__init__()
+
+    def __str__(self):
+        return "SELU"
+
+    def fn(self, z):
+        return self.scale * self.elu.fn(z)
+
+    def grad(self, x):
+        return np.where(
+            x >= 0, np.ones_like(x) * self.scale, np.exp(x) * self.alpha * self.scale
+        )
+
+    def grad2(self, x):
+        return np.where(x >= 0, np.zeros_like(x), np.exp(x) * self.alpha * self.scale)
+
+
+class HardSigmoid(ActivationBase):
+    """
+    A "hard" sigmoid activation function.
+
+    HardSigmoid(x) =
+        0               if x < -2.5
+        0.2 * x + 0.5   if -2.5 <= x <= 2.5.
+        1               if x > 2.5
+
+    The hard sigmoid is a piecewise linear approximation of the logistic
+    sigmoid that is computationally more efficient to compute.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "Hard Sigmoid"
+
+    def fn(self, z):
+        return np.clip((0.2 * z) + 0.5, 0.0, 1.0)
+
+    def grad(self, x):
+        return np.where((x >= -2.5) & (x <= 2.5), 0.2, 0)
+
+    def grad2(self, x):
+        return np.zeros_like(x)
