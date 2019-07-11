@@ -150,6 +150,7 @@ class ELU(ActivationBase):
         # 0 if x >= 0 else alpha * e^(z)
         return np.where(x >= 0, np.zeros_like(x), self.alpha * np.exp(x))
 
+
 class SoftPlus(ActivationBase):
     def __init__(self):
         super().__init__()
@@ -164,4 +165,4 @@ class SoftPlus(ActivationBase):
         return np.exp(x) / (np.exp(x) + 1)
 
     def grad2(self, x):
-        return np.exp(x) / ((np.exp(x) + 1)**2)
+        return np.exp(x) / ((np.exp(x) + 1) ** 2)
