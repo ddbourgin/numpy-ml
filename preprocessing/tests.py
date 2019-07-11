@@ -4,24 +4,23 @@ from collections import Counter
 import huffman
 import numpy as np
 
-from sklearn.datasets import fetch_20newsgroups
+from scipy.fftpack import dct
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from nlp import HuffmanEncoder, TFIDFEncoder
+from librosa.core.time_frequency import fft_frequencies
+from librosa.feature import mfcc as lr_mfcc
+from librosa.util import frame
+from librosa.filters import mel
+
 from general import Standardizer
+from nlp import HuffmanEncoder, TFIDFEncoder
+from dsp import DCT, DFT, mfcc, to_frames, mel_filterbank, dft_bins
 
 
 sys.path.append("..")
 from utils.testing import random_paragraph
-
-
-def load_newsgroups():
-    categories = ["alt.atheism", "talk.religion.misc", "comp.graphics", "sci.space"]
-    dataset = fetch_20newsgroups(
-        subset="all", categories=categories, shuffle=True, random_state=42
-    )
-    return dataset.data, dataset.target
 
 
 def test_huffman():
@@ -90,6 +89,124 @@ def test_tfidf():
         tfidf.fit(docs)
         mine = tfidf.transform(ignore_special_chars=True)
         theirs = gold.fit_transform(docs).toarray()
+
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+
+
+def test_dct():
+    while True:
+        N = np.random.randint(2, 100)
+        signal = np.random.rand(N)
+        ortho = bool(np.random.randint(2))
+        mine = DCT(signal, orthonormal=ortho)
+        theirs = dct(signal, norm="ortho" if ortho else None)
+
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+
+
+def test_dft():
+    while True:
+        N = np.random.randint(2, 100)
+        signal = np.random.rand(N)
+        mine = DFT(signal)
+        theirs = np.fft.rfft(signal)
+
+        np.testing.assert_almost_equal(mine.real, theirs.real)
+        print("PASSED")
+
+
+def test_mfcc():
+    """Broken"""
+    while True:
+        N = np.random.randint(500, 100000)
+        fs = np.random.randint(50, 10000)
+        n_mfcc = 12
+        window_len = 100
+        stride_len = 50
+        n_filters = 20
+        window_dur = window_len / fs
+        stride_dur = stride_len / fs
+        signal = np.random.rand(N)
+        #  ff = frame(signal, frame_length=window_len, hop_length=stride_len).T
+        #  print(len(ff))
+
+        mine = mfcc(
+            signal,
+            fs=fs,
+            window="hann",
+            window_duration=window_dur,
+            stride_duration=stride_dur,
+            lifter_coef=0,
+            alpha=0,
+            n_mfccs=n_mfcc,
+            normalize=False,
+            center=True,
+            n_filters=n_filters,
+            replace_intercept=False,
+        )
+
+        theirs = lr_mfcc(
+            signal,
+            sr=fs,
+            n_mels=n_filters,
+            n_mfcc=n_mfcc,
+            n_fft=window_len,
+            hop_length=stride_len,
+            htk=True,
+        ).T
+
+        np.testing.assert_almost_equal(mine, theirs, decimal=5)
+        print("PASSED")
+
+
+def test_framing():
+    while True:
+        N = np.random.randint(500, 100000)
+        window_len = np.random.randint(10, 100)
+        stride_len = np.random.randint(1, 50)
+        signal = np.random.rand(N)
+
+        mine = to_frames(signal, window_len, stride_len, writeable=False)
+        theirs = frame(signal, frame_length=window_len, hop_length=stride_len).T
+
+        assert len(mine) == len(theirs), "len(mine) = {}, len(theirs) = {}".format(
+            len(mine), len(theirs)
+        )
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+
+
+def test_dft_bins():
+    while True:
+        N = np.random.randint(500, 100000)
+        fs = np.random.randint(50, 1000)
+
+        mine = dft_bins(N, fs=fs, positive_only=True)
+        theirs = fft_frequencies(fs, N)
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+
+
+def test_mel_filterbank():
+    while True:
+        fs = np.random.randint(50, 10000)
+        n_filters = np.random.randint(2, 20)
+        window_len = np.random.randint(10, 100)
+        norm = np.random.randint(2)
+
+        mine = mel_filterbank(
+            window_len, n_filters, fs, min_freq=0, max_freq=None, normalize=bool(norm)
+        )
+
+        theirs = mel(
+            fs,
+            n_fft=window_len,
+            n_mels=n_filters,
+            htk=True,
+            norm=norm if norm == 1 else None,
+        )
 
         np.testing.assert_almost_equal(mine, theirs)
         print("PASSED")

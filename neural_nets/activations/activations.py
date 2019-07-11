@@ -136,14 +136,16 @@ class ELU(ActivationBase):
         super().__init__()
 
     def __str__(self):
-        return "Elu(alpha={})".format(self.alpha)
+        return "ELU(alpha={})".format(self.alpha)
 
     def fn(self, z):
-        _z = z * (z > 0) + self.alpha * (np.exp(z) - 1.) * (z < 0)
-        return _z
+        # z if z > 0  else alpha * (e^z - 1) """
+        return z * (z > 0) + self.alpha * (np.exp(z) - 1) * (z < 0)
 
     def grad(self, x):
+        # 1 if x >= 0 else alpha * e^(z)
         return np.where(x >= 0, np.ones_like(x), self.fn(x) + self.alpha)
 
     def grad2(self, x):
-        return np.zeros_like(x)
+        # 0 if x >= 0 else alpha * e^(z)
+        return np.where(x >= 0, np.zeros_like(x), self.alpha * np.exp(x))
