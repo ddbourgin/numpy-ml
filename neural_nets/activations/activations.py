@@ -179,7 +179,7 @@ class SoftSign(ActivationBase):
         return z / (1 + np.absolute(z))
 
     def grad(self, x):
-        print("todo")
+        return 1 / ((1 + np.absolute(x)) ** 2)
 
     def grad2(self, x):
-        print("todo")
+        return -2 * x / ((np.absolute(x) * (1 + np.absolute(x)))) ** 3 
