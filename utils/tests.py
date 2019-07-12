@@ -62,7 +62,11 @@ def test_radial_basis_kernel():
         X = np.random.rand(N, C)
         Y = np.random.rand(M, C)
 
-        mine = RBFKernel(gamma=gamma)(X, Y)
+        # sklearn (gamma) <-> mine (sigma) conversion:
+        # gamma = 1 / (2 * sigma^2)
+        # sigma = np.sqrt(1 / 2 * gamma)
+
+        mine = RBFKernel(sigma=np.sqrt(1 / (2 * gamma)))(X, Y)
         gold = sk_rbf(X, Y, gamma=gamma)
 
         np.testing.assert_almost_equal(mine, gold)
