@@ -12,12 +12,12 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("paper", font_scale=0.5)
 
+from gp import GPRegression
 from linear_models.lm import LinearRegression
 from kernel_regression import KernelRegression
 from knn import KNN
 
 from sklearn.model_selection import train_test_split
-from sklearn.datasets import make_regression
 
 
 def random_regression_problem(n_ex, n_in, n_out, d=3, intercept=0, std=1, seed=0):
@@ -31,15 +31,6 @@ def random_regression_problem(n_ex, n_in, n_out, d=3, intercept=0, std=1, seed=0
         y.append(val)
     y = np.array(y)
 
-    #  X, y, coef = make_regression(
-    #      n_samples=n_ex,
-    #      n_features=n_in,
-    #      n_targets=n_out,
-    #      bias=intercept,
-    #      noise=std,
-    #      coef=True,
-    #      random_state=seed,
-    #  )
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=seed
     )
@@ -82,7 +73,7 @@ def plot_regression():
         KR_poly = KernelRegression(kernel=KR_poly_best)
         KR_poly.fit(X_train, y_train)
 
-        KR_rbf = KernelRegression(kernel="RBFKernel(gamma=0.01)")
+        KR_rbf = KernelRegression(kernel="RBFKernel(sigma=1)")
         KR_rbf.fit(X_train, y_train)
         y_pred_rbf = KR_rbf.predict(X_test)
         loss_rbf = np.mean((y_test.flatten() - y_pred_rbf.flatten()) ** 2)
@@ -174,4 +165,79 @@ def plot_knn():
 
     plt.tight_layout()
     plt.savefig("img/knn_plots.png", dpi=300)
+    plt.close("all")
+
+
+def plot_gp():
+    np.random.seed(12345)
+    sns.set_context("paper", font_scale=0.65)
+
+    X_test = np.linspace(-10, 10, 100)
+    X_train = np.array([-3, 0, 7, 1, -9])
+    y_train = np.sin(X_train)
+
+    fig, axes = plt.subplots(2, 2)
+    alphas = [0, 1e-10, 1e-5, 1]
+    for ix, (ax, alpha) in enumerate(zip(axes.flatten(), alphas)):
+        G = GPRegression(kernel="RBFKernel", alpha=alpha)
+        G.fit(X_train, y_train)
+        y_pred, conf = G.predict(X_test)
+
+        ax.plot(X_train, y_train, "rx", label="observed")
+        ax.plot(X_test, np.sin(X_test), label="true fn")
+        ax.plot(X_test, y_pred, "--", label="MAP (alpha={})".format(alpha))
+        ax.fill_between(X_test, y_pred + conf, y_pred - conf, alpha=0.1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        sns.despine()
+
+        ax.legend()
+
+    plt.tight_layout()
+    plt.savefig("img/gp_alpha.png", dpi=300)
+    plt.close("all")
+
+
+def plot_gp_dist():
+    np.random.seed(12345)
+    sns.set_context("paper", font_scale=0.95)
+
+    X_test = np.linspace(-10, 10, 100)
+    X_train = np.array([-3, 0, 7, 1, -9])
+    y_train = np.sin(X_train)
+
+    fig, axes = plt.subplots(1, 3)
+    G = GPRegression(kernel="RBFKernel", alpha=0)
+    G.fit(X_train, y_train)
+
+    y_pred_prior = G.sample(X_test, 3, "prior")
+    y_pred_posterior = G.sample(X_test, 3, "posterior_predictive")
+
+    for prior_sample in y_pred_prior:
+        axes[0].plot(X_test, prior_sample.ravel(), lw=1)
+    axes[0].set_title("Prior samples")
+    axes[0].set_xticks([])
+    axes[0].set_yticks([])
+
+    for post_sample in y_pred_posterior:
+        axes[1].plot(X_test, post_sample.ravel(), lw=1)
+    axes[1].plot(X_train, y_train, "ko", ms=1.2)
+    axes[1].set_title("Posterior samples")
+    axes[1].set_xticks([])
+    axes[1].set_yticks([])
+
+    y_pred, conf = G.predict(X_test)
+
+    axes[2].plot(X_test, np.sin(X_test), lw=1, label="true function")
+    axes[2].plot(X_test, y_pred, lw=1, label="MAP estimate")
+    axes[2].fill_between(X_test, y_pred + conf, y_pred - conf, alpha=0.1)
+    axes[2].plot(X_train, y_train, "ko", ms=1.2, label="observed")
+    axes[2].legend(fontsize="x-small")
+    axes[2].set_title("Posterior mean")
+    axes[2].set_xticks([])
+    axes[2].set_yticks([])
+
+    fig.set_size_inches(6, 2)
+    plt.tight_layout()
+    plt.savefig("img/gp_dist.png", dpi=300)
     plt.close("all")

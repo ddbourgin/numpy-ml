@@ -113,6 +113,7 @@ This repo includes code for the following models:
 9. **Nonparameteric models**
     - Nadaraya-Watson kernel regression
     - k-Nearest neighbors classification and regression
+    - Gaussian process regression
 
 10. **Preprocessing**
     - Discrete Fourier transform (1D signals)
