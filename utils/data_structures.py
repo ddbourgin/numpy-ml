@@ -3,7 +3,7 @@ from copy import copy
 
 import numpy as np
 
-from utils.distance_metrics import euclidean
+from .distance_metrics import euclidean
 
 #######################################################################
 #                           Priority Queue                            #
