@@ -39,7 +39,7 @@ class Sigmoid(ActivationBase):
         return self.fn(x) * (1 - self.fn(x))
 
     def grad2(self, x):
-        return self.grad(x) * (1 - self.fn(x)) - self.fn(x) * self.grad(x)
+        return self.grad(x) * (1 - 2 * self.fn(x))
 
 
 class ReLU(ActivationBase):
