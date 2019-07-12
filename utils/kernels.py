@@ -10,17 +10,18 @@ class KernelBase(ABC):
         self.parameters = {}
         self.hyperparameters = {}
 
-    def __call__(self, X, Y=None):
-        """Refer to documentation for the `_kernel` method"""
-        return self._kernel(X, Y)
-
     @abstractmethod
     def _kernel(self, X, Y):
         raise NotImplementedError
 
-    @abstractmethod
+    def __call__(self, X, Y=None):
+        """Refer to documentation for the `_kernel` method"""
+        return self._kernel(X, Y)
+
     def __str__(self):
-        raise NotImplementedError
+        P, H = self.parameters, self.hyperparameters
+        p_str = ", ".join(["{}={}".format(k, v) for k, v in P.items()])
+        return "{}({})".format(H["id"], p_str)
 
     def summary(self):
         return {
@@ -50,18 +51,24 @@ class KernelBase(ABC):
 
 
 class LinearKernel(KernelBase):
-    def __init__(self):
+    def __init__(self, c0=0):
         """
-        The linear kernel (i.e., dot-product).
+        The linear (i.e., dot-product) kernel.
 
-            k(x, y) = x @ y.T
+            k(x, y) = x @ y.T + c0
+
+        Parameters
+        ----------
+        c0 : float (default: 1)
+            An "inhomogeneity" parameter. When c0 = 0, the kernel is said to be
+            homogenous. [Homogenous functions are those with multiplicative
+            scaling behavior - if all arguments are multiplied by a factor,
+            then a homogenous function's value is a multiple of (some power of)
+            that same factor]
         """
         super().__init__()
         self.hyperparameters = {"id": "LinearKernel"}
-
-    def __str__(self):
-        H = self.hyperparameters
-        return "{}()".format(H["id"])
+        self.parameters = {"c0": c0}
 
     def _kernel(self, X, Y=None):
         """
@@ -81,7 +88,7 @@ class LinearKernel(KernelBase):
             Similarity between X and Y where index (i,j) gives k(x_i, y_j)
         """
         X, Y = kernel_checks(X, Y)
-        return X @ Y.T
+        return X @ Y.T + self.parameters["c0"]
 
 
 class PolynomialKernel(KernelBase):
@@ -93,7 +100,10 @@ class PolynomialKernel(KernelBase):
 
         In contrast to the linear kernel, the polynomial kernel also computes
         similarities *across* dimensions of the x and y vectors, allowing it to
-        account for interactions between features.
+        account for interactions between features.  As an instance of the dot
+        product family of kernels, the polynomial kernel is invariant to a
+        rotation of the coordinates about the origin, but *not* to
+        translations.
 
         Parameters
         ----------
@@ -105,19 +115,14 @@ class PolynomialKernel(KernelBase):
         c0 : float (default: 1)
             Parameter trading off the influence of higher-order versus lower-order
             terms in the polynomial. If c0 = 0, the kernel is said to be
-            homogenous.
+            homogenous. [Homogenous functions are those with multiplicative
+            scaling behavior - if all arguments are multiplied by a factor,
+            then a homogenous function's value is a multiple of (some power of)
+            that same factor]
         """
         super().__init__()
-        self.hyperparameters = {
-            "id": "PolynomialKernel",
-            "d": d,
-            "c0": c0,
-            "gamma": gamma,
-        }
-
-    def __str__(self):
-        H = self.hyperparameters
-        return "{}(d={}, gamma={}, c0={})".format(H["id"], H["d"], H["gamma"], H["c0"])
+        self.hyperparameters = {"id": "PolynomialKernel"}
+        self.parameters = {"d": d, "c0": c0, "gamma": gamma}
 
     def _kernel(self, X, Y=None):
         """
@@ -135,45 +140,46 @@ class PolynomialKernel(KernelBase):
         -------
         out : numpy array of shape (N, M)
             Similarity between X and Y where index (i,j) gives k(x_i, y_j)
+            (i.e., the kernel's Gram-matrix)
         """
-        H = self.hyperparameters
+        P = self.parameters
         X, Y = kernel_checks(X, Y)
-        gamma = 1 / X.shape[1] if H["gamma"] is None else H["gamma"]
-        return (gamma * (X @ Y.T) + H["c0"]) ** H["d"]
+        gamma = 1 / X.shape[1] if P["gamma"] is None else P["gamma"]
+        return (gamma * (X @ Y.T) + P["c0"]) ** P["d"]
 
 
 class RBFKernel(KernelBase):
-    def __init__(self, gamma=None):
+    def __init__(self, sigma=None):
         """
-        Radial basis function (RBF) kernel.
+        Radial basis function (RBF) / squared exponential kernel.
 
-            k(x, y) = exp(-gamma * ||x - y||^2)
+            k(x, y) = exp( -0.5 * ||(x / sigma) - (y / sigma)||^2 )
 
         The RBF kernel decreases with distance and ranges between zero (in the
-        limit) and one (when x = y).
+        limit) to one (when x = y). Notably, the implied feature space of the
+        kernel has an infinite number of dimensions.
 
         Parameters
         ----------
-        gamma : float (default: None)
-            A scaling parameter for the dot product between x and y. If None,
-            defaults to 1 / C. Sometimes referred to as the kernel bandwidth.
+        sigma : float or array of shape (C,) (default: None)
+            A scaling parameter for the vectors x and y, producing an isotropic
+            kernel if a float, or an anistropic kernel if an array of length C.
+            If None, defaults to sqrt(C / 2). Sometimes referred to as the
+            kernel 'bandwidth'.
         """
         super().__init__()
-        self.hyperparameters = {"id": "RBFKernel", "gamma": gamma}
-
-    def __str__(self):
-        H = self.hyperparameters
-        return "{}(gamma={})".format(H["id"], H["gamma"])
+        self.hyperparameters = {"id": "RBFKernel"}
+        self.parameters = {"sigma": sigma}
 
     def _kernel(self, X, Y=None):
         """
-        Computes the radial basis function (RBF) kernel between all pairs of rows
-        in X and Y.
+        Computes the radial basis function (RBF) kernel between all pairs of
+        rows in X and Y.
 
         Parameters
         ----------
         X : numpy array of shape (N, C)
-            Collection of N input vectors
+            Collection of N input vectors, each with dimension C.
         Y : numpy array of shape (M, C) (default: None)
             Collection of M input vectors. If None, assume Y = X.
 
@@ -182,14 +188,14 @@ class RBFKernel(KernelBase):
         out : numpy array of shape (N, M)
             Similarity between X and Y where index (i, j) gives k(x_i, y_j)
         """
-        H = self.hyperparameters
+        P = self.parameters
         X, Y = kernel_checks(X, Y)
-        gamma = 1 / X.shape[1] if H["gamma"] is None else H["gamma"]
-        return np.exp(-gamma * pairwise_l2_distances(X, Y) ** 2)
+        sigma = np.sqrt(X.shape[1] / 2) if P["sigma"] is None else P["sigma"]
+        return np.exp(-0.5 * pairwise_l2_distances(X / sigma, Y / sigma) ** 2)
 
 
 class KernelInitializer(object):
-    def __init__(self, param=None, lr=None):
+    def __init__(self, param=None):
         """
         A class for initializing learning rate schedulers. Valid inputs are:
             (a) __str__ representations of `KernelBase` instances
@@ -236,11 +242,11 @@ class KernelInitializer(object):
             raise ValueError("Must have `hyperparameters` key: {}".format(S))
 
         if sc and sc["id"] == "LinearKernel":
-            scheduler = LinearKernel().set_params(sc)
+            scheduler = LinearKernel().set_params(S)
         elif sc and sc["id"] == "PolynomialKernel":
-            scheduler = PolynomialKernel().set_params(sc)
+            scheduler = PolynomialKernel().set_params(S)
         elif sc and sc["id"] == "RBFKernel":
-            scheduler = RBFKernel().set_params(sc)
+            scheduler = RBFKernel().set_params(S)
         elif sc:
             raise NotImplementedError("{}".format(sc["id"]))
         return scheduler
@@ -282,6 +288,6 @@ def pairwise_l2_distances(X, Y):
         Pairwise distance matrix. Entry (i, j) contains the l2 distance between
         x_i and y_j
     """
-    return np.sqrt(
-        -2 * X @ Y.T + np.sum(Y ** 2, axis=1) + np.sum(X ** 2, axis=1)[:, np.newaxis]
-    )
+    D = -2 * X @ Y.T + np.sum(Y ** 2, axis=1) + np.sum(X ** 2, axis=1)[:, np.newaxis]
+    D[D < 0] = 0  # clip any value less than 0 (a result of numerical imprecision)
+    return np.sqrt(D)
