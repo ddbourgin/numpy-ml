@@ -129,12 +129,58 @@ class Dropout(WrapperBase):
         self._wrapper_hyperparameters = {"wrapper": "Dropout", "p": self.p}
 
     def forward(self, X):
-        scaler, mask = 1.0, np.ones(X.shape).astype(bool)
         if self.trainable:
+            scaler, mask = 1.0, np.ones(X.shape).astype(bool)
             scaler = 1.0 / (1.0 - self.p)
             mask = np.random.rand(*X.shape) >= self.p
             X = mask * X
         self._wrapper_derived_variables["dropout_mask"] = mask
+        return scaler * self._base_layer.forward(X)
+
+    def backward(self, dLdy):
+        assert self.trainable, "Layer is frozen"
+        dLdy *= 1.0 / (1.0 - self.p)
+        return self._base_layer.backward(dLdy)
+
+class AlphaDropout(WrapperBase):
+    def __init__(self, wrapped_layer, p):
+        """
+       Alpha Dropout is a `Dropout` that aim at keeping mean and variance to
+       their original values after “alpha dropout”, in order to ensure the
+       self-normalizing property even for “alpha dropout”.
+
+        Parameters
+        ----------
+        wrapped_layer : `layers.LayerBase` instance
+            The layer to apply AlphaDropout to.
+        p : float in [0, 1)
+            The dropout propbability during training(as with Dropout)
+        """
+        super().__init__(wrapped_layer)
+        self.p = p
+        self._init_wrapper_params()
+        self._init_params()
+
+    def _init_wrapper_params(self):
+        self._wrapper_derived_variables = {"dropout_mask": None}
+        self._wrapper_hyperparameters = {"wrapper": "AlphaDropout", "p": self.p}
+
+    def _greaterOrEqual(self,x,y):
+        return x >= y
+
+    def forward(self, X):
+        alpha = 1.6732632423543772848170429916717
+        scale = 1.0507009873554804934193349852946
+        alpha_p = -alpha * scale
+        if self.trainable:
+            scaler = 1.0 - self.p
+            a = ((1 - self.p) * (1 + self.p * alpha_p ** 2)) ** -0.5
+            b = -a * alpha_p * self.p
+
+            keep = self._greaterOrEqual(np.random.uniform(0,1,X.shape))
+            x = X * keep + alpha_p * (1 - keep)
+            X = a * x + b
+        self._wrapper_derived_variables["AlphaDropout_mask"] = keep
         return scaler * self._base_layer.forward(X)
 
     def backward(self, dLdy):
@@ -147,6 +193,8 @@ def init_wrappers(layer, wrappers_list):
     for wr in wrappers_list:
         if wr["wrapper"] == "Dropout":
             layer = Dropout(layer, 1)._set_wrapper_params(wr)
+        elif wr["wrapper"] == "AlphaDropout":
+            layer = AlphaDropout(layer, 1)._set_wrapper_params(wr)
         else:
             raise NotImplementedError("{}".format(wr["wrapper"]))
     return layer
