@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn.datasets.samples_generator import make_blobs
-from sklearn.metrics import zero_one_loss
 
 from scipy.stats import multivariate_normal
 import matplotlib
@@ -81,28 +80,26 @@ def plot():
         X, y = make_blobs(
             n_samples=n_ex, centers=n_classes, n_features=n_in, random_state=i
         )
+        X -= X.mean(axis=0)
 
-        # take best fit over 10 tries
+        # take best fit over 10 runs
         best_elbo = -np.inf
         for k in range(10):
-            _G = GMM(X, C=n_classes)
-            ret = _G.fit(max_iter=75, verbose=False)
+            _G = GMM(C=n_classes, seed=i * 3)
+            ret = _G.fit(X, max_iter=100, verbose=False)
             while ret != 0:
                 print("Components collapsed; Refitting")
-                ret = _G.fit(max_iter=75, verbose=False)
+                ret = _G.fit(X, max_iter=100, verbose=False)
 
             if _G.best_elbo > best_elbo:
                 best_elbo = _G.best_elbo
                 G = _G
 
-        #  y_pred = G.Q.argmax(1)
-        #  loss = zero_one_loss(y, y_pred) * 100.0
         ax = plot_clusters(G, X, ax)
-
         ax.xaxis.set_ticklabels([])
         ax.yaxis.set_ticklabels([])
-
         ax.set_title("# Classes: {}; Final VLB: {:.2f}".format(n_classes, G.best_elbo))
+
     plt.tight_layout()
     plt.savefig("img/plot.png", dpi=300)
     plt.close("all")

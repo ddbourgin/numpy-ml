@@ -3,18 +3,32 @@ from numpy.testing import assert_allclose
 
 
 class GMM(object):
-    def __init__(self, X, C=3):
-        self.X = X
+    def __init__(self, C=3, seed=None):
+        """
+        A Gaussian mixture model trained via the expectation maximization
+        algorithm.
+
+        Parameters
+        ----------
+        C : int (default: 3)
+            The number of clusters / mixture components in the GMM
+        seed : int (default: None)
+            Seed for the random number generator
+        """
         self.C = C  # number of clusters
-        self.N = X.shape[0]  # number of objects
-        self.d = X.shape[1]  # dimension of each object
+        self.N = None  # number of objects
+        self.d = None  # dimension of each object
+
+        if seed:
+            np.random.seed(seed)
 
     def _initialize_params(self):
-        C = self.C
-        d = self.d
+        """
+        Randomly initialize the starting GMM parameters
+        """
+        C, d = self.C, self.d
         rr = np.random.rand(C)
 
-        # randomly initialize the starting GMM parameters
         self.pi = rr / rr.sum()  # cluster priors
         self.Q = np.zeros((self.N, C))  # variational distribution q(T)
         self.mu = np.random.uniform(-5, 10, C * d).reshape(C, d)  # cluster means
@@ -26,6 +40,9 @@ class GMM(object):
         self.best_elbo = -np.inf
 
     def likelihood_lower_bound(self):
+        """
+        Compute the LLB under the current GMM parameters
+        """
         N = self.N
         C = self.C
 
@@ -40,7 +57,7 @@ class GMM(object):
                 mu_k = self.mu[c, :]
                 sigma_k = self.sigma[c, :, :]
 
-                log_pi_k = np.log(pi_k)
+                log_pi_k = np.log(pi_k + eps)
                 log_p_x_i = log_gaussian_pdf(x_i, mu_k, sigma_k)
                 prob = z_nk * (log_p_x_i + log_pi_k)
 
@@ -50,7 +67,35 @@ class GMM(object):
         loss = expec1 - expec2
         return loss
 
-    def fit(self, max_iter=75, tol=1e-3, verbose=False):
+    def fit(self, X, max_iter=100, tol=1e-3, verbose=False):
+        """
+        Fit the parameters of the GMM on some training data.
+
+        Parameters
+        ----------
+        X : numpy array of shape (N, d)
+            A collection of `N` training data points, each with dimension `d`
+        max_iter : int (default: 100)
+            The maximum number of EM updates to perform before terminating
+            training
+        tol : float (default 1e-3)
+            The convergence tolerance. Training is terminated if the difference
+            in VLB between the current and previous iteration is less than
+            `tol`.
+        verbose : bool (default: False)
+            Whether to print the VLB at each training iteration.
+
+        Returns
+        -------
+        success : 0 or -1
+            Whether training terminated without incident (0) or one of the
+            mixture components collapsed and training was halted prematurely
+            (-1)
+        """
+        self.X = X
+        self.N = X.shape[0]  # number of objects
+        self.d = X.shape[1]  # dimension of each object
+
         self._initialize_params()
         prev_vlb = -np.inf
 
@@ -63,7 +108,8 @@ class GMM(object):
                 if verbose:
                     print("{}. Lower bound: {}".format(_iter + 1, vlb))
 
-                if np.isnan(vlb) or np.abs((vlb - prev_vlb) / prev_vlb) <= tol:
+                converged = _iter > 0 and np.abs(vlb - prev_vlb) <= tol
+                if np.isnan(vlb) or converged:
                     break
 
                 prev_vlb = vlb
@@ -113,20 +159,20 @@ class GMM(object):
         # update cluster means
         nums_mu = [np.dot(self.Q[:, c], X) for c in range(C)]
         for ix, (num, den) in enumerate(zip(nums_mu, denoms)):
-            self.mu[ix, :] = num / den
+            self.mu[ix, :] = num / den if den > 0 else np.zeros_like(num)
 
         # update cluster covariances
         for c in range(C):
             mu_c = self.mu[c, :]
             n_c = denoms[c]
 
-            outer = np.zeros((2, 2))
+            outer = np.zeros((self.d, self.d))
             for i in range(N):
                 wic = self.Q[i, c]
                 xi = self.X[i, :]
                 outer += wic * np.outer(xi - mu_c, xi - mu_c)
 
-            outer /= n_c
+            outer = outer / n_c if n_c > 0 else outer
             self.sigma[c, :, :] = outer
 
         assert_allclose(np.sum(self.pi), 1, err_msg="{}".format(np.sum(self.pi)))
