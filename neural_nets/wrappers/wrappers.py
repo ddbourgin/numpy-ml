@@ -129,8 +129,8 @@ class Dropout(WrapperBase):
         self._wrapper_hyperparameters = {"wrapper": "Dropout", "p": self.p}
 
     def forward(self, X):
+        scaler, mask = 1.0, np.ones(X.shape).astype(bool)
         if self.trainable:
-            scaler, mask = 1.0, np.ones(X.shape).astype(bool)
             scaler = 1.0 / (1.0 - self.p)
             mask = np.random.rand(*X.shape) >= self.p
             X = mask * X
