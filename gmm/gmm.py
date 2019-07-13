@@ -3,24 +3,21 @@ from numpy.testing import assert_allclose
 
 
 class GMM(object):
-    def __init__(self, X, C=3, seed=None):
+    def __init__(self, C=3, seed=None):
         """
         A Gaussian mixture model trained via the expectation maximization
         algorithm.
 
         Parameters
         ----------
-        X : numpy array of shape (N, d)
-            A collection of training data points
         C : int (default: 3)
             The number of clusters / mixture components in the GMM
         seed : int (default: None)
             Seed for the random number generator
         """
-        self.X = X
         self.C = C  # number of clusters
-        self.N = X.shape[0]  # number of objects
-        self.d = X.shape[1]  # dimension of each object
+        self.N = None  # number of objects
+        self.d = None  # dimension of each object
 
         if seed:
             np.random.seed(seed)
@@ -29,8 +26,7 @@ class GMM(object):
         """
         Randomly initialize the starting GMM parameters
         """
-        C = self.C
-        d = self.d
+        C, d = self.C, self.d
         rr = np.random.rand(C)
 
         self.pi = rr / rr.sum()  # cluster priors
@@ -71,12 +67,14 @@ class GMM(object):
         loss = expec1 - expec2
         return loss
 
-    def fit(self, max_iter=100, tol=1e-3, verbose=False):
+    def fit(self, X, max_iter=100, tol=1e-3, verbose=False):
         """
         Fit the parameters of the GMM on some training data.
 
         Parameters
         ----------
+        X : numpy array of shape (N, d)
+            A collection of `N` training data points, each with dimension `d`
         max_iter : int (default: 100)
             The maximum number of EM updates to perform before terminating
             training
@@ -94,6 +92,10 @@ class GMM(object):
             mixture components collapsed and training was halted prematurely
             (-1)
         """
+        self.X = X
+        self.N = X.shape[0]  # number of objects
+        self.d = X.shape[1]  # dimension of each object
+
         self._initialize_params()
         prev_vlb = -np.inf
 
