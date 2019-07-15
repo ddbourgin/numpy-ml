@@ -357,20 +357,3 @@ class SoftPlus(ActivationBase):
 
     def grad2(self, x):
         return np.exp(x) / ((np.exp(x) + 1) ** 2)
-
-
-class SoftSign(ActivationBase):
-    def __init__(self):
-        super().__init__()
-
-    def __str__(self):
-        return "SoftSign"
-
-    def fn(self, z):
-        return z / (1 + np.absolute(z))
-
-    def grad(self, x):
-        return 1 / ((1 + np.absolute(x)) ** 2)
-
-    def grad2(self, x):
-        return -2 * x / ((np.absolute(x) * (1 + np.absolute(x)))) ** 3 
