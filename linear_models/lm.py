@@ -168,7 +168,7 @@ class LogisticRegression:
         p = self.penalty
         beta = self.beta
         gamma = self.gamma
-        d_penalty = gamma * beta if p == "l2" else gamma * np.sign(beta)
+        d_penalty = gamma * np.sum(np.square(beta)) if p == "l2" else gamma * np.sum(np.abs(beta))
         return -(np.dot(y - y_pred, X) + d_penalty) / N
 
     def predict(self, X):
