@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-from tests import assert_is_binary, assert_is_stochastic
+# from tests import assert_is_binary, assert_is_stochastic
 
 
 class ObjectiveBase(ABC):
@@ -385,3 +385,66 @@ class WGAN_GPLoss(ObjectiveBase):
         else:
             raise ValueError("Unrecognized module: {}".format(module))
         return grad
+
+
+class Cosine(ObjectiveBase):
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, y, y_pred):
+        return self.loss(y, y_pred)
+
+    def __str__(self):
+        return "Cosine Proximity"
+
+    @staticmethod
+    def loss(y, y_pred):
+        """
+        Compute the Cosine distance between 1-D arrays.
+
+        The Cosine distance between `u` and `v`, is defined as
+        .. math::
+            1 - \\frac{u \\cdot v}
+                      {||u||_2 ||v||_2}.
+        where :math:`u \\cdot v` is the dot product of :math:`u` and
+        :math:`v`.
+
+        Parameters
+        ----------
+        y : numpy array of shape (n, m)
+
+        y_pred : numpy array of shape (n, m)
+
+
+        Returns
+        -------
+        loss : float
+
+        """
+        def l2_normalize(x, axis=-1):
+            y = np.max(np.sum(x ** 2, axis, keepdims=True), axis, keepdims=True)
+            return x / np.sqrt(y)
+
+        y_true = l2_normalize(y, axis=-1)
+        y_pred = l2_normalize(y_pred, axis=-1)
+        return 1. - np.sum(y_true * y_pred, axis=-1)
+
+    @staticmethod
+    def grad(y, y_pred, z, act_fn):
+        """
+
+
+        Parameters
+        ----------
+        y : numpy array of shape (n, m)
+
+        y_pred : numpy array of shape (n, m)
+
+
+        Returns
+        -------
+        grad : numpy array of shape (n, m)
+
+        """
+        return 0.0
+
