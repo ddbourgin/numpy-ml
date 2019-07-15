@@ -122,6 +122,10 @@ def test_losses(N=50):
     time.sleep(1)
     test_WGAN_GP_loss(N)
 
+    print("Testing Cosine Loss")
+    time.sleep(1)
+    test_cosine_proximity(N)
+
 
 def test_activations(N=50):
     print("Testing Sigmoid activation")
@@ -397,6 +401,31 @@ def test_WGAN_GP_loss(N=None):
         i += 1
 
 
+def test_cosine_proximity(N=None):
+    from scipy.spatial.distance import cosine
+    from losses import Cosine
+
+    N = np.inf if N is None else N
+
+    mine = Cosine()
+    gold = cosine
+
+    i = 1
+    while i < N:
+        vector_length_max = 100
+
+        for j in range(2, vector_length_max):
+            x = np.random.uniform(0., 1., [j, ])
+            y = np.random.uniform(0., 1., [j, ])
+
+            dist = mine(x, y)
+            dist_true = gold(x, y)
+            # print(dist, dist_true - 1.)
+            assert_almost_equal(dist, dist_true)
+            print('PASSED.')
+        i += 1
+
+
 #######################################################################
 #                       Loss Function Gradients                       #
 #######################################################################
@@ -563,7 +592,6 @@ def test_softsign_activation(N=None):
         assert_almost_equal(mine.fn(z), gold(z))
         print("PASSED")
         i += 1
-
 
 
 #######################################################################
