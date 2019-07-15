@@ -159,7 +159,7 @@ class LogisticRegression:
         N, M = X.shape
         order = 2 if self.penalty == "l2" else 1
         nll = -np.log(y_pred[y == 1]).sum() - np.log(1 - y_pred[y == 0]).sum()
-        penalty = 0.5 * self.gamma * np.linalg.norm(self.beta, ord=order)
+        penalty = 0.5 * self.gamma * np.linalg.norm(self.beta, ord=order) ** 2
         return (penalty + nll) / N
 
     def _NLL_grad(self, X, y, y_pred):
@@ -168,7 +168,8 @@ class LogisticRegression:
         p = self.penalty
         beta = self.beta
         gamma = self.gamma
-        d_penalty = gamma * beta if p == "l2" else gamma * np.sign(beta)
+        l1norm = lambda x: np.linalg.norm(x, 1)
+        d_penalty = gamma * beta if p == "l2" else gamma * l1norm(beta) * np.sign(beta)
         return -(np.dot(y - y_pred, X) + d_penalty) / N
 
     def predict(self, X):

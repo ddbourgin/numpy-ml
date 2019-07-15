@@ -548,6 +548,24 @@ def test_softplus_activation(N=None):
         i += 1
 
 
+def test_softsign_activation(N=None):
+    from activations import SoftSign
+
+    N = np.inf if N is None else N
+
+    mine = SoftSign()
+    gold = lambda z: F.softsign(torch.FloatTensor(z)).numpy()
+
+    i = 0
+    while i < N:
+        n_dims = np.random.randint(1, 100)
+        z = random_stochastic_matrix(1, n_dims)
+        assert_almost_equal(mine.fn(z), gold(z))
+        print("PASSED")
+        i += 1
+
+
+
 #######################################################################
 #                      Activation Gradients                           #
 #######################################################################
@@ -663,6 +681,24 @@ def test_softplus_grad(N=None):
 
     mine = SoftPlus()
     gold = torch_gradient_generator(F.softplus)
+
+    i = 0
+    while i < N:
+        n_ex = np.random.randint(1, 100)
+        n_dims = np.random.randint(1, 100)
+        z = random_tensor((n_ex, n_dims), standardize=True)
+        assert_almost_equal(mine.grad(z), gold(z))
+        print("PASSED")
+        i += 1
+
+
+def test_softsign_grad(N=None):
+    from activations import SoftSign
+
+    N = np.inf if N is None else N
+
+    mine = SoftSign()
+    gold = torch_gradient_generator(F.softsign)
 
     i = 0
     while i < N:
