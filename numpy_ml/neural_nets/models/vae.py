@@ -3,10 +3,10 @@ from collections import OrderedDict
 
 import numpy as np
 
-from .losses import VAELoss
-from .utils import minibatch
-from .activations import ReLU, Affine, Sigmoid
-from .layers import Conv2D, Pool2D, Flatten, FullyConnected
+from ..losses import VAELoss
+from ..utils import minibatch
+from ..activations import ReLU, Affine, Sigmoid
+from ..layers import Conv2D, Pool2D, Flatten, FullyConnected
 
 
 class BernoulliVAE(object):
