@@ -1,1 +1,1 @@
-from . import losses
+from .losses import *

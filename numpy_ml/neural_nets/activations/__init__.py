@@ -1,1 +1,1 @@
-from . import activations
+from .activations import *
