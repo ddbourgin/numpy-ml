@@ -1568,6 +1568,37 @@ class TorchFCLayer(nn.Module):
         return grads
 
 
+class TorchEmbeddingLayer(nn.Module):
+    def __init__(self, vocab_size, n_out, params, **kwargs):
+        super(TorchEmbeddingLayer, self).__init__()
+        self.layer1 = nn.Embedding(vocab_size, n_out)
+
+        # explicitly set embedding weights
+        self.layer1.weight = nn.Parameter(torch.FloatTensor(params["W"]))
+        self.model = nn.Sequential(self.layer1)
+
+    def forward(self, X):
+        self.X = X
+        if not isinstance(X, torch.Tensor):
+            self.X = torch.from_numpy(X)
+
+        self.out1 = self.layer1(self.X)
+        self.out1.retain_grad()
+
+    def extract_grads(self, X):
+        self.forward(X)
+        self.loss1 = self.out1.sum()
+        self.loss1.backward()
+        grads = {
+            "X": self.X.detach().numpy(),
+            "W": self.layer1.weight.detach().numpy(),
+            "y": self.out1.detach().numpy(),
+            "dLdy": self.out1.grad.numpy(),
+            "dLdW": self.layer1.weight.grad.numpy(),
+        }
+        return grads
+
+
 class TorchSDPAttentionLayer(nn.Module):
     def __init__(self):
         super(TorchSDPAttentionLayer, self).__init__()
