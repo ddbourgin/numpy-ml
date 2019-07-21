@@ -32,6 +32,7 @@ from .torch_models import (
     TorchDeconv2DLayer,
     TorchLayerNormLayer,
     TorchBatchNormLayer,
+    TorchEmbeddingLayer,
     TorchLinearActivation,
     TorchSDPAttentionLayer,
     TorchBidirectionalLSTM,
@@ -763,6 +764,53 @@ def test_FullyConnected(N=None):
         ]
 
         print("\nTrial {}\nact_fn={}".format(i, act_fn_name))
+        for ix, (mine, label) in enumerate(params):
+            assert_almost_equal(
+                mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=3
+            )
+            print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_Embedding(N=None):
+    from ..layers import Embedding
+
+    N = np.inf if N is None else N
+
+    i = 1
+    while i < N + 1:
+        vocab_size = np.random.randint(1, 2000)
+        n_ex = np.random.randint(1, 100)
+        n_in = np.random.randint(1, 100)
+        emb_dim = np.random.randint(1, 100)
+
+        X = np.random.randint(0, vocab_size, (n_ex, n_in))
+
+        # initialize Embedding layer
+        L1 = Embedding(n_out=emb_dim, vocab_size=vocab_size)
+
+        # forward prop
+        y_pred = L1.forward(X)
+
+        # backprop
+        dLdy = np.ones_like(y_pred)
+        #  dLdX = L1.backward(dLdy)
+        L1.backward(dLdy)
+
+        # get gold standard gradients
+        gold_mod = TorchEmbeddingLayer(vocab_size, emb_dim, L1.parameters)
+        golds = gold_mod.extract_grads(X)
+
+        params = [
+            (L1.X[0], "X"),
+            (y_pred, "y"),
+            (L1.parameters["W"], "W"),
+            (dLdy, "dLdy"),
+            (L1.gradients["W"], "dLdW"),
+            #  (dLdX, "dLdX"),
+        ]
+
+        print("\nTrial {}".format(i))
         for ix, (mine, label) in enumerate(params):
             assert_almost_equal(
                 mine, golds[label], err_msg=err_fmt(params, golds, ix), decimal=3

@@ -1613,6 +1613,9 @@ class Embedding(LayerBase):
         Equations:
             Y = W[x]
 
+        NB. This layer must be the first in a neural network as the gradients
+        do not get passed back through to the inputs.
+
         Parameters
         ----------
         n_out : int
@@ -1698,12 +1701,14 @@ class Embedding(LayerBase):
     def _fwd(self, X):
         """Actual computation of forward pass"""
         W = self.parameters["W"]
-        # equiv to np.array([xx @ W for xx in X_oh])
         return W[X]
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to embedding weights.
+
+        Note that because the items in X are interpreted as indices, we cannot
+        compute the gradient of the layer output wrt. X.
 
         Parameters
         ----------
@@ -1712,41 +1717,24 @@ class Embedding(LayerBase):
         retain_grads : bool (default: True)
             Whether to include the intermediate parameter gradients computed
             during the backward pass in the final parameter update
-
-        Returns
-        -------
-        dLdX : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer input X
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
             dLdy = [dLdy]
 
-        dX = []
         X = self.X
         for dy, x in zip(dLdy, X):
-            dx, dw = self._bwd(dy, x)
-            dX.append(dx)
+            dw = self._bwd(dy, x)
 
             if retain_grads:
                 self.gradients["W"] += dw
 
-        return dX[0] if len(X) == 1 else dX
-
     def _bwd(self, dLdy, X):
-        """Actual computation of gradient of the loss wrt. X and W"""
-        #  W = self.parameters["W"]
-        #  n_ex, n_in = X.shape
-        #  dX = dLdy * W  # (n_ex, n_in, n_out) * (vocab_size, n_out) --> (n_ex, n_in)
-        #  dW = dLdy * X  # (n_ex, n_in, n_out) * (n_ex, n_in) --> (vocab_size, n_out)
-        #
-        #  # convert X to one-hot (n_ex, n_in, vocab_size)
-        #  # Y = np.array([xx @ W for xx in X_oh])
-        #  X_oh = np.zeros((n_ex, n_in, self.vocab_size))
-        #  for ex_ix, ex in enumerate(X):
-        #      for d_ix, dim in enumerate(ex):
-        #          X_oh[ex_ix, d_ix, dim] = 1
-        dW = dLdy.sum(axis=-1)
+        """Actual computation of gradient of the loss wrt. W"""
+        dW = np.zeros_like(self.parameters["W"])
+        dLdy = dLdy.reshape(-1, self.n_out)
+        for ix, v_id in enumerate(X.flatten()):
+            dW[v_id] += dLdy[ix]
         return dW
 
 
