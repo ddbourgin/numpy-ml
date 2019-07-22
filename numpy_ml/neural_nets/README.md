@@ -34,6 +34,7 @@ emphasize conceptual understanding over flexibility.
     - 2D "deconvolution" (with stride and padding) ([Zeiler et al., 2010](https://www.matthewzeiler.com/mattzeiler/deconvolutionalnetworks.pdf))
     - Restricted Boltzmann machines (with CD-_n_ training) ([Smolensky, 1996](http://stanford.edu/~jlmcc/papers/PDP/Volume%201/Chap6_PDP86.pdf); [Carreira-Perpiñán & Hinton, 2005](http://www.cs.toronto.edu/~fritz/absps/cdmiguel.pdf))
     - Elementwise multiplication
+    - Embedding 
     - Summation
     - Flattening
     - Softmax

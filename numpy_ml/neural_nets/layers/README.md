@@ -11,6 +11,7 @@ be composed to create larger neural networks. It includes:
 - Elementwise multiplication operation
 - Summation operation
 - Flattening operation
+- Embedding layer
 - Softmax layer
 - Max & average pooling layer
 - 1D and 2D batch normalization layers ([Ioffe & Szegedy, 2015](http://proceedings.mlr.press/v37/ioffe15.pdf))
