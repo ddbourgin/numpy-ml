@@ -36,10 +36,12 @@ class Sigmoid(ActivationBase):
         return 1 / (1 + np.exp(-z))
 
     def grad(self, x):
-        return self.fn(x) * (1 - self.fn(x))
+        fn_x = self.fn(x)
+        return fn_x * (1 - fn_x)
 
     def grad2(self, x):
-        return self.grad(x) * (1 - 2 * self.fn(x))
+        fn_x = self.fn_x
+        return fn_x * (1 - fn_x) * (1 - 2 * fn_x)
 
 
 class ReLU(ActivationBase):
