@@ -145,7 +145,8 @@ class Tanh(ActivationBase):
         return 1 - np.tanh(x) ** 2
 
     def grad2(self, x):
-        return -2 * np.tanh(x) * self.grad(x)
+        tanh_x = np.tanh(x)
+        return -2 * tanh_x * (1 - tanh_x ** 2)
 
 
 class Affine(ActivationBase):
