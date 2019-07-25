@@ -356,7 +356,9 @@ class SoftPlus(ActivationBase):
         return np.log(np.exp(z) + 1)
 
     def grad(self, x):
-        return np.exp(x) / (np.exp(x) + 1)
+        exp_x = np.exp(x)
+        return exp_x / (exp_x + 1)
 
     def grad2(self, x):
-        return np.exp(x) / ((np.exp(x) + 1) ** 2)
+        exp_x = np.exp(x)
+        return exp_x / ((exp_x + 1) ** 2)
