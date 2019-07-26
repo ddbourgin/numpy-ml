@@ -263,14 +263,19 @@ class BallTree:
         return PQ
 
 
+#######################################################################
+#                         Multinomial Sampler                         #
+#######################################################################
+
+
 class DiscreteSampler:
-    def __init__(self, probs, log=True):
+    def __init__(self, probs, log=False, with_replacement=True):
         """
-        Sample from an arbitrary PMF over the first N nonnegative integers
-        using Vose's algorithm for the alias method.
+        Sample from an arbitrary multinomial PMF over the first N nonnegative
+        integers using Vose's algorithm for the alias method.
 
         For an overview of the various implementations of the alias method, see
-        Keith Schwarz's superb discussion at `http://www.keithschwarz.com/darts-dice-coins/`
+        Keith Schwarz's discussion at `http://www.keithschwarz.com/darts-dice-coins/`
 
         Vose's algorithm takes O(n) time to initialize, requires O(n) memory,
         and generates samples in constant time.
@@ -280,8 +285,10 @@ class DiscreteSampler:
         probs : numpy array of length (N,)
             A list of probabilities of the N outcomes in the sample space.
             probs[i] returns the probability of outcome i.
-        log : bool (default: True)
+        log : bool (default: False)
             Whether the probabilities in `probs` are in logspace.
+        with_replacement : bool (default: True)
+            Whether to generate samples with or without replacement
 
         References
         ----------
@@ -297,6 +304,7 @@ class DiscreteSampler:
         self.log = log
         self.N = len(probs)
         self.probs = probs
+        self.with_replacement = with_replacement
 
         alias = np.zeros(self.N)
         prob = np.zeros(self.N)
@@ -312,7 +320,7 @@ class DiscreteSampler:
             prob[l] = scaled_probs[l]
 
             if log:
-                pg = logsumexp([scaled_probs[g], scaled_probs[l], -1])
+                pg = np.log(np.exp(scaled_probs[g]) + np.exp(scaled_probs[l]) - 1)
             else:
                 pg = scaled_probs[g] + scaled_probs[l] - 1
 
@@ -332,13 +340,10 @@ class DiscreteSampler:
         self.prob_table = prob
         self.alias_table = alias
 
-    def __call__(self, n_samples):
-        return self.sample(n_samples)
-
-    def sample(self, n_samples=1):
+    def __call__(self, n_samples=1):
         """
-        Generate a sample from an arbitrary discrete distribution over the
-        integers in [0, N).
+        Generate random draws from the `probs` distribution over integers in
+        [0, N).
 
         Parameters
         ----------
@@ -347,22 +352,39 @@ class DiscreteSampler:
 
         Returns
         -------
-        sample : int in [0, N)
-            A sample from the distribution defined by `probs`
+        sample : numpy array of shape (n_samples,)
+            A collection of draws from the distribution defined by `probs`.
+            Each sample is an int in [0, N)
+        """
+        return self.sample(n_samples)
+
+    def sample(self, n_samples=1):
+        """
+        Generate random draws from the `probs` distribution over integers in
+        [0, N).
+
+        Parameters
+        ----------
+        n_samples: int (default: 1)
+            The number of samples to generate
+
+        Returns
+        -------
+        sample : numpy array of shape (n_samples,)
+            A collection of draws from the distribution defined by `probs`.
+            Each sample is an int in [0, N)
         """
         ixs = np.random.randint(0, self.N, n_samples)
         p = np.exp(self.prob_table[ixs]) if self.log else self.prob_table[ixs]
         flips = np.random.binomial(1, p)
         samples = [ix if f else self.alias_table[ix] for ix, f in zip(ixs, flips)]
+
+        # use rejection sampling to sample without replacement
+        if not self.with_replacement:
+            unique = list(set(samples))
+            while len(samples) != len(unique):
+                n_new = len(samples) - len(unique)
+                samples = unique + self.sample(n_new).tolist()
+                unique = list(set(samples))
+
         return np.array(samples, dtype=int)
-
-
-def logsumexp(log_probs, axis=None):
-    """
-    Redefine `scipy.special.logsumexp`
-    See: http://bayesjumping.net/log-sum-exp-trick/
-    """
-    _max = np.max(log_probs)
-    ds = log_probs - _max
-    exp_sum = np.exp(ds).sum(axis=axis)
-    return _max + np.log(exp_sum)
