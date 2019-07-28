@@ -14,7 +14,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..utils import calc_pad_dims_2D, conv2D_naive, conv2D, pad2D, pad1D
+from ...utils.testing import (
+    random_one_hot_matrix,
+    random_stochastic_matrix,
+    random_tensor,
+)
+
 from .torch_models import (
+    TFNCELoss,
     WGAN_GP_tf,
     torch_xe_grad,
     torch_mse_grad,
@@ -41,35 +48,6 @@ from .torch_models import (
     TorchSkipConnectionIdentity,
     TorchMultiHeadedAttentionModule,
 )
-
-#######################################################################
-#                           Data Generators                           #
-#######################################################################
-
-
-def random_one_hot_matrix(n_examples, n_classes):
-    """Create a random one-hot matrix of shape n_examples x n_classes"""
-    X = np.eye(n_classes)
-    X = X[np.random.choice(n_classes, n_examples)]
-    return X
-
-
-def random_stochastic_matrix(n_examples, n_classes):
-    """Create a random stochastic matrix of shape n_examples x n_classes"""
-    X = np.random.rand(n_examples, n_classes)
-    X /= X.sum(axis=1, keepdims=True)
-    return X
-
-
-def random_tensor(shape, standardize=False):
-    eps = np.finfo(float).eps
-    offset = np.random.randint(-300, 300, shape)
-    X = np.random.rand(*shape) + offset
-
-    if standardize:
-        X = (X - X.mean(axis=0)) / (X.std(axis=0) + eps)
-    return X
-
 
 #######################################################################
 #                           Debug Formatter                           #
@@ -122,6 +100,10 @@ def test_losses(N=50):
     print("Testing WGAN_GPLoss")
     time.sleep(1)
     test_WGAN_GP_loss(N)
+
+    print("Testing NCELoss")
+    time.sleep(1)
+    test_NCELoss(N)
 
 
 def test_activations(N=50):
@@ -395,6 +377,99 @@ def test_WGAN_GP_loss(N=None):
                 atol=1e-2,
             )
             print("\tPASSED {}".format(label))
+        i += 1
+
+
+def test_NCELoss(N=None):
+    from ..losses import NCELoss
+    from numpy_ml.utils.data_structures import DiscreteSampler
+
+    np.random.seed(12345)
+
+    N = np.inf if N is None else N
+
+    i = 1
+    while i < N + 1:
+        n_ex = np.random.randint(1, 10)
+        n_c = np.random.randint(1, 10)
+        n_out = np.random.randint(1, 300)
+        vocab_size = np.random.randint(200, 1000)
+        num_negative_samples = np.random.randint(1, 10)
+
+        embeddings = random_tensor((n_ex, n_c, n_out), standardize=True)
+        target = np.random.randint(0, vocab_size, (n_ex, 1))
+
+        probs = np.random.rand(vocab_size)
+        probs /= probs.sum()
+
+        D = DiscreteSampler(probs, log=False, with_replacement=False)
+        NCE = NCELoss(vocab_size, D, num_negative_samples)
+        my_loss = NCE(embeddings, target.flatten())
+
+        my_dLdX = NCE.grad(update_params=False)
+        my_dLdW = NCE.gradients["W"]
+        my_dLdb = NCE.gradients["b"]
+
+        NCE.gradients["W"] = np.zeros_like(NCE.parameters["W"])
+        NCE.gradients["b"] = np.zeros_like(NCE.parameters["b"])
+
+        MY_final_loss, TF_final_loss = 0, 0
+        MY_dLdX, TF_dLdX = np.zeros_like(embeddings), np.zeros_like(embeddings)
+        TF_dLdW, TF_dLdb = (
+            np.zeros_like(NCE.parameters["W"]),
+            np.zeros_like(NCE.parameters["b"]),
+        )
+
+        # XXX: instead of calculating the tf NCE on the entire batch, we
+        # calculate it per-example and then sum. this is really lame and should
+        # be changed to operate on batches.
+        nv = NCE.derived_variables["noise_samples"][0]
+        for ix, emb in enumerate(embeddings):
+            sv = (nv[0], np.array([nv[1][0, ix]]), nv[2])
+
+            NCE.X = []
+            for k, v in NCE.derived_variables.items():
+                NCE.derived_variables[k] = []
+
+            for k, v in NCE.gradients.items():
+                NCE.gradients[k] = np.zeros_like(v)
+
+            my = NCE(emb[None, :, :], target[ix], neg_samples=sv[0])
+
+            NCE.derived_variables["noise_samples"] = [sv]
+            dldx = NCE.grad(update_params=False)
+            NCE.derived_variables["noise_samples"] = sv
+
+            MY_final_loss += my
+            MY_dLdX[ix, ...] += np.squeeze(dldx, axis=0)
+
+            TF_dict = TFNCELoss(emb, np.array([target[ix]]), NCE)
+
+            TF_loss = TF_dict["final_loss"]
+            TF_final_loss += TF_loss
+            TF_dLdX[ix, ...] += TF_dict["dLdX"]
+            TF_dLdW[TF_dict["dLdW"].indices, :] += TF_dict["dLdW"].values
+            TF_dLdb[:, TF_dict["dLdb"].indices] += TF_dict["dLdb"].values
+
+            tf_dw = np.zeros_like(NCE.gradients["W"])
+            tf_dw[TF_dict["dLdW"].indices, :] += TF_dict["dLdW"].values
+
+            tf_db = np.zeros_like(NCE.gradients["b"])
+            tf_db[:, TF_dict["dLdb"].indices] += TF_dict["dLdb"].values
+
+        print("\nTrial {}".format(i))
+        np.testing.assert_almost_equal(my_loss, TF_final_loss, decimal=3)
+        print("PASSED: final loss")
+
+        maps = [
+            ("dLdW", my_dLdW, TF_dLdW),
+            ("dLdb", my_dLdb, TF_dLdb),
+            ("dLdX", my_dLdX, TF_dLdX),
+        ]
+        for (ll, k1, k2) in maps:
+            np.testing.assert_almost_equal(k1, k2, decimal=2, err_msg=ll)
+            print("PASSED: {}".format(ll))
+
         i += 1
 
 

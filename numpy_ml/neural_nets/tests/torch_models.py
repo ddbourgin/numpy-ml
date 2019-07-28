@@ -2183,3 +2183,94 @@ def WGAN_GP_tf(X, lambda_, params, batch_size):
             "dG_Y_fake": _dG_Y_fake,
         }
     return grads
+
+
+def TFNCELoss(X, target_word, L):
+    from tensorflow.python.ops.nn_impl import _compute_sampled_logits
+    from tensorflow.python.ops.nn_impl import sigmoid_cross_entropy_with_logits
+
+    in_embed = tf.placeholder(tf.float32, shape=X.shape)
+    in_bias = tf.placeholder(tf.float32, shape=L.parameters["b"].flatten().shape)
+    in_weights = tf.placeholder(tf.float32, shape=L.parameters["W"].shape)
+    in_target_word = tf.placeholder(tf.int64)
+    in_neg_samples = tf.placeholder(tf.int32)
+    in_target_prob = tf.placeholder(tf.float32)
+    in_neg_samp_prob = tf.placeholder(tf.float32)
+
+    feed = {
+        in_embed: X,
+        in_weights: L.parameters["W"],
+        in_target_word: target_word,
+        in_bias: L.parameters["b"].flatten(),
+        in_neg_samples: L.derived_variables["noise_samples"][0],
+        in_target_prob: L.derived_variables["noise_samples"][1],
+        in_neg_samp_prob: L.derived_variables["noise_samples"][2],
+    }
+
+    # Compute the NCE loss, using a sample of the negative labels each time.
+    nce_unreduced = tf.nn.nce_loss(
+        weights=in_weights,
+        biases=in_bias,
+        labels=in_target_word,
+        inputs=in_embed,
+        sampled_values=(in_neg_samples, in_target_prob, in_neg_samp_prob),
+        num_sampled=L.num_negative_samples,
+        num_classes=L.n_classes,
+    )
+
+    loss = tf.reduce_sum(nce_unreduced)
+    dLdW = tf.gradients(loss, [in_weights])[0]
+    dLdb = tf.gradients(loss, [in_bias])[0]
+    dLdX = tf.gradients(loss, [in_embed])[0]
+
+    sampled_logits, sampled_labels = _compute_sampled_logits(
+        weights=in_weights,
+        biases=in_bias,
+        labels=in_target_word,
+        inputs=in_embed,
+        sampled_values=(in_neg_samples, in_target_prob, in_neg_samp_prob),
+        num_sampled=L.num_negative_samples,
+        num_classes=L.n_classes,
+        num_true=1,
+        subtract_log_q=True,
+    )
+
+    sampled_losses = sigmoid_cross_entropy_with_logits(
+        labels=sampled_labels, logits=sampled_logits
+    )
+
+    with tf.Session() as session:
+        session.run(tf.global_variables_initializer())
+        (
+            _final_loss,
+            _nce_unreduced,
+            _dLdW,
+            _dLdb,
+            _dLdX,
+            _sampled_logits,
+            _sampled_labels,
+            _sampled_losses,
+        ) = session.run(
+            [
+                loss,
+                nce_unreduced,
+                dLdW,
+                dLdb,
+                dLdX,
+                sampled_logits,
+                sampled_labels,
+                sampled_losses,
+            ],
+            feed_dict=feed,
+        )
+    tf.reset_default_graph()
+    return {
+        "final_loss": _final_loss,
+        "nce_unreduced": _nce_unreduced,
+        "dLdW": _dLdW,
+        "dLdb": _dLdb,
+        "dLdX": _dLdX,
+        "out_logits": _sampled_logits,
+        "out_labels": _sampled_labels,
+        "sampled_loss": _sampled_losses,
+    }
