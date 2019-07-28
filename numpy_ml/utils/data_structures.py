@@ -379,7 +379,7 @@ class DiscreteSampler:
         flips = np.random.binomial(1, p)
         samples = [ix if f else self.alias_table[ix] for ix, f in zip(ixs, flips)]
 
-        # use rejection sampling to sample without replacement
+        # do recursive rejection sampling to sample without replacement
         if not self.with_replacement:
             unique = list(set(samples))
             while len(samples) != len(unique):
