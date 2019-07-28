@@ -63,6 +63,7 @@ This repo includes code for the following models:
         - Squared error
         - Bernoulli VAE loss
         - Wasserstein loss with gradient penalty
+        - Noise contrastive estimation loss
     * Activations
         - ReLU
         - Tanh

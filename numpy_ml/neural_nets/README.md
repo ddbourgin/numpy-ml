@@ -21,6 +21,7 @@ emphasize conceptual understanding over flexibility.
     - Categorical cross entropy 
     - VAE Bernoulli loss ([Kingma & Welling, 2014](https://arxiv.org/abs/1312.6114))
     - Wasserstein loss with gradient penalty ([Gulrajani et al., 2017](https://arxiv.org/pdf/1704.00028.pdf))
+    - Noise contrastive estimation (NCE) loss ([Gutmann & Hyv&auml;rinen](https://www.cs.helsinki.fi/u/ahyvarin/papers/Gutmann10AISTATS.pdf); [Minh & Teh, 2012](https://www.cs.toronto.edu/~amnih/papers/ncelm.pdf))
 
 3. **Wrappers**. Layer wrappers. Includes:
     - Dropout ([Srivastava, et al., 2014](http://www.jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf))
