@@ -40,6 +40,7 @@ class Sigmoid(ActivationBase):
         return fn_x * (1 - fn_x)
 
     def grad2(self, x):
+        """ grad(x) * (1 - 2 * fn(x)) """
         fn_x = self.fn_x
         return fn_x * (1 - fn_x) * (1 - 2 * fn_x)
 
@@ -145,6 +146,7 @@ class Tanh(ActivationBase):
         return 1 - np.tanh(x) ** 2
 
     def grad2(self, x):
+        """ -2 * fn(x) * grad(x) """
         tanh_x = np.tanh(x)
         return -2 * tanh_x * (1 - tanh_x ** 2)
 
