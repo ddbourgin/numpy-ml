@@ -24,6 +24,13 @@ class ObjectiveBase(ABC):
 
 
 class SquaredError(ObjectiveBase):
+    """
+    The squared-error / L2 loss. For target `y` and predictions `y_pred`, this
+    is::
+
+            L(y, y_pred) = 0.5 * ||y_pred - y||^2
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -36,21 +43,19 @@ class SquaredError(ObjectiveBase):
     @staticmethod
     def loss(y, y_pred):
         """
-        Squared error (L2) loss.
-
-        L(y, y') = 0.5 * ||y' - y||^2
+        Compute the squared error (L2) loss between `y` and `y_pred`.
 
         Parameters
         ----------
         y : numpy array of shape (n, m)
-            Ground truth values for each of n examples
+            Ground truth values for each of `n` examples
         y_pred : numpy array of shape (n, m)
-            Predictions for the n examples in the batch
+            Predictions for the `n` examples in the batch
 
         Returns
         -------
         loss : float
-            The sum of the squared error across dimensions and examples
+            The sum of the squared error across dimensions and examples.
         """
         return 0.5 * np.linalg.norm(y_pred - y) ** 2
 
@@ -58,27 +63,31 @@ class SquaredError(ObjectiveBase):
     def grad(y, y_pred, z, act_fn):
         """
         Gradient of the squared error loss with respect to the pre-nonlinearity
-        input, z.
-
-        That is, return df/dz where
-            f(z) = squared_error(g(z))
-            g(z) = <act_fn>(z) = y_pred
-
-        This is simply (g(z) - y) * g'(z)
+        input, `z`.
 
         Parameters
         ----------
         y : numpy array of shape (n, m)
-            Ground truth values for each of n examples
+            Ground truth values for each of `n` examples.
         y_pred : numpy array of shape (n, m)
-            Predictions for the n examples in the batch
+            Predictions for the `n` examples in the batch.
         act_fn : `Activation` object
-            The activation function for the output layer of the network
+            The activation function for the output layer of the network.
 
         Returns
         -------
         grad : numpy array of shape (n, m)
-            The gradient of the squared error loss with respect to z
+            The gradient of the squared error loss with respect to `z`.
+
+        Notes
+        -----
+        The current method computes the gradient `dL/dZ`, where::
+
+            L(z) = squared_error(g(z))
+            g(z) = <act_fn>(z) = y_pred
+
+        In this case, the gradient with respect to `z` is simply ``(g(z) - y) *
+        g'(z)``.
         """
         return (y_pred - y) * act_fn.grad(z)
 
@@ -96,20 +105,25 @@ class CrossEntropy(ObjectiveBase):
     @staticmethod
     def loss(y, y_pred):
         """
-        Cross-entropy (log) loss. Returns the sum (not average!) of the
-        losses per-sample.
+        Compute the cross-entropy (log) loss.
 
         Parameters
         ----------
         y : numpy array of shape (n, m)
-            Class labels (one-hot with m possible classes) for each of n examples
+            Class labels (one-hot with `m` possible classes) for each of `n`
+            examples.
         y_pred : numpy array of shape (n, m)
-            Probabilities of each of m classes for the n examples in the batch
+            Probabilities of each of `m` classes for the `n` examples in the
+            batch.
 
         Returns
         -------
         loss : float
-            The sum of the cross-entropy across classes and examples
+            The sum of the cross-entropy across classes and examples.
+
+        Notes
+        -----
+        This method returns the sum (not average!) of the losses per-sample.
         """
         is_binary(y)
         is_stochastic(y_pred)
@@ -127,12 +141,8 @@ class CrossEntropy(ObjectiveBase):
     @staticmethod
     def grad(y, y_pred):
         """
-        Let:  f(z) = cross_entropy(softmax(z)).
-        Then: df / dz = softmax(z) - y_true
-                      = y_pred - y_true
-
-        Note that this gradient goes through both the cross-entropy loss AND the
-        softmax non-linearity to return df / dz (rather than df / d softmax(z) ).
+        Compute the gradient of the cross entropy loss with regard to the
+        softmax input, `z`.
 
         Input
         -----
@@ -140,14 +150,29 @@ class CrossEntropy(ObjectiveBase):
             A one-hot encoding of the true class labels. Each row constitues a
             training example, and each column is a different class
         y_pred: numpy array of shape (n, m)
-            The network predictions for the probability of each of m class labels on
-            each of n examples in a batch.
+            The network predictions for the probability of each of `m` class
+            labels on each of `n` examples in a batch.
 
         Returns
         -------
         grad : numpy array of shape (n, m)
             The gradient of the cross-entropy loss with respect to the *input*
             to the softmax function.
+
+        Notes
+        -----
+        Note that this gradient goes through both the cross-entropy loss AND
+        the softmax non-linearity to return ``df / dz`` (rather than ``df / d
+        softmax(z)``).
+
+        In particular, let::
+
+            f(z) = cross_entropy(softmax(z)).
+
+        The current method computes::
+
+            df/dz = softmax(z) - y_true
+                  = y_pred - y_true
         """
         is_binary(y)
         is_stochastic(y_pred)
@@ -163,6 +188,27 @@ class CrossEntropy(ObjectiveBase):
 
 
 class VAELoss(ObjectiveBase):
+    """
+    The variational lower bound for a variational autoencoder with Bernoulli
+    units.
+
+    The VLB to the sum of the binary cross entropy between the true input and
+    the predicted output (the "reconstruction loss") and the KL divergence
+    between the learned variational distribution :math:`q` and the prior,
+    :math:`p`, assumed to be a unit Gaussian.
+
+        VAELoss = BXE(y, y_pred) + KL[q || p]
+
+    where ``BxE`` is the binary cross-entropy between `y` and `y_pred`, and
+    ``KL`` is the Kullback-Leibler divergence between the distributions
+    :math:`q` and :math:`p`.
+
+    References
+    ----------
+    [1] Kingma & Welling (2014). "Auto-encoding variational Bayes". arXiv
+        preprint arXiv:1312.6114. https://arxiv.org/pdf/1312.6114.pdf
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -175,26 +221,19 @@ class VAELoss(ObjectiveBase):
     @staticmethod
     def loss(y, y_pred, t_mean, t_log_var):
         """
-        Variational lower bound for a Bernoulli VAE. Equal to the sum of
-        the binary cross entropy between the true input and the predicted
-        output (the "reconstruction loss") and the KL divergence between the
-        learned variational distribution q and the prior, p, assumed to be a
-        unit Gaussian.
-
-        Equations:
-
-            VAELoss = BXE(y, y_pred) + KL[q || p]
+        Variational lower bound for a Bernoulli VAE.
 
         Parameters
         ----------
         y : numpy array of shape (n_ex, N)
-            The original images
+            The original images.
         y_pred : numpy array of shape (n_ex, N)
-            The VAE reconstruction of the images
+            The VAE reconstruction of the images.
         t_mean: numpy array of shape (n_ex, T)
-            Mean of the variational distribution q(t | x)
+            Mean of the variational distribution :math:`q(t | x)`.
         t_log_var: numpy array of shape (n_ex, T)
-            Log of the variance vector of the variational distribution q(t | x)
+            Log of the variance vector of the variational distribution
+            :math:`q(t | x)`.
 
         Returns
         -------
@@ -216,6 +255,30 @@ class VAELoss(ObjectiveBase):
 
     @staticmethod
     def grad(y, y_pred, t_mean, t_log_var):
+        """
+        Compute the gradient of the VLB with regard to the network parameters.
+
+        Parameters
+        ----------
+        y : numpy array of shape (n_ex, N)
+            The original images.
+        y_pred : numpy array of shape (n_ex, N)
+            The VAE reconstruction of the images.
+        t_mean: numpy array of shape (n_ex, T)
+            Mean of the variational distribution :math:`q(t | x)`.
+        t_log_var: numpy array of shape (n_ex, T)
+            Log of the variance vector of the variational distribution
+            :math:`q(t | x)`.
+
+        Returns
+        -------
+        dY_pred : numpy array of shape (n_ex, N)
+            The gradient of the VLB with regard to `y_pred`.
+        dLogVar : numpy array of shape (n_ex, T)
+            The gradient of the VLB with regard to `t_log_var`.
+        dMean : numpy array of shape (n_ex, T)
+            The gradient of the VLB with regard to `t_mean`.
+        """
         N = y.shape[0]
         eps = np.finfo(float).eps
         y_pred = np.clip(y_pred, eps, 1 - eps)
@@ -227,12 +290,39 @@ class VAELoss(ObjectiveBase):
 
 
 class WGAN_GPLoss(ObjectiveBase):
+    """
+    The loss function for a Wasserstein GAN with gradient penalty.
+
+    Assuming an optimal critic, minimizing this quantity wrt. the generator
+    parameters corresponds to minimizing the Wasserstein-1 (earth-mover)
+    distance between the fake and real data distributions.
+
+    The formula for the WGAN-GP loss is::
+
+        WGANLoss = sum([p(x) * D(x) for x in X_real]) -
+            sum([p(x_) * D(x_) for x_ in X_fake])
+
+        WGANLossGP = WGANLoss + lambda * (||∇_Xi D(Xi)|| - 1)^2
+
+    where::
+
+            X_fake ~ G(z) for z ~ N(0, 1)
+                Xi ~ alpha * X_real + (1 - alpha) * X_fake
+             alpha ~ Uniform(0, 1, dim=X_real.shape[0])
+
+    References
+    ----------
+    .. [1] Gulrajani et al. (2017) "Improved training of Wasserstein GANs"
+       Advances in Neural Information Processing Systems, 31, 5769-5779.
+       https://arxiv.org/pdf/1704.00028.pdf
+    .. [2] Goodfellow et al. (2014) "Generative adversarial nets" Advances in
+       Neural Information Processing Systems, 27, 2672-2680.
+       https://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf
+    """
+
     def __init__(self, lambda_=10):
         """
-        The WGAN-GP value function. Assuming an optimal critic, minimizing this
-        quantity wrt. the generator parameters corresponds to minimizing the
-        Wasserstein-1 (earth-mover) distance between the fake and real data
-        distributions.
+        The WGAN-GP value function.
 
         Parameters
         ----------
@@ -247,38 +337,25 @@ class WGAN_GPLoss(ObjectiveBase):
         Computes the generator and critic loss using the WGAN-GP value
         function.
 
-        Equations
-        ---------
-
-            WGANLoss = sum([p(x) * D(x) for x in X_real]) -
-                sum([p(x_) * D(x_) for x_ in X_fake])
-
-            WGANLossGP = WGANLoss + lambda * (||∇_Xi D(Xi)|| - 1)^2
-
-            where:
-
-                X_fake ~ G(z) for z ~ N(0, 1)
-                Xi ~ alpha * X_real + (1 - alpha) * X_fake
-                alpha ~ Uniform(0, 1, dim=X_real.shape[0])
-
         Parameters
         ----------
         Y_fake : numpy array of shape (n_ex,)
-            The output of the critic for X_fake
+            The output of the critic for `X_fake`.
         module : {'C' or 'G'}
             Whether to calculate the loss for the critic ('C') or the generator
             ('G'). If calculating loss for the critic, `Y_real` and
-            `gradInterp` must not be `None`
-        Y_real : numpy array of shape (n_ex,) (default: None)
-            The output of the critic for X_real
-        gradInterp : numpy array of shape (n_ex, n_feats) (default: None)
-            The gradient of the critic output for X_interp wrt. X_interp
+            `gradInterp` must not be `None`.
+        Y_real : numpy array of shape (n_ex,) or None
+            The output of the critic for `X_real`. Default is None.
+        gradInterp : numpy array of shape (n_ex, n_feats) or None
+            The gradient of the critic output for `X_interp` wrt. `X_interp`.
+            Default is None.
 
         Returns
         -------
         loss : float
             Depending on the setting for `module`, either the critic or
-            generator loss, averaged over examples in the minibatch
+            generator loss, averaged over examples in the minibatch.
         """
         return self.loss(Y_fake, module, Y_real=Y_real, gradInterp=gradInterp)
 
@@ -290,37 +367,25 @@ class WGAN_GPLoss(ObjectiveBase):
         Computes the generator and critic loss using the WGAN-GP value
         function.
 
-        Equations:
-
-            WGANLoss = sum([p(x) * D(x) for x in X_real]) -
-                sum([p(x_) * D(x_) for x_ in X_fake])
-
-            WGANLossGP = WGANLoss + lambda * (||∇_Xi D(Xi)|| - 1)^2
-
-            where:
-
-                X_fake ~ G(z) for z ~ N(0, 1)
-                Xi ~ alpha * X_real + (1 - alpha) * X_fake
-                alpha ~ Uniform(0, 1, dim=X_real.shape[0])
-
         Parameters
         ----------
         Y_fake : numpy array of shape (n_ex,)
-            The output of the critic for `X_fake`
+            The output of the critic for `X_fake`.
         module : {'C' or 'G'}
             Whether to calculate the loss for the critic ('C') or the generator
             ('G'). If calculating loss for the critic, `Y_real` and
-            `gradInterp` must not be `None`
-        Y_real : numpy array of shape (n_ex,) (default: None)
-            The output of the critic for `X_real`
-        gradInterp : numpy array of shape (n_ex, n_feats) (default: None)
-            The gradient of the critic output for `X_interp` wrt. `X_interp`
+            `gradInterp` must not be `None`.
+        Y_real : numpy array of shape (n_ex,) or None
+            The output of the critic for `X_real`. Default is None.
+        gradInterp : numpy array of shape (n_ex, n_feats) or None
+            The gradient of the critic output for `X_interp` wrt. `X_interp`.
+            Default is None.
 
         Returns
         -------
         loss : float
             Depending on the setting for `module`, either the critic or
-            generator loss, averaged over examples in the minibatch
+            generator loss, averaged over examples in the minibatch.
         """
         # calc critic loss including gradient penalty
         if module == "C":
@@ -341,27 +406,30 @@ class WGAN_GPLoss(ObjectiveBase):
 
     def grad(self, Y_fake, module, Y_real=None, gradInterp=None):
         """
-        Computes the gradient of the generator or critic loss wrt to its inputs.
+        Computes the gradient of the generator or critic loss with regard to
+        its inputs.
 
         Parameters
         ----------
         Y_fake : numpy array of shape (n_ex,)
-            The output of the critic for X_fake
+            The output of the critic for `X_fake`.
         module : {'C' or 'G'}
             Whether to calculate the gradient for the critic loss ('C') or the
             generator loss ('G'). If calculating grads for the critic, `Y_real`
-            and `gradInterp` must not be `None`.
-        Y_real : numpy array of shape (n_ex,) (default: None)
-            The output of the critic for X_real
-        gradInterp : numpy array of shape (n_ex, n_feats) (default: None)
-            The gradient of the critic output for X_interp wrt. X_interp
+            and `gradInterp` must not be None.
+        Y_real : numpy array of shape (n_ex,) or None
+            The output of the critic for `X_real`. Default is None.
+        gradInterp : numpy array of shape (n_ex, n_feats) or None
+            The gradient of the critic output on `X_interp` wrt. `X_interp`.
+            Default is None.
 
         Returns
         -------
         grads : tuple
             If `module` == 'C', returns a 3-tuple containing the gradient of
-            the critic loss wrt. (`Y_fake`, `Y_real`, `gradInterp`). If
-            `module` == 'G', returns the gradient of the generator wrt. `Y_fake`.
+            the critic loss with regard to (`Y_fake`, `Y_real`, `gradInterp`).
+            If `module` == 'G', returns the gradient of the generator with
+            regard to `Y_fake`.
         """
         eps = np.finfo(float).eps
         n_ex_fake = Y_fake.shape[0]
@@ -394,6 +462,45 @@ class WGAN_GPLoss(ObjectiveBase):
 
 
 class NCELoss(ObjectiveBase):
+    """
+    Noise contrastive estimation is a candidate sampling method often
+    used to reduce the computational challenge of training a softmax
+    layer on problems with a large number of output classes. It proceeds by
+    training a logistic regression model to discriminate between samples
+    from the true data distribution and samples from an artificial noise
+    distribution.
+
+    It can be shown that as the ratio of negative samples to data samples
+    goes to infinity, the gradient of the NCE loss converges to the
+    original softmax gradient.
+
+    For input data `X`, target labels `targets`, loss parameters `W` and
+    `b`, and noise samples `noise` sampled from the noise distribution `Q`,
+    the NCE loss is
+
+        NCE(X, targets) = BxE(y_data, y_hat_data) + BxE(y_noise, y_hat_noise)
+
+    where
+
+        BxE(a, b) = -sum_i b[i] * log(a[i]) + (1 - b[i]) * log(1 - a[i])
+
+    is the binary cross entropy between binary labels `b` and label
+    probabilities `a`, and
+
+        y_hat_data = sigmoid(W[data] @ X + b[data] - log Q(data))
+        y_hat_noise = sigmoid(W[noise] @ X + b[noise] - log Q(noise))
+
+    are the predictions of the NCE logistic model for the data and noise
+    samples, respectively.
+
+    References
+    ----------
+    .. [1] Gutmann & Hyvarinen (2010). Noise-contrastive estimation: A new
+           estimation principle for unnormalized statistical models. AISTATS 13.
+    .. [2] Minh & Teh (2012). A fast and simple algorithm for training neural
+           probabilistic language models. ICML 29.
+    """
+
     def __init__(
         self,
         n_classes,
@@ -406,66 +513,33 @@ class NCELoss(ObjectiveBase):
         """
         A noise contrastive estimation (NCE) loss function.
 
-        Noise contrastive estimation is a candidate sampling method often
-        used to reduce the computational challenge of training a softmax
-        layer on problems with a large number of output classes. It proceeds by
-        training a logistic regression model to discriminate between samples
-        from the true data distribution and samples from an artificial noise
-        distribution.
-
-        It can be shown that as the ratio of negative samples to data samples
-        goes to infinity, the gradient of the NCE loss converges to the
-        original softmax gradient.
-
-        Equations
-        ---------
-        For input data `X`, target labels `targets`, loss parameters `W` and
-        `b`, and noise samples `noise` sampled from the noise distribution `Q`,
-        the NCE loss is
-
-            NCE(X, targets) = BxE(y_data, y_hat_data) + BxE(y_noise, y_hat_noise)
-
-        where
-
-            BxE(a, b) = -sum_i b[i] * log(a[i]) + (1 - b[i]) * log(1 - a[i])
-
-        is the binary cross entropy between binary labels `b` and label
-        probabilities `a`, and
-
-            y_hat_data = sigmoid(W[data] @ X + b[data] - log Q(data))
-            y_hat_noise = sigmoid(W[noise] @ X + b[noise] - log Q(noise))
-
-        are the predictions of the NCE logistic model for the data and noise
-        samples, respectively.
-
         Parameters
         ----------
         n_classes : int
-            The total number of output classes in the model
+            The total number of output classes in the model.
         noise_sampler : `numpy_ml.utils.data_structures.DiscreteSampler` instance
             The negative sampler. Defines a distribution over all classes in
             the dataset.
         num_negative_samples : int
             The number of negative samples to draw for each target / batch of
-            targets
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            targets.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is 'glorot_uniform'.
+        optimizer : str, `OptimizerBase` instance, or None
             The optimization strategy to use when performing gradient updates
             within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
-        subtract_log_label_prob : bool (default: True)
+            default parameters. Default is None.
+        subtract_log_label_prob : bool
             Whether to subtract the log of the probability of each label under
             the noise distribution from its respective logit. Set to False for
-            negative sampling, True for NCE.
+            negative sampling, True for NCE. Default is True.
 
-        References
+        Attributes
         ----------
-        - Gutmann & Hyvarinen (2010). Noise-contrastive estimation: A new
-          estimation principle for unnormalized statistical models. AISTATS 13.
-        - Minh & Teh (2012). A fast and simple algorithm for training neural
-          probabilistic language models. ICML 29.
+        gradients : dict
+        parameters : dict
+        hyperparameters : dict
+        derived_variables : dict
         """
         super().__init__()
 
@@ -560,8 +634,36 @@ class NCELoss(ObjectiveBase):
         """
         Compute the NCE loss for a collection of inputs and associated targets.
 
-        Equations
-        ---------
+        Parameters
+        ----------
+        X : numpy array of shape (n_ex, n_c, n_in)
+            Layer input. A minibatch of `n_ex` examples, where each example is
+            an `n_c` x `n_in` matrix (e.g., the matrix of `n_c` context
+            embeddings, each of dimensionality `n_in`, for a CBOW model)
+        target : numpy array of shape (n_ex,)
+            Integer indices of the target class(es) for each example in the
+            minibatch (e.g., the target word id for an example in a CBOW model)
+        neg_samples : numpy array of shape (`num_negative_samples`,) or None
+            An optional array of negative samples to use during the loss
+            calculation. These will be used instead of samples draw from
+            ``self.noise_sampler``. Default is None.
+        retain_derived : bool
+            Whether to retain the variables calculated during the forward pass
+            for use later during backprop. If `False`, this suggests the layer
+            will not be expected to backprop through with regard to this input.
+            Default is True.
+
+        Returns
+        -------
+        loss : float
+            The NCE loss summed over the minibatch and samples
+        y_pred : numpy array of shape (n_ex, n_c)
+            The network predictions for the conditional probability of each
+            target given each context: entry (i, j) gives the predicted
+            probability of target i under context vector j.
+
+        Notes
+        -----
         For input data `X`, target labels `targets`, loss parameters `W` and
         `b`, and noise samples `noise` sampled from the noise distribution `Q`,
         the NCE loss is
@@ -580,33 +682,6 @@ class NCELoss(ObjectiveBase):
 
         are the predictions of the NCE logistic model for the data and noise
         samples, respectively.
-
-        Parameters
-        ----------
-        X : numpy array of shape (n_ex, n_c, n_in)
-            Layer input. A minibatch of `n_ex` examples, where each example is
-            an `n_c` x `n_in` matrix (e.g., the matrix of `n_c` context
-            embeddings, each of dimensionality `n_in`, for a CBOW model)
-        target : numpy array of shape (n_ex,)
-            Integer indices of the target class(es) for each example in the
-            minibatch (e.g., the target word id for an example in a CBOW model)
-        neg_samples : numpy array of shape (`num_negative_samples`,) (default: None)
-            An optional array of negative samples to use during the loss
-            calculation. These will be used instead of samples draw from
-            `noise_sampler`
-        retain_derived : bool (default : True)
-            Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
-
-        Returns
-        -------
-        loss : float
-            The NCE loss summed over the minibatch and samples
-        y_pred : numpy array of shape (n_ex, n_c)
-            The network predictions for the conditional probability of each
-            target given each context: entry (i, j) gives the predicted
-            probability of target i under context vector j.
         """
         if not self.is_initialized:
             self.n_in = X.shape[-1]
@@ -689,24 +764,25 @@ class NCELoss(ObjectiveBase):
 
     def grad(self, retain_grads=True, update_params=True):
         """
-        Compute the gradient of the NCE loss wrt. the inputs, weights, and
-        biases.
+        Compute the gradient of the NCE loss with regard to the inputs,
+        weights, and biases.
 
         Parameters
         ----------
-        retain_grads : bool (default: True)
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
-        update_params : bool (default: True)
+            during the backward pass in the final parameter update. Default is
+            True.
+        update_params : bool
             Whether to perform a single step of gradient descent on the layer
             weights and bias using the calculated gradients. If `retain_grads`
             is False, this option is ignored and the parameter gradients are
-            not updated.
+            not updated. Default is True.
 
         Returns
         -------
         dLdX : list of arrays or numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer input(s) X
+            The gradient of the loss with regard to the layer input(s) `X`.
         """
         assert self.trainable, "NCE loss is frozen"
 
