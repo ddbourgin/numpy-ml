@@ -974,7 +974,7 @@ class Vocabulary:
         return len(self._tokens)
 
     def __iter__(self):
-        return iter(self._tokens.word)
+        return iter(self._tokens)
 
     def __contains__(self, word):
         return word in self.token2idx
@@ -1093,10 +1093,10 @@ class Vocabulary:
         H = self.hyperparameters
         idx2word, word2idx = {}, {}
 
+        min_count = H["min_count"]
         lowercase = H["lowercase"]
         max_tokens = H["max_tokens"]
         filter_stop = H["filter_stopwords"]
-        corpus_fp, min_count = H["corpus_fp"], H["min_count"]
 
         H["encoding"] = encoding
         H["corpus_fps"] = corpus_fps
