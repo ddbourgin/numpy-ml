@@ -14,13 +14,13 @@ def minibatch(X, batchsize=256, shuffle=True):
     X : numpy array of shape (N, ...)
         The dataset to divide into minibatches. Assumes the first dimension
         represents the number of training examples.
-    batchsize : int (default: 256)
-        The desired size of each minibatch. Note, however, that if X.shape[0] %
-        batchsize > 0 then the final batch will contain fewer than batchsize
-        entries.
-    shuffle : bool (default: True)
+    batchsize : int
+        The desired size of each minibatch. Note, however, that if ``X.shape[0] %
+        batchsize > 0`` then the final batch will contain fewer than batchsize
+        entries. Default is 256.
+    shuffle : bool
         Whether to shuffle the entries in the dataset before dividing into
-        minibatches
+        minibatches. Default is True.
 
     Returns
     -------
@@ -50,7 +50,7 @@ def minibatch(X, batchsize=256, shuffle=True):
 
 def calc_pad_dims_2D(X_shape, out_dim, kernel_shape, stride, dilation=0):
     """
-    Compute the padding necessary to ensure that convolving X with a 2D kernel
+    Compute the padding necessary to ensure that convolving `X` with a 2D kernel
     of shape `kernel_shape` and stride `stride` produces outputs with dimension
     `out_dim`.
 
@@ -58,21 +58,21 @@ def calc_pad_dims_2D(X_shape, out_dim, kernel_shape, stride, dilation=0):
     ----------
     X_shape : tuple of (n_ex, in_rows, in_cols, in_ch)
         Dimensions of the input volume. Padding is applied to `in_rows` and
-        `in_cols`
+        `in_cols`.
     out_dim : tuple of (out_rows, out_cols)
         The desired dimension of an output example after applying the
-        convolution
+        convolution.
     kernel_shape : 2-tuple
-        The dimension of the 2D convolution kernel
+        The dimension of the 2D convolution kernel.
     stride : int
-        The stride for the convolution kernel
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements
+        The stride for the convolution kernel.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
 
     Returns
     -------
     padding_dims : 4-tuple
-        Padding dims for X. Organized as (left, right, up, down)
+        Padding dims for `X`. Organized as (left, right, up, down)
     """
     if not isinstance(X_shape, tuple):
         raise ValueError("`X_shape` must be of type tuple")
@@ -122,7 +122,7 @@ def calc_pad_dims_2D(X_shape, out_dim, kernel_shape, stride, dilation=0):
 
 def calc_pad_dims_1D(X_shape, l_out, kernel_width, stride, dilation=0, causal=False):
     """
-    Compute the padding necessary to ensure that convolving X with a 1D kernel
+    Compute the padding necessary to ensure that convolving `X` with a 1D kernel
     of shape `kernel_shape` and stride `stride` produces outputs with length
     `l_out`.
 
@@ -132,17 +132,17 @@ def calc_pad_dims_1D(X_shape, l_out, kernel_width, stride, dilation=0, causal=Fa
         Dimensions of the input volume. Padding is applied on either side of
         `l_in`.
     l_out : int
-        The desired length an output example after applying the convolution
+        The desired length an output example after applying the convolution.
     kernel_width : int
-        The width of the 1D convolution kernel
+        The width of the 1D convolution kernel.
     stride : int
-        The stride for the convolution kernel
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements.
-    causal : bool (default: False)
+        The stride for the convolution kernel.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
+    causal : bool
         Whether to compute the padding dims for a regular or causal
         convolution. If causal, padding is added only to the left side of the
-        sequence.
+        sequence. Default is False.
 
     Returns
     -------
@@ -194,28 +194,29 @@ def calc_pad_dims_1D(X_shape, l_out, kernel_width, stride, dilation=0, causal=Fa
 
 def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
     """
-    One-dimensional zero-padding utility.
+    Zero-pad a 3D input volume `X` along the second dimension.
 
     Parameters
     ----------
     X : numpy array of shape (n_ex, l_in, in_ch)
-        Input volume. Padding is applied to `l_in`
+        Input volume. Padding is applied to `l_in`.
     pad : tuple, int, or {'same', 'causal'}
         The padding amount. If 'same', add padding to ensure that the output
         length of a 1D convolution with a kernel of `kernel_shape` and stride
         `stride` is the same as the input length.  If 'causal' compute padding
         such that the output both has the same length as the input AND
-        output[t] does not depend on input[t + 1:]. If 2-tuple, specifies the
-        number of padding columns to add on each side of the sequence
-    kernel_width : int (default: None)
+        ``output[t]`` does not depend on ``input[t + 1:]``. If 2-tuple,
+        specifies the number of padding columns to add on each side of the
+        sequence.
+    kernel_width : int
         The dimension of the 2D convolution kernel. Only relevant if p='same'
-        or 'causal'
-    stride : int (default: None)
+        or 'causal'. Default is None.
+    stride : int
         The stride for the convolution kernel. Only relevant if p='same' or
-        'causal'
-    dilation : int (default: 0)
+        'causal'. Default is None.
+    dilation : int
         The dilation of the convolution kernel. Only relevant if p='same' or
-        'causal'
+        'causal'. Default is None.
 
     Returns
     -------
@@ -223,7 +224,7 @@ def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
         The padded output volume
     p : 2-tuple
         The number of 0-padded columns added to the (left, right) of the sequences
-        in X
+        in `X`.
     """
     p = pad
     if isinstance(p, int):
@@ -250,7 +251,7 @@ def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
 
 def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
     """
-    Two-dimensional zero-padding utility.
+    Zero-pad a 4D input volume `X` along the second and third dimensions.
 
     Parameters
     ----------
@@ -261,23 +262,25 @@ def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
         a 2D convolution with a kernel of `kernel_shape` and stride `stride`
         has the same dimensions as the input.  If 2-tuple, specifies the number
         of padding rows and colums to add *on both sides* of the rows/columns
-        in X. If 4-tuple, specifies the number of rows/columns to add to the
+        in `X`. If 4-tuple, specifies the number of rows/columns to add to the
         top, bottom, left, and right of the input volume.
-    kernel_shape : 2-tuple (default: None)
+    kernel_shape : 2-tuple
         The dimension of the 2D convolution kernel. Only relevant if p='same'.
-    stride : int (default: None)
+        Default is None.
+    stride : int
         The stride for the convolution kernel. Only relevant if p='same'.
-    dilation : int (default: 0)
-        The dilation of the convolution kernel. Only relevant if p='same'.
+        Default is None.
+    dilation : int
+        The dilation of the convolution kernel. Only relevant if p='same'. Default is 0.
 
     Returns
     -------
     X_pad : numpy array of shape (n_ex, padded_in_rows, padded_in_cols,
     in_channels)
-        The padded output volume
+        The padded output volume.
     p : 4-tuple
         The number of 0-padded rows added to the (top, bottom, left, right) of
-        X
+        `X`.
     """
     p = pad
     if isinstance(p, int):
@@ -305,22 +308,30 @@ def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
 
 def dilate(X, d):
     """
-    Dilate the 4D volume X by d. For a visual depiction, refer to:
-    https://arxiv.org/pdf/1603.07285v1.pdf
+    Dilate the 4D volume `X` by `d`.
 
     Parameters
     ----------
     X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-        Input volume
+        Input volume.
     d : int
-        The number of 0-rows to insert between each adjacent row + column in X
+        The number of 0-rows to insert between each adjacent row + column in `X`.
 
     Returns
     -------
     Xd : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
         The dilated array.
-            out_rows = in_rows + d * (in_rows - 1)
-            out_cols = in_cols + d * (in_cols - 1)
+            `out_rows` = `in_rows` + `d` * (`in_rows` - 1)
+            `out_cols` = `in_cols` + `d` * (`in_cols` - 1)
+
+    Notes
+    -----
+    For a visual depiction of a dilated convolution, see [1]_.
+
+    References
+    ----------
+    .. [1] Dumoulin & Visin (2016). "A guide to convolution arithmetic for deep
+       learning." https://arxiv.org/pdf/1603.07285v1.pdf
     """
     n_ex, in_rows, in_cols, n_in = X.shape
     r_ix = np.repeat(np.arange(1, in_rows), d)
@@ -343,7 +354,7 @@ def calc_fan(weight_shape):
     ----------
     weight_shape : tuple
         The dimensions of the weight matrix/volume. The final 2 entries must be
-        in_ch, out_ch.
+        `in_ch`, `out_ch`.
 
     Returns
     -------
@@ -365,36 +376,37 @@ def calc_fan(weight_shape):
 
 def calc_conv_out_dims(X_shape, W_shape, stride=1, pad=0, dilation=0):
     """
-    Compute the dimension of the output volume for the specified convolution
+    Compute the dimension of the output volume for the specified convolution.
 
     Parameters
     ----------
     X_shape : 3-tuple or 4-tuple
         The dimensions of the input volume to the convolution. If 3-tuple,
-        entries are expected to be (n_ex, in_length, in_ch). If 4-tuple,
-        entries are expected to be (n_ex, in_rows, in_cols, in_ch).
+        entries are expected to be (`n_ex`, `in_length`, `in_ch`). If 4-tuple,
+        entries are expected to be (`n_ex`, `in_rows`, `in_cols`, `in_ch`).
     weight_shape : 3-tuple or 4-tuple
         The dimensions of the weight volume for the convolution. If 3-tuple,
-        entries are expected to be (f_len, in_ch, out_ch). If 4-tuple, entries
-        are expected to be (fr, fc, in_ch, out_ch).
-    pad : tuple, int, or {'same', 'causal'} (default: 0)
+        entries are expected to be (`f_len`, `in_ch`, `out_ch`). If 4-tuple,
+        entries are expected to be (`fr`, `fc`, `in_ch`, `out_ch`).
+    pad : tuple, int, or {'same', 'causal'}
         The padding amount. If 'same', add padding to ensure that the output
         length of a 1D convolution with a kernel of `kernel_shape` and stride
         `stride` is the same as the input length.  If 'causal' compute padding
         such that the output both has the same length as the input AND
-        output[t] does not depend on input[t + 1:]. If 2-tuple, specifies the
-        number of padding columns to add on each side of the sequence
-    stride : int (default: 1)
-        The stride for the convolution kernel.
-    dilation : int (default: 0)
-        The dilation of the convolution kernel.
+        ``output[t]`` does not depend on ``input[t + 1:]``. If 2-tuple, specifies the
+        number of padding columns to add on each side of the sequence. Default
+        is 0.
+    stride : int
+        The stride for the convolution kernel. Default is 1.
+    dilation : int
+        The dilation of the convolution kernel. Default is 0.
 
     Returns
     -------
     out_dims : 3-tuple or 4-tuple
-        The dimensions of the output volume. If 3-tuple, entries are (n_ex,
-        out_length, out_ch). If 4-tuple, entries are (n_ex, out_rows, out_cols,
-        out_ch).
+        The dimensions of the output volume. If 3-tuple, entries are (`n_ex`,
+        `out_length`, `out_ch`). If 4-tuple, entries are (`n_ex`, `out_rows`,
+        `out_cols`, `out_ch`).
     """
     dummy = np.zeros(X_shape)
     s, p, d = stride, pad, dilation
@@ -434,7 +446,7 @@ def _im2col_indices(X_shape, fr, fc, p, s, d=0):
     Helper function that computes indices into X in prep for columnization in
     `im2col`.
 
-    Modified from Andrej Karpathy's `im2col.py`
+    Code extended from Andrej Karpathy's `im2col.py`
     """
     pr1, pr2, pc1, pc2 = p
     n_ex, n_in, in_rows, in_cols = X_shape
@@ -470,16 +482,13 @@ def _im2col_indices(X_shape, fr, fc, p, s, d=0):
 
 def im2col(X, W_shape, pad, stride, dilation=0):
     """
-    Numpy reimagining of MATLAB's im2col 'sliding' function. Pads and
-    rearranges overlapping windows of the input volume into column vectors, and
-    returns the concatenated padded vectors in a matrix `X_col`.
-
-    Modified from Andrej Karpathy's `im2col.py`
+    Pads and rearrange overlapping windows of the input volume into column
+    vectors, returning the concatenated padded vectors in a matrix `X_col`.
 
     Parameters
     ----------
     X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-        Input volume (NOT padded).
+        Input volume (not padded).
     W_shape: 4-tuple containing (kernel_rows, kernel_cols, in_ch, out_ch)
         The dimensions of the weights/kernels in the present convolutional
         layer.
@@ -493,8 +502,8 @@ def im2col(X, W_shape, pad, stride, dilation=0):
         volume.
     stride : int
         The stride of each convolution kernel
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
 
     Returns
     -------
@@ -502,6 +511,12 @@ def im2col(X, W_shape, pad, stride, dilation=0):
         The reshaped input volume where where:
             Q = kernel_rows * kernel_cols * n_in
             Z = n_ex * out_rows * out_cols
+
+    Notes
+    -----
+    A NumPy reimagining of MATLAB's ``im2col`` 'sliding' function.
+
+    Code extended from Andrej Karpathy's ``im2col.py``.
     """
     fr, fc, n_in, n_out = W_shape
     s, p, d = stride, pad, dilation
@@ -524,31 +539,34 @@ def im2col(X, W_shape, pad, stride, dilation=0):
 
 def col2im(X_col, X_shape, W_shape, pad, stride, dilation=0):
     """
-    Numpy reimagining of MATLAB's `col2im` 'sliding' function. Takes columns of
-    a 2D matrix and rearranges them into the blocks/windows of a 4D image
-    volume.
-
-    Modified from Andrej Karpathy's `im2col.py`
+    Take columns of a 2D matrix and rearrange them into the blocks/windows of
+    a 4D image volume.
 
     Parameters
     ----------
     X_col : numpy array of shape (Q, Z)
-        The columnized version of X (assumed to include padding)
+        The columnized version of `X` (assumed to include padding)
     X_shape : 4-tuple containing (n_ex, in_rows, in_cols, in_ch)
-        The original dimensions of X (not including padding)
+        The original dimensions of `X` (not including padding)
     W_shape: 4-tuple containing (kernel_rows, kernel_cols, in_ch, out_ch)
         The dimensions of the weights in the present convolutional layer
     pad : 4-tuple of (left, right, up, down)
-        Number of zero-padding rows/cols to add to X
+        Number of zero-padding rows/cols to add to `X`
     stride : int
         The stride of each convolution kernel
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
 
     Returns
     -------
     img : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-        The reshaped X_col input matrix
+        The reshaped `X_col` input matrix
+
+    Notes
+    -----
+    A NumPy reimagining of MATLAB's ``col2im`` 'sliding' function.
+
+    Code extended from Andrej Karpathy's ``im2col.py``.
     """
     if not (isinstance(pad, tuple) and len(pad) == 4):
         raise TypeError("pad must be a 4-tuple, but got: {}".format(pad))
@@ -574,21 +592,17 @@ def col2im(X_col, X_shape, W_shape, pad, stride, dilation=0):
 def conv2D(X, W, stride, pad, dilation=0):
     """
     A faster (but more memory intensive) implementation of the 2D "convolution"
-    (technically, cross-correlation) of input X with a collection of kernels in
-    W. Relies on the `im2col` function to perform the convolution as a single
-    matrix multiplication.
-
-    For a helpful diagram:
-    https://petewarden.com/2015/04/20/why-gemm-is-at-the-heart-of-deep-learning/
+    (technically, cross-correlation) of input `X` with a collection of kernels in
+    `W`.
 
     Parameters
     ----------
     X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-        Input volume (unpadded)
+        Input volume (unpadded).
     W: numpy array of shape (kernel_rows, kernel_cols, in_ch, out_ch)
-        A volume of convolution weights/kernels for a given layer
+        A volume of convolution weights/kernels for a given layer.
     stride : int
-        The stride of each convolution kernel
+        The stride of each convolution kernel.
     pad : tuple, int, or 'same'
         The padding amount. If 'same', add padding to ensure that the output of
         a 2D convolution with a kernel of `kernel_shape` and stride `stride`
@@ -597,13 +611,25 @@ def conv2D(X, W, stride, pad, dilation=0):
         sides* of the rows/columns in X. If 4-tuple, specifies the number of
         rows/columns to add to the top, bottom, left, and right of the input
         volume.
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
 
     Returns
     -------
     Z : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-        The covolution of X with W.
+        The covolution of `X` with `W`.
+
+    Notes
+    -----
+    Relies on the ``im2col`` function to perform the convolution as a single
+    matrix multiplication.
+
+    For a helpful diagram, see Pete Warden's 2015 blogpost [1].
+
+    References
+    ----------
+    .. [1] Warden (2015). "Why GEMM is at the heart of deep learning,"
+       https://petewarden.com/2015/04/20/why-gemm-is-at-the-heart-of-deep-learning/
     """
     s, d = stride, dilation
     _, p = pad2D(X, pad, W.shape[:2], s, dilation=dilation)
@@ -636,12 +662,8 @@ def conv2D(X, W, stride, pad, dilation=0):
 def conv1D(X, W, stride, pad, dilation=0):
     """
     A faster (but more memory intensive) implementation of a 1D "convolution"
-    (technically, cross-correlation) of input X with a collection of kernels in
-    W. Relies on the `im2col` function to perform the convolution as a single
-    matrix multiplication.
-
-    For a helpful diagram:
-    https://petewarden.com/2015/04/20/why-gemm-is-at-the-heart-of-deep-learning/
+    (technically, cross-correlation) of input `X` with a collection of kernels in
+    `W`.
 
     Parameters
     ----------
@@ -664,6 +686,18 @@ def conv1D(X, W, stride, pad, dilation=0):
     -------
     Z : numpy array of shape (n_ex, l_out, out_ch)
         The convolution of X with W.
+
+    Notes
+    -----
+    Relies on the ``im2col`` function to perform the convolution as a single
+    matrix multiplication.
+
+    For a helpful diagram, see Pete Warden's 2015 blogpost [1].
+
+    References
+    ----------
+    .. [1] Warden (2015). "Why GEMM is at the heart of deep learning,"
+       https://petewarden.com/2015/04/20/why-gemm-is-at-the-heart-of-deep-learning/
     """
     _, p = pad1D(X, pad, W.shape[0], stride, dilation=dilation)
 
@@ -680,12 +714,8 @@ def conv1D(X, W, stride, pad, dilation=0):
 def deconv2D_naive(X, W, stride, pad, dilation=0):
     """
     Perform a "deconvolution" (more accurately, a transposed convolution) of an
-    input volume X with a weight kernel W, incorporating stride, pad, and
-    dilation. Rather than using the transpose of the convolution matrix, this
-    approach uses a direct convolution with zero padding, which, while
-    conceptually straightforward, is computationally inefficient.
-
-    For further reference, see: https://arxiv.org/pdf/1603.07285v1.pdf
+    input volume `X` with a weight kernel `W`, incorporating stride, pad, and
+    dilation.
 
     Parameters
     ----------
@@ -700,17 +730,30 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
         a 2D convolution with a kernel of `kernel_shape` and stride `stride`
         produces an output volume of the same dimensions as the input.  If
         2-tuple, specifies the number of padding rows and colums to add *on both
-        sides* of the rows/columns in X. If 4-tuple, specifies the number of
+        sides* of the rows/columns in `X`. If 4-tuple, specifies the number of
         rows/columns to add to the top, bottom, left, and right of the input
         volume.
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
 
     Returns
     -------
     Y : numpy array of shape (n_ex, out_rows, out_cols, n_out)
-        The decovolution of (padded) input volume X with W using stride s and
-        dilation d
+        The decovolution of (padded) input volume `X` with `W` using stride `s` and
+        dilation `d`.
+
+    Notes
+    -----
+    Rather than using the transpose of the convolution matrix, this approach
+    uses a direct convolution with zero padding, which, while conceptually
+    straightforward, is computationally inefficient.
+
+    For further explanation, see [1].
+
+    References
+    ----------
+    .. [1] Dumoulin & Visin (2016). "A guide to convolution arithmetic for deep
+       learning." https://arxiv.org/pdf/1603.07285v1.pdf
     """
     if stride > 1:
         X = dilate(X, stride - 1)
@@ -748,33 +791,37 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
 def conv2D_naive(X, W, stride, pad, dilation=0):
     """
     A slow but more straightforward implementation of a 2D "convolution"
-    (technically, cross-correlation) of input X with a collection of kernels W.
-    This implementation uses for loops and direct indexing to perform the
-    convolution.
+    (technically, cross-correlation) of input `X` with a collection of kernels `W`.
 
     Parameters
     ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-        Input volume
-    W: numpy array of shape (kernel_rows, kernel_cols, in_ch, out_ch)
-        The volume of convolution weights/kernels
+    X : numpy array of shape (`n_ex`, `in_rows`, `in_cols`, `in_ch`)
+        Input volume.
+    W: numpy array of shape (`kernel_rows`, `kernel_cols`, `in_ch`, `out_ch`)
+        The volume of convolution weights/kernels.
     stride : int
-        The stride of each convolution kernel
+        The stride of each convolution kernel.
     pad : tuple, int, or 'same'
         The padding amount. If 'same', add padding to ensure that the output of
         a 2D convolution with a kernel of `kernel_shape` and stride `stride`
         produces an output volume of the same dimensions as the input.  If
         2-tuple, specifies the number of padding rows and colums to add *on both
-        sides* of the rows/columns in X. If 4-tuple, specifies the number of
+        sides* of the rows/columns in `X`. If 4-tuple, specifies the number of
         rows/columns to add to the top, bottom, left, and right of the input
         volume.
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
 
     Returns
     -------
     Z : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-        The covolution of X with W
+        The covolution of `X` with `W`.
+
+    Notes
+    -----
+    This implementation uses ``for`` loops and direct indexing to perform the
+    convolution. As a result, it is slower than the vectorized `conv2D`
+    function that relies on the `col2im` and `im2col` transformations.
     """
     s, d = stride, dilation
     X_pad, p = pad2D(X, pad, W.shape[:2], stride=s, dilation=d)
@@ -794,8 +841,8 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
         for c in range(out_ch):
             for i in range(out_rows):
                 for j in range(out_cols):
-                    i0, i1 = i * s, (i * s) + fr * (d + 1) - d
-                    j0, j1 = j * s, (j * s) + fc * (d + 1) - d
+                    i0, i1 = i * s, (i * s) + fr
+                    j0, j1 = j * s, (j * s) + fc
 
                     window = X_pad[m, i0 : i1 : (d + 1), j0 : j1 : (d + 1), :]
                     Z[m, i, j, c] = np.sum(window * W[:, :, :, c])
@@ -809,21 +856,23 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
 
 def he_uniform(weight_shape):
     """
-    Initializes network weights W with draws from Uniform(-b, b) where
+    Initializes network weights `W` with draws from ``Uniform(-b, b)`` where::
 
         b = sqrt(6 / fan_in)
-
-    Developed for deep networks with ReLU nonlinearities.
 
     Parameters
     ----------
     weight_shape : tuple
-        The dimensions of the weight matrix/volume
+        The dimensions of the weight matrix/volume.
 
     Returns
     -------
-    W : numpy array of shape weight_shape
-        The initialized weights
+    W : numpy array of shape `weight_shape`
+        The initialized weights.
+
+    Notes
+    -----
+    Developed for deep networks with ReLU nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     b = np.sqrt(6 / fan_in)
@@ -832,22 +881,24 @@ def he_uniform(weight_shape):
 
 def he_normal(weight_shape):
     """
-    Initializes network weights W with draws from TruncatedNormal(0, b) where
-    the variance b is
+    Initializes network weights `W` with draws from ``TruncatedNormal(0, b)``
+    where the variance ``b`` is::
 
         b = 2 / fan_in
-
-    Developed for deep networks with ReLU nonlinearities.
 
     Parameters
     ----------
     weight_shape : tuple
-        The dimensions of the weight matrix/volume
+        The dimensions of the weight matrix/volume.
 
     Returns
     -------
     W : numpy array of shape `weight_shape`
-        The initialized weights
+        The initialized weights.
+
+    Notes
+    -----
+    Developed for deep networks with ReLU nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     std = np.sqrt(2 / fan_in)
@@ -856,23 +907,28 @@ def he_normal(weight_shape):
 
 def glorot_uniform(weight_shape, gain=1.0):
     """
-    Initializes network weights W with draws from Uniform(-b, b) where
+    Initializes network weights `W` with draws from ``Uniform(-b, b)`` where::
 
         b = gain * sqrt(6 / (fan_in + fan_out))
-
-    The motivation is to choose weights to ensure that the variance of the
-    layer outputs are approximately equal to the variance of its inputs.
-    Developed for deep networks with tanh and logistic sigmoid nonlinearities.
 
     Parameters
     ----------
     weight_shape : tuple
-        The dimensions of the weight matrix/volume
+        The dimensions of the weight matrix/volume.
 
     Returns
     -------
-    W : numpy array of shape weight_shape
-        The initialized weights
+    W : numpy array of shape `weight_shape`
+        The initialized weights.
+
+    Notes
+    -----
+    The motivation for Glorot uniform initialization is to choose weights to
+    ensure that the variance of the layer outputs are approximately equal to
+    the variance of its inputs.
+
+    This initialization strategy was primarily developed for deep networks with
+    tanh and logistic sigmoid nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     b = gain * np.sqrt(6 / (fan_in + fan_out))
@@ -881,24 +937,29 @@ def glorot_uniform(weight_shape, gain=1.0):
 
 def glorot_normal(weight_shape, gain=1.0):
     """
-    Initializes network weights W with draws from TruncatedNormal(0, b) where
-    the variance b is
+    Initializes network weights `W` with draws from ``TruncatedNormal(0, b)``
+    where the variance ``b`` is::
 
         b = gain^2 * 2 / (fan_in + fan_out)
-
-    The motivation is to choose weights to ensure that the variance of the
-    layer outputs are approximately equal to the variance of its inputs.
-    Developed for deep networks with tanh and logistic sigmoid nonlinearities.
 
     Parameters
     ----------
     weight_shape : tuple
-        The dimensions of the weight matrix/volume
+        The dimensions of the weight matrix/volume.
 
     Returns
     -------
     W : numpy array of shape `weight_shape`
-        The initialized weights
+        The initialized weights.
+
+    Notes
+    -----
+    The motivation for Glorot normal initialization is to choose weights to
+    ensure that the variance of the layer outputs are approximately equal to
+    the variance of its inputs.
+
+    This initialization strategy was primarily developed for deep networks with
+    tanh and logistic sigmoid nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     std = gain * np.sqrt(2 / (fan_in + fan_out))
@@ -908,8 +969,6 @@ def glorot_normal(weight_shape, gain=1.0):
 def truncated_normal(mean, std, out_shape):
     """
     Generate draws from a truncated normal distribution via rejection sampling.
-    Specifically, draw samples from a normal distribution and resample any
-    values more than two standard deviations from the mean.
 
     Parameters
     ----------
@@ -918,14 +977,20 @@ def truncated_normal(mean, std, out_shape):
     std : float or array_like of floats
         Standard deviation (spread or "width") of the distribution.
     out_shape : int or tuple of ints
-        Output shape.  If the given shape is, e.g., `(m, n, k)`, then
-        `m * n * k` samples are drawn.
+        Output shape.  If the given shape is, e.g., ``(m, n, k)``, then
+        ``m * n * k`` samples are drawn.
 
     Returns
     -------
     samples : numy array of shape `out_shape`
         Samples from the truncated normal distribution parameterized by `mean`
         and `std`.
+
+    Notes
+    -----
+    The rejection sampling regimen draws samples from a normal distribution
+    with mean `mean` and standard deviation `std`, and resamples any values
+    more than two standard deviations from `mean`.
     """
     samples = np.random.normal(loc=mean, scale=std, size=out_shape)
     reject = np.logical_or(samples >= mean + 2 * std, samples <= mean - 2 * std)
