@@ -404,7 +404,7 @@ def test_NCELoss(N=None):
 
         D = DiscreteSampler(probs, log=False, with_replacement=False)
         NCE = NCELoss(vocab_size, D, num_negative_samples)
-        my_loss = NCE(embeddings, target.flatten())
+        my_loss, _ = NCE(embeddings, target.flatten())
 
         my_dLdX = NCE.grad(update_params=False)
         my_dLdW = NCE.gradients["W"]
@@ -434,7 +434,7 @@ def test_NCELoss(N=None):
             for k, v in NCE.gradients.items():
                 NCE.gradients[k] = np.zeros_like(v)
 
-            my = NCE(emb[None, :, :], target[ix], neg_samples=sv[0])
+            my, _ = NCE(emb[None, :, :], target[ix], neg_samples=sv[0])
 
             NCE.derived_variables["noise_samples"] = [sv]
             dldx = NCE.grad(update_params=False)
