@@ -1606,7 +1606,9 @@ class LayerNorm1D(LayerBase):
 
 
 class Embedding(LayerBase):
-    def __init__(self, n_out, vocab_size, init="glorot_uniform", optimizer=None):
+    def __init__(
+        self, n_out, vocab_size, pool=None, init="glorot_uniform", optimizer=None
+    ):
         """
         An embedding layer.
 
@@ -1623,6 +1625,9 @@ class Embedding(LayerBase):
         vocab_size : int
             The total number of items in the vocabulary. All integer indices
             are expected to range between 0 and `vocab_size - 1`.
+        pool : {'sum', 'mean', None} (default: None)
+            If not None, apply this function to the collection of `n_in`
+            encodings in each example to produce a single, pooled embedding.
         init : str (default: 'glorot_uniform')
             The weight initialization strategy. Valid entries are
             {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
@@ -1632,13 +1637,16 @@ class Embedding(LayerBase):
             default parameters.
         """
         super().__init__(optimizer)
+        fstr = "'pool' must be either 'sum', 'mean', or None but got '{}'"
+        assert pool in ["sum", "mean", None], fstr.format(pool)
 
         self.init = init
-        self.n_in = None
+        self.pool = pool
         self.n_out = n_out
         self.vocab_size = vocab_size
         self.parameters = {"W": None}
         self.is_initialized = False
+        self._init_params()
 
     def _init_params(self):
         init_weights = WeightInitializer("Affine(slope=1, intercept=0)", mode=self.init)
@@ -1654,7 +1662,7 @@ class Embedding(LayerBase):
         return {
             "layer": "Embedding",
             "init": self.init,
-            "n_in": self.n_in,
+            "pool": self.pool,
             "n_out": self.n_out,
             "vocab_size": self.vocab_size,
             "optimizer": {
@@ -1662,6 +1670,22 @@ class Embedding(LayerBase):
                 "hyperparameters": self.optimizer.hyperparameters,
             },
         }
+
+    def lookup(self, ids):
+        """
+        Return the embeddings associated with the IDs in `ids`.
+
+        Parameters
+        ----------
+        word_ids : numpy array of shape (`M`,)
+            An array of `M` IDs to retrieve embeddings for.
+
+        Returns
+        -------
+        embeddings : numpy array of shape (`M`, `n_out`)
+            The embedding vectors for each of the `M` IDs.
+        """
+        return self.parameters["W"][ids]
 
     def forward(self, X, retain_derived=True):
         """
@@ -1672,24 +1696,29 @@ class Embedding(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
-            Layer input, representing a minibatch of `n_ex` examples, each
-            consisting of `n_in` integer token IDs
-        retain_derived : bool (default : True)
+        X : numpy array of shape (n_ex, n_in) or list of length `n_ex`
+            Layer input, representing a minibatch of `n_ex` examples. If
+            `self.pool` is None, each example must consist of exactly `n_in`
+            integer token IDs. Otherwise, `X` can be a ragged array, with each
+            example consisting of a variable number of token IDs.
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
             for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            will not be expected to backprop through with regard to this input.
+            Default is True.
 
         Returns
         -------
         Y : numpy array of shape (n_ex, n_in, n_out)
             Embeddings for each coordinate of each of the `n_ex` examples
         """
-        if not self.is_initialized:
-            self.n_in = X.shape[1]
-            self._init_params()
+        # if X is a ragged array
+        if isinstance(X, list) and not issubclass(X[0].dtype.type, np.integer):
+            fstr = "Input to Embedding layer must be an array of integers, got '{}'"
+            raise TypeError(fstr.format(X[0].dtype.type))
 
-        if not issubclass(X.dtype.type, np.integer):
+        # otherwise
+        if isinstance(X, np.ndarray) and not issubclass(X.dtype.type, np.integer):
             fstr = "Input to Embedding layer must be an array of integers, got '{}'"
             raise TypeError(fstr.format(X.dtype.type))
 
@@ -1701,29 +1730,37 @@ class Embedding(LayerBase):
     def _fwd(self, X):
         """Actual computation of forward pass"""
         W = self.parameters["W"]
-        return W[X]
+        if self.pool is None:
+            emb = W[X]
+        elif self.pool == "sum":
+            emb = np.array([W[x].sum(axis=0) for x in X])[:, None, :]
+        elif self.pool == "mean":
+            emb = np.array([W[x].mean(axis=0) for x in X])[:, None, :]
+        return emb
 
     def backward(self, dLdy, retain_grads=True):
         """
         Backprop from layer outputs to embedding weights.
 
-        Note that because the items in X are interpreted as indices, we cannot
-        compute the gradient of the layer output wrt. X.
-
         Parameters
         ----------
         dLdy : numpy array of shape (n_ex, n_in, n_out) or list of arrays
             The gradient(s) of the loss wrt. the layer output(s)
-        retain_grads : bool (default: True)
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
+
+        Notes
+        -----
+        Because the items in `X` are interpreted as indices, we cannot compute
+        the gradient of the layer output wrt. `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
             dLdy = [dLdy]
 
-        X = self.X
-        for dy, x in zip(dLdy, X):
+        for dy, x in zip(dLdy, self.X):
             dw = self._bwd(dy, x)
 
             if retain_grads:
@@ -1733,8 +1770,16 @@ class Embedding(LayerBase):
         """Actual computation of gradient of the loss wrt. W"""
         dW = np.zeros_like(self.parameters["W"])
         dLdy = dLdy.reshape(-1, self.n_out)
-        for ix, v_id in enumerate(X.flatten()):
-            dW[v_id] += dLdy[ix]
+
+        if self.pool is None:
+            for ix, v_id in enumerate(X.flatten()):
+                dW[v_id] += dLdy[ix]
+        elif self.pool is "sum":
+            for ix, v_ids in enumerate(X):
+                dW[v_ids] += dLdy[ix]
+        elif self.pool is "mean":
+            for ix, v_ids in enumerate(X):
+                dW[v_ids] += dLdy[ix] / len(v_ids)
         return dW
 
 
@@ -1852,8 +1897,8 @@ class FullyConnected(LayerBase):
 
         Returns
         -------
-        dLdX : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer input X
+        dLdX : numpy array of shape (n_ex, n_in) or list of arrays
+            The gradient of the loss wrt. the layer input(s) X
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
