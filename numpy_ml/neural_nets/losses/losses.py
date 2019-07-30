@@ -442,7 +442,7 @@ class NCELoss(ObjectiveBase):
         ----------
         n_classes : int
             The total number of output classes in the model
-        noise_sampler :
+        noise_sampler : `numpy_ml.utils.data_structures.DiscreteSampler` instance
             The negative sampler. Defines a distribution over all classes in
             the dataset.
         num_negative_samples : int
@@ -499,9 +499,9 @@ class NCELoss(ObjectiveBase):
             "sampled_b": [],
             "sampled_w": [],
             "out_labels": [],
-            "true_logits": [],
+            "target_logits": [],
             "noise_samples": [],
-            "sampled_logits": [],
+            "noise_logits": [],
         }
 
         self.is_initialized = True
@@ -586,11 +586,14 @@ class NCELoss(ObjectiveBase):
         X : numpy array of shape (n_ex, n_c, n_in)
             Layer input. A minibatch of `n_ex` examples, where each example is
             an `n_c` x `n_in` matrix (e.g., the matrix of `n_c` context
-            embeddings, each of dimensionality `n_in`, for a skip-gram model)
+            embeddings, each of dimensionality `n_in`, for a CBOW model)
         target : numpy array of shape (n_ex,)
             Integer indices of the target class(es) for each example in the
-            minibatch (e.g., the target word id for an example in a skip-gram
-            model)
+            minibatch (e.g., the target word id for an example in a CBOW model)
+        neg_samples : numpy array of shape (`num_negative_samples`,) (default: None)
+            An optional array of negative samples to use during the loss
+            calculation. These will be used instead of samples draw from
+            `noise_sampler`
         retain_derived : bool (default : True)
             Whether to retain the variables calculated during the forward pass
             for use later during backprop. If `False`, this suggests the layer
@@ -600,6 +603,10 @@ class NCELoss(ObjectiveBase):
         -------
         loss : float
             The NCE loss summed over the minibatch and samples
+        y_pred : numpy array of shape (n_ex, n_c)
+            The network predictions for the conditional probability of each
+            target given each context: entry (i, j) gives the predicted
+            probability of target i under context vector j.
         """
         if not self.is_initialized:
             self.n_in = X.shape[-1]
@@ -616,22 +623,19 @@ class NCELoss(ObjectiveBase):
             self.derived_variables["y_pred"].append(y_pred)
             self.derived_variables["target"].append(target)
             self.derived_variables["out_labels"].append(y_true)
-            self.derived_variables["true_logits"].append(Z_target)
+            self.derived_variables["target_logits"].append(Z_target)
             self.derived_variables["noise_samples"].append(noise_samples)
-            self.derived_variables["sampled_logits"].append(Z_neg)
+            self.derived_variables["noise_logits"].append(Z_neg)
 
-        return loss
+        return loss, np.squeeze(y_pred[..., :1], -1)
 
     def _loss(self, X, target, neg_samples):
         """Actual computation of NCE loss"""
-        fstr = "Loss input must have shape (n_ex, n_c, n_in), but got {}"
-        assert X.ndim == 3, fstr.format(X.shape)
+        fstr = "X must have shape (n_ex, n_c, n_in), but got {} dims instead"
+        assert X.ndim == 3, fstr.format(X.ndim)
 
         W = self.parameters["W"]
         b = self.parameters["b"]
-
-        if not isinstance(target, np.ndarray):
-            target = np.atleast_1d(np.array(target).squeeze())
 
         # sample negative samples from the noise distribution
         if neg_samples is None:
@@ -656,18 +660,18 @@ class NCELoss(ObjectiveBase):
             Z_target[range(n), ...] -= np.log(p_target)
             Z_neg[range(m), ...] -= np.log(p_neg_samples)
 
-        # just retain the probability of the target for the corresponding
+        # only retain the probability of the target under its associated
         # minibatch example
         aa, _, cc = Z_target.shape
         Z_target = Z_target[range(aa), :, range(cc)][..., None]
 
-        # p_target = ([n_ex], n_c, 1)
-        # p_neg = ([n_ex], n_c, n_samples)
+        # p_target = (n_ex, n_c, 1)
+        # p_neg = (n_ex, n_c, n_samples)
         pred_p_target = self.act_fn(Z_target)
         pred_p_neg = self.act_fn(Z_neg)
 
         # if we're in evaluation mode, ignore the negative samples - just
-        # return the binary cross entropy for the targets themselves
+        # return the binary cross entropy on the targets
         y_pred = pred_p_target
         if self.trainable:
             # (n_ex, n_c, 1 + n_samples) (target is first column)
@@ -679,7 +683,7 @@ class NCELoss(ObjectiveBase):
 
         # binary cross entropy
         eps = np.finfo(float).eps
-        np.clip(y_pred, eps, None, y_pred)
+        np.clip(y_pred, eps, 1 - eps, y_pred)
         loss = -np.sum(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
         return loss, Z_target, Z_neg, y_pred, y_true, noise_samples
 
@@ -729,20 +733,21 @@ class NCELoss(ObjectiveBase):
         y_pred = self.derived_variables["y_pred"][input_idx]
         target = self.derived_variables["target"][input_idx]
         y_true = self.derived_variables["out_labels"][input_idx]
-        Z_target = self.derived_variables["true_logits"][input_idx]
-        Z_neg = self.derived_variables["sampled_logits"][input_idx]
+        Z_neg = self.derived_variables["noise_logits"][input_idx]
+        Z_target = self.derived_variables["target_logits"][input_idx]
         neg_samples = self.derived_variables["noise_samples"][input_idx][0]
 
+        # the number of target classes per minibatch example
         n_targets = 1
 
-        # calculate the grad of binary cross entropy wrt to posterior
-        # probabilities manually
+        # calculate the grad of the binary cross entropy wrt. the network
+        # predictions
         preds, classes = y_pred.flatten(), y_true.flatten()
 
         dLdp_real = ((1 - classes) / (1 - preds)) - (classes / preds)
         dLdp_real = dLdp_real.reshape(*y_pred.shape)
 
-        # partition into target and negative samples
+        # partition the gradients into target and negative sample portions
         dLdy_pred_target = dLdp_real[..., :n_targets]
         dLdy_pred_neg = dLdp_real[..., n_targets:]
 
@@ -757,7 +762,7 @@ class NCELoss(ObjectiveBase):
         dW_neg = (dLdZ_neg.transpose(0, 2, 1) @ X).sum(axis=0)
         dW_target = (dLdZ_target.transpose(0, 2, 1) @ X).sum(axis=1)
 
-        # TODO: there's probably a way to do this with einsum...
+        # TODO: can this be done with np.einsum instead?
         dX_target = np.vstack(
             [dLdZ_target[[ix]] @ W[[t]] for ix, t in enumerate(target)]
         )
@@ -766,7 +771,7 @@ class NCELoss(ObjectiveBase):
         hits = list(set(target).intersection(set(neg_samples)))
         hit_ixs = [np.where(target == h)[0] for h in hits]
 
-        # adjust param gradients in there's accidental hit
+        # adjust param gradients if there's an accidental hit
         if len(hits) != 0:
             hit_ixs = np.concatenate(hit_ixs)
             target = np.delete(target, hit_ixs)
@@ -775,8 +780,9 @@ class NCELoss(ObjectiveBase):
 
         dX = dX_target + dX_neg
 
-        # use np.add.at to ensure that repeated indices in target (or possibly
-        # neg_samples) are properly accounted for
+        # use np.add.at to ensure that repeated indices in the target (or
+        # possibly in neg_samples if sampling is done with replacement) are
+        # properly accounted for
         dB = np.zeros_like(b).flatten()
         np.add.at(dB, target, dB_target)
         np.add.at(dB, neg_samples, dB_neg)
