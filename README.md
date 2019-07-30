@@ -78,6 +78,7 @@ This repo includes code for the following models:
     * Models
         - Bernoulli variational autoencoder
         - Wasserstein GAN with gradient penalty
+        - word2vec encoder with skip-gram and CBOW architectures
     * Utilities
         - `col2im` (MATLAB port)
         - `im2col` (MATLAB port)
