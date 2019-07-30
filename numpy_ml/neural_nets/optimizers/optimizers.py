@@ -11,8 +11,8 @@ For a discussion regarding the impact of different optimization strategies, see:
     learning", Proceedings of the 31st Conference on Neural Information Processing Systems
     https://arxiv.org/pdf/1705.08292.pdf
 
-Particularly, the authors find that
-    The solutions found by adaptive methods generalize worse (often
+Particularly, the authors find that:
+    The solutions found that adaptive methods generalize worse (often
     significantly worse) than SGD, even when these solutions have better
     training performance.
 
@@ -81,24 +81,25 @@ class SGD(OptimizerBase):
         """
         Stochastic gradient descent optimizer.
 
-        Equations:
+        Equations::
+
             update[t] = cache[t] = momentum * cache[t-1] + lr * grad[t]
             param[t+1] = param[t] - update[t]
 
         Parameters
         ----------
-        lr : float (default: 0.01)
+        lr : float
             Learning rate for SGD. If scheduler is not None, this is used as
-            the starting learning rate.
-        momentum : float in range [0, 1] (default: 0)
+            the starting learning rate. Default is 0.01.
+        momentum : float in range [0, 1]
             The fraction of the previous update to add to the current update.
-            If 0, no momentum is applied.
-        clip_norm : float (default: None)
+            If 0, no momentum is applied. Default is 0.
+        clip_norm : float
             If not None, all param gradients are scaled to have maximum l2 norm of
-            `clip_norm` before computing update.
-        lr_scheduler : str or `SchedulerBase` instance (default: None)
+            `clip_norm` before computing update. Default is None.
+        lr_scheduler : str, `SchedulerBase` instance, or None
             The learning rate scheduler. If `None`, use a constant learning
-            rate equal to `lr`.
+            rate equal to `lr`. Default is None.
         """
         super().__init__(lr, lr_scheduler)
 
@@ -124,19 +125,19 @@ class SGD(OptimizerBase):
         Parameters
         ----------
         param : numpy array of shape (n, m)
-            The value of the parameter to be updated
+            The value of the parameter to be updated.
         param_grad : numpy array of shape (n, m)
-            The gradient of the loss function with respect to `param_name`
+            The gradient of the loss function with respect to `param_name`.
         param_name : str
             The name of the parameter
-        cur_loss : float (default: None)
+        cur_loss : float
             The training or validation loss for the current minibatch. Used for
-            learning rate scheduling e.g., by `KingScheduler`.
+            learning rate scheduling e.g., by `KingScheduler`. Default is None.
 
         Returns
         -------
         updated_params : numpy array of shape (n, m)
-            The value of `param` after applying the momentum update
+            The value of `param` after applying the momentum update.
         """
         C = self.cache
         H = self.hyperparameters
