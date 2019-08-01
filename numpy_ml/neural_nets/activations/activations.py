@@ -36,10 +36,13 @@ class Sigmoid(ActivationBase):
         return 1 / (1 + np.exp(-z))
 
     def grad(self, x):
-        return self.fn(x) * (1 - self.fn(x))
+        fn_x = self.fn(x)
+        return fn_x * (1 - fn_x)
 
     def grad2(self, x):
-        return self.grad(x) * (1 - 2 * self.fn(x))
+        """ grad(x) * (1 - 2 * fn(x)) """
+        fn_x = self.fn_x
+        return fn_x * (1 - fn_x) * (1 - 2 * fn_x)
 
 
 class ReLU(ActivationBase):
@@ -143,7 +146,9 @@ class Tanh(ActivationBase):
         return 1 - np.tanh(x) ** 2
 
     def grad2(self, x):
-        return -2 * np.tanh(x) * self.grad(x)
+        """ -2 * fn(x) * grad(x) """
+        tanh_x = np.tanh(x)
+        return -2 * tanh_x * (1 - tanh_x ** 2)
 
 
 class Affine(ActivationBase):
@@ -353,7 +358,9 @@ class SoftPlus(ActivationBase):
         return np.log(np.exp(z) + 1)
 
     def grad(self, x):
-        return np.exp(x) / (np.exp(x) + 1)
+        exp_x = np.exp(x)
+        return exp_x / (exp_x + 1)
 
     def grad2(self, x):
-        return np.exp(x) / ((np.exp(x) + 1) ** 2)
+        exp_x = np.exp(x)
+        return exp_x / ((exp_x + 1) ** 2)
