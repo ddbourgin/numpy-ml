@@ -2,7 +2,7 @@
 
 Thank you for contributing to numpy-ml!
 
-| <p align="center">⚠️ ⚠️ All PRs should reflect earnest attempts at implementing a model yourself. ⚠️⚠️ </p> It is fine to reference others' code. It is NOT fine to blindly copy it without attribution. When in doubt, please ask. |
+| <p align="center">⚠️ ⚠️ All PRs should reflect earnest attempts at implementing a model yourself. ⚠️⚠️ </p> It is fine to reference others' code. It is not fine to blindly copy it without attribution. When in doubt, please ask. |
 | --- |
 
 ### General guidelines
