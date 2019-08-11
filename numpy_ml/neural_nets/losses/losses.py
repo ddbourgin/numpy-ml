@@ -197,7 +197,7 @@ class VAELoss(ObjectiveBase):
     between the learned variational distribution :math:`q` and the prior,
     :math:`p`, assumed to be a unit Gaussian.
 
-        VAELoss = BXE(y, y_pred) + KL[q || p]
+        VAELoss = BCE(y, y_pred) + KL[q || p]
 
     where ``BxE`` is the binary cross-entropy between `y` and `y_pred`, and
     ``KL`` is the Kullback-Leibler divergence between the distributions
