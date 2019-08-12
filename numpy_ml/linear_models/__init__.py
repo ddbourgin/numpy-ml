@@ -1,1 +1,1 @@
-from . import lm
+from .lm import *
