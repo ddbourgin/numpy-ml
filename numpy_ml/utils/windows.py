@@ -8,29 +8,30 @@ FFT that the data is infinite and to reduce spectral leakage.
 
 def blackman_harris(window_len, symmetric=False):
     """
-    The Blackman-Harris window, an instance of the more general class of
-    cosine-sum windows where K=3. Additional coefficients extend the Hamming
+    The Blackman-Harris window.
+
+    Notes
+    -----
+    The Blackman-Harris window is an instance of the more general class of
+    cosine-sum windows where `K=3`. Additional coefficients extend the Hamming
     window to further minimize the magnitude of the nearest side-lobe in the
     frequency response.
 
-    bh(n) = a0 - a1 * cos(2 * pi * n / N) + a2 * cos(4 * pi * n / N) - a3 * cos(6 * pi * n / N)
+    .. math::
+        \\text{bh}(n) = a_0 - a_1 \cos\left(\\frac{2 \pi n}{N}\\right) + a_2 \cos\left(\\frac{4 \pi n }{N}\\right) - a_3 \cos\left(\\frac{6 \pi n}{N}\\right)
 
-    where
-        N = window_len - 1,
-        a0 = 0.35875,
-        a1 = 0.48829,
-        a2 = 0.14128,
-        a3 = 0.01168.
+    where `N` = `window_len` - 1, :math:`a_0` = 0.35875, :math:`a_1` = 0.48829,
+    :math:`a_2` = 0.14128, and :math:`a_3` = 0.01168.
 
     Parameters
     ----------
     window_len : int
         The length of the window in samples. Should be equal to the
         `frame_width` if applying to a windowed signal.
-    symmetric : bool (default: False)
+    symmetric : bool
         If False, create a 'periodic' window that can be used in with an FFT /
         in spectral analysis.  If True, generate a symmetric window that can be
-        used in, e.g., filter design.
+        used in, e.g., filter design. Default is False.
 
     Returns
     -------
@@ -44,21 +45,27 @@ def blackman_harris(window_len, symmetric=False):
 
 def hamming(window_len, symmetric=False):
     """
-    The Hamming window, an instance of the more general class of cosine-sum
-    windows where K=1 and a0 = 0.54. Coefficients selected to minimize the
-    magnitude of the nearest side-lobe in the frequency response.
+    The Hamming window.
 
-        hamming(n) = 0.54 - 0.46 * cos((2 * pi * n) / (window_len - 1))
+    Notes
+    -----
+    The Hamming window is an instance of the more general class of cosine-sum
+    windows where `K=1` and :math:`a_0 = 0.54`. Coefficients selected to
+    minimize the magnitude of the nearest side-lobe in the frequency response.
+
+    .. math::
+
+        \\text{hamming}(n) = 0.54 - 0.46 \cos\left(\\frac{2 \pi n}{\\text{window_len} - 1}\\right)
 
     Parameters
     ----------
     window_len : int
         The length of the window in samples. Should be equal to the
         `frame_width` if applying to a windowed signal.
-    symmetric : bool (default: False)
+    symmetric : bool
         If False, create a 'periodic' window that can be used in with an FFT /
         in spectral analysis.  If True, generate a symmetric window that can be
-        used in, e.g., filter design.
+        used in, e.g., filter design. Default is False.
 
     Returns
     -------
@@ -70,21 +77,27 @@ def hamming(window_len, symmetric=False):
 
 def hann(window_len, symmetric=False):
     """
-    The Hann window, an instance of the more general class of cosine-sum
-    windows where K=1 and a0 = 0.5. Unlike the Hamming window, the end points
-    of the Hann window touch zero.
+    The Hann window.
 
-        hann(n) = 0.5 - 0.5 * cos((2 * pi * n) / (window_len - 1))
+    Notes
+    -----
+    The Hann window is an instance of the more general class of cosine-sum
+    windows where `K=1` and :math:`a_0` = 0.5. Unlike the Hamming window, the
+    end points of the Hann window touch zero.
+
+    .. math::
+
+        \\text{hann}(n) = 0.5 - 0.5 \cos\left(\\frac{2 \pi n}{\\text{window_len} - 1}\\right)
 
     Parameters
     ----------
     window_len : int
         The length of the window in samples. Should be equal to the
         `frame_width` if applying to a windowed signal.
-    symmetric : bool (default: False)
+    symmetric : bool
         If False, create a 'periodic' window that can be used in with an FFT /
         in spectral analysis.  If True, generate a symmetric window that can be
-        used in, e.g., filter design.
+        used in, e.g., filter design. Default is False.
 
     Returns
     -------
@@ -96,12 +109,17 @@ def hann(window_len, symmetric=False):
 
 def generalized_cosine(window_len, coefs, symmetric=False):
     """
-    The generalized cosine family of window functions. Reflects a simple
-    weighted sum of cosine terms.
+    The generalized cosine family of window functions.
 
-    For n in [0, window_len]:
+    Notes
+    -----
+    The generalized cosine window is a simple weighted sum of cosine terms.
 
-        GCW(n) = sum_{k=0}^K (-1)^k * a_k * cos((2 * pi * k * n) / window_len)
+    For :math:`n \in \{0, \ldots, \\text{window_len} \}`:
+
+    .. math::
+
+        \\text{GCW}(n) = \sum_{k=0}^K (-1)^k a_k \cos\left(\\frac{2 \pi k n}{\\text{window_len}}\\right)
 
     Parameters
     ----------
@@ -109,11 +127,11 @@ def generalized_cosine(window_len, coefs, symmetric=False):
         The length of the window in samples. Should be equal to the
         `frame_width` if applying to a windowed signal.
     coefs: list of floats
-        The a_k coefficient values
-    symmetric : bool (default: False)
+        The :math:`a_k` coefficient values
+    symmetric : bool
         If False, create a 'periodic' window that can be used in with an FFT /
         in spectral analysis.  If True, generate a symmetric window that can be
-        used in, e.g., filter design.
+        used in, e.g., filter design. Default is False.
 
     Returns
     -------

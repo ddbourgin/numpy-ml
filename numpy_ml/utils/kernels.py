@@ -24,6 +24,7 @@ class KernelBase(ABC):
         return "{}({})".format(H["id"], p_str)
 
     def summary(self):
+        """Return the dictionary of model parameters, hyperparameters, and ID"""
         return {
             "id": self.hyperparameters["id"],
             "parameters": self.parameters,
@@ -31,6 +32,24 @@ class KernelBase(ABC):
         }
 
     def set_params(self, summary_dict):
+        """
+        Set the model parameters and hyperparameters using the settings in
+        `summary_dict`.
+
+        Parameters
+        ----------
+        summary_dict : dict
+            A dictionary with keys 'parameters' and 'hyperparameters',
+            structured as would be returned by the ``self.summary`` method. If
+            a particular (hyper)parameter is not included in this dict, the
+            current value will be used.
+
+        Returns
+        -------
+        new_kernel : `KernelBase` instance
+            A kernel with parameters and hyperparameters adjusted to those
+            specified in `summary_dict`.
+        """
         kr, sd = self, summary_dict
 
         # collapse `parameters` and `hyperparameters` nested dicts into a single
@@ -55,16 +74,20 @@ class LinearKernel(KernelBase):
         """
         The linear (i.e., dot-product) kernel.
 
-            k(x, y) = x @ y.T + c0
+        Notes
+        -----
+        For input vectors :math:`\mathbf{x}` and :math:`\mathbf{y}`, the linear
+        kernel is:
+
+        .. math::
+
+            k(\mathbf{x}, \mathbf{y}) = \mathbf{x}^\\top \mathbf{y} + c_0
 
         Parameters
         ----------
-        c0 : float (default: 1)
-            An "inhomogeneity" parameter. When c0 = 0, the kernel is said to be
-            homogenous. [Homogenous functions are those with multiplicative
-            scaling behavior - if all arguments are multiplied by a factor,
-            then a homogenous function's value is a multiple of (some power of)
-            that same factor]
+        c0 : float
+            An "inhomogeneity" parameter. When `c0` = 0, the kernel is said to be
+            homogenous. Default is 1.
         """
         super().__init__()
         self.hyperparameters = {"id": "LinearKernel"}
@@ -73,19 +96,21 @@ class LinearKernel(KernelBase):
     def _kernel(self, X, Y=None):
         """
         Compute the linear kernel (i.e., dot-product) between all pairs of rows in
-        X and Y.
+        `X` and `Y`.
 
         Parameters
         ----------
         X : numpy array of shape (N, C)
-            Collection of N input vectors
-        Y : numpy array of shape (M, C) (default: None)
-            Collection of M input vectors. If `None`, assume Y = X.
+            Collection of `N` input vectors
+        Y : numpy array of shape (M, C) or None
+            Collection of `M` input vectors. If `None`, assume `Y` = `X`.
+            Default is None.
 
         Returns
         -------
         out : numpy array of shape (N, M)
-            Similarity between X and Y where index (i,j) gives k(x_i, y_j)
+            Similarity between `X` and `Y`, where index (`i`, `j`) gives
+            :math:`k(x_i, y_j)`.
         """
         X, Y = kernel_checks(X, Y)
         return X @ Y.T + self.parameters["c0"]
@@ -94,31 +119,36 @@ class LinearKernel(KernelBase):
 class PolynomialKernel(KernelBase):
     def __init__(self, d=3, gamma=None, c0=1):
         """
-        The degree-d polynomial kernel.
+        The degree-`d` polynomial kernel.
 
-            k(x, y) = (gamma * x @ y + c0) ** d
+        Notes
+        -----
+        For input vectors :math:`\mathbf{x}` and :math:`\mathbf{y}`, the polynomial
+        kernel is:
+
+        .. math::
+
+            k(\mathbf{x}, \mathbf{y}) = (\gamma \mathbf{x}^\\top \mathbf{y} + c_0)^d
 
         In contrast to the linear kernel, the polynomial kernel also computes
-        similarities *across* dimensions of the x and y vectors, allowing it to
-        account for interactions between features.  As an instance of the dot
-        product family of kernels, the polynomial kernel is invariant to a
-        rotation of the coordinates about the origin, but *not* to
-        translations.
+        similarities *across* dimensions of the **x** and **y** vectors,
+        allowing it to account for interactions between features.  As an
+        instance of the dot product family of kernels, the polynomial kernel is
+        invariant to a rotation of the coordinates about the origin, but *not*
+        to translations.
 
         Parameters
         ----------
-        d : int (default: 3)
-            Degree of the polynomial kernel
-        gamma : float (default: None)
-            A scaling parameter for the dot product between x and y. If None,
-            defaults to 1 / C. Sometimes referred to as the kernel bandwidth.
-        c0 : float (default: 1)
+        d : int
+            Degree of the polynomial kernel. Default is 3.
+        gamma : float or None
+            A scaling parameter for the dot product between `x` and `y`. If None,
+            defaults to 1 / `C`. Sometimes referred to as the kernel bandwidth.
+            Default is None.
+        c0 : float
             Parameter trading off the influence of higher-order versus lower-order
-            terms in the polynomial. If c0 = 0, the kernel is said to be
-            homogenous. [Homogenous functions are those with multiplicative
-            scaling behavior - if all arguments are multiplied by a factor,
-            then a homogenous function's value is a multiple of (some power of)
-            that same factor]
+            terms in the polynomial. If `c0` = 0, the kernel is said to be
+            homogenous. Default is 1.
         """
         super().__init__()
         self.hyperparameters = {"id": "PolynomialKernel"}
@@ -126,21 +156,22 @@ class PolynomialKernel(KernelBase):
 
     def _kernel(self, X, Y=None):
         """
-        Compute the degree-d polynomial kernel between all pairs of rows in X
-        and Y.
+        Compute the degree-`d` polynomial kernel between all pairs of rows in `X`
+        and `Y`.
 
         Parameters
         ----------
         X : numpy array of shape (N, C)
             Collection of N input vectors
-        Y : numpy array of shape (M, C) (default: None)
-            Collection of M input vectors. If None, assume Y = X.
+        Y : numpy array of shape (M, C) or None
+            Collection of M input vectors. If None, assume Y = X. Default is
+            None.
 
         Returns
         -------
         out : numpy array of shape (N, M)
-            Similarity between X and Y where index (i,j) gives k(x_i, y_j)
-            (i.e., the kernel's Gram-matrix)
+            Similarity between `X` and `Y` where index (`i`, `j`) gives
+            :math:`k(x_i, y_j)` (i.e., the kernel's Gram-matrix).
         """
         P = self.parameters
         X, Y = kernel_checks(X, Y)
@@ -153,19 +184,26 @@ class RBFKernel(KernelBase):
         """
         Radial basis function (RBF) / squared exponential kernel.
 
-            k(x, y) = exp( -0.5 * ||(x / sigma) - (y / sigma)||^2 )
+        Notes
+        -----
+        For input vectors :math:`\mathbf{x}` and :math:`\mathbf{y}`, the radial
+        basis function kernel is:
+
+        .. math::
+
+            k(\mathbf{x}, \mathbf{y}) = \exp \left\{ -0.5   \left\lVert \\frac{\mathbf{x} - \mathbf{y}}{\sigma} \\right\\rVert_2^2 \\right\}
 
         The RBF kernel decreases with distance and ranges between zero (in the
-        limit) to one (when x = y). Notably, the implied feature space of the
-        kernel has an infinite number of dimensions.
+        limit) to one (when **x** = **y**). Notably, the implied feature space
+        of the kernel has an infinite number of dimensions.
 
         Parameters
         ----------
-        sigma : float or array of shape (C,) (default: None)
-            A scaling parameter for the vectors x and y, producing an isotropic
-            kernel if a float, or an anistropic kernel if an array of length C.
-            If None, defaults to sqrt(C / 2). Sometimes referred to as the
-            kernel 'bandwidth'.
+        sigma : float or array of shape (C,) or None
+            A scaling parameter for the vectors **x** and **y**, producing an
+            isotropic kernel if a float, or an anistropic kernel if an array of
+            length `C`.  If None, defaults to ``sqrt(C / 2)``. Sometimes
+            referred to as the kernel 'bandwidth'. Default is None.
         """
         super().__init__()
         self.hyperparameters = {"id": "RBFKernel"}
@@ -174,19 +212,20 @@ class RBFKernel(KernelBase):
     def _kernel(self, X, Y=None):
         """
         Computes the radial basis function (RBF) kernel between all pairs of
-        rows in X and Y.
+        rows in `X` and `Y`.
 
         Parameters
         ----------
         X : numpy array of shape (N, C)
-            Collection of N input vectors, each with dimension C.
-        Y : numpy array of shape (M, C) (default: None)
-            Collection of M input vectors. If None, assume Y = X.
+            Collection of `N` input vectors, each with dimension `C`.
+        Y : numpy array of shape (M, C)
+            Collection of `M` input vectors. If None, assume `Y` = `X`. Default
+            is None.
 
         Returns
         -------
         out : numpy array of shape (N, M)
-            Similarity between X and Y where index (i, j) gives k(x_i, y_j)
+            Similarity between `X` and `Y` where index (i, j) gives :math:`k(x_i, y_j)`.
         """
         P = self.parameters
         X, Y = kernel_checks(X, Y)
@@ -265,28 +304,34 @@ def kernel_checks(X, Y):
 
 def pairwise_l2_distances(X, Y):
     """
-    A fast, vectorized way to compute pairwise l2 distances between rows in X
-    and Y.
+    A fast, vectorized way to compute pairwise l2 distances between rows in `X`
+    and `Y`.
 
-        d[i, j] = np.sqrt((x_i - y_i) @ (x_i - y_i))
-                = np.sqrt(sum (x_i - y_j)^2)
-                = np.sqrt(sum (x_i)^2 - 2 x_i y_j + (y_j)^2)
+    Notes
+    -----
+    An entry of the pairwise Euclidean distance matrix for two vectors is
+
+    .. math::
+
+        d[i, j]  &=  \sqrt{(x_i - y_i) @ (x_i - y_i)} \\\\
+                 &=  \sqrt{sum (x_i - y_j)^2} \\\\
+                 &=  \sqrt{sum (x_i)^2 - 2 x_i y_j + (y_j)^2}
 
     The code below computes the the third line using numpy broadcasting
-    fanciness to avoid any `for` loops.
+    fanciness to avoid any for loops.
 
     Parameters
     ----------
     X : numpy array of shape (N, C)
         Collection of N input vectors
-    Y : numpy array of shape (M, C) (default: None)
-        Collection of M input vectors. If `None`, assume Y = X.
+    Y : numpy array of shape (M, C)
+        Collection of M input vectors. If `None`, assume `Y` = `X`. Default is None.
 
     Returns
     -------
     dists : numpy array of shape (N, M)
-        Pairwise distance matrix. Entry (i, j) contains the l2 distance between
-        x_i and y_j
+        Pairwise distance matrix. Entry (i, j) contains the `L2` distance between
+        :math:`x_i` and :math:`y_j`.
     """
     D = -2 * X @ Y.T + np.sum(Y ** 2, axis=1) + np.sum(X ** 2, axis=1)[:, np.newaxis]
     D[D < 0] = 0  # clip any value less than 0 (a result of numerical imprecision)

@@ -1,17 +1,19 @@
 from time import time
 import numpy as np
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# https://seaborn.pydata.org/generated/seaborn.set_context.html
-# https://seaborn.pydata.org/generated/seaborn.set_style.html
-sns.set_style("white")
-sns.set_context("notebook", font_scale=1)
-
 
 class Trainer(object):
     def __init__(self, agent, env):
+        """
+        An object to facilitate agent training and evaluation.
+
+        Parameters
+        ----------
+        agent : :class:`AgentBase` instance
+            The agent to train.
+        env : ``gym.wrappers`` or ``gym.envs`` instance
+            The environment to run the agent on.
+        """
         self.env = env
         self.agent = agent
         self.rewards = {"total": [], "smooth_total": [], "n_steps": [], "duration": []}
@@ -38,6 +40,28 @@ class Trainer(object):
         render_every=None,
         smooth_factor=0.05,
     ):
+        """
+        Train an agent on an OpenAI gym environment, logging training
+        statistics along the way.
+
+        Parameters
+        ----------
+        n_episodes : int
+            The number of episodes to train the agent across.
+        max_steps : int
+            The maximum number of steps the agent can take on each episode.
+        seed : int or None
+            A seed for the random number generator. Default is None.
+        plot : bool
+            Whether to generate a plot of the cumulative reward as a function
+            of training episode. Default is True.
+        verbose : bool
+            Whether to print intermediate run statistics to stdout during
+            training. Default is True.
+        smooth_factor : float in [0, 1]
+            The amount to smooth the cumulative reward across episodes. Larger
+            values correspond to less smoothing.
+        """
         if seed:
             np.random.seed(seed)
             self.env.seed(seed=seed)
@@ -77,6 +101,31 @@ class Trainer(object):
             self.plot_rewards(rwd_greedy)
 
     def plot_rewards(self, rwd_greedy):
+        """
+        Plot the cumulative reward per episode as a function of episode number.
+
+        Notes
+        -----
+        Saves plot to the file ``./img/<agent>-<env>.png``
+
+        Parameters
+        ----------
+        rwd_greedy : float
+            The cumulative reward earned with a final execution of a greedy
+            target policy.
+        """
+        try:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+
+            # https://seaborn.pydata.org/generated/seaborn.set_context.html
+            # https://seaborn.pydata.org/generated/seaborn.set_style.html
+            sns.set_style("white")
+            sns.set_context("notebook", font_scale=1)
+        except:
+            fstr = "Error importing `matplotlib` and `seaborn` -- plotting functionality is disabled"
+            raise ImportError(fstr)
+
         R = self.rewards
         fig, ax = plt.subplots()
         x = np.arange(len(R["total"]))

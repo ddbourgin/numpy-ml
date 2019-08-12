@@ -9,10 +9,6 @@ def bootstrap_sample(X, Y):
 
 
 class RandomForest:
-    """
-    A random forest of decision trees.
-    """
-
     def __init__(
         self, n_trees, max_depth, n_feats, classifier=True, criterion="entropy"
     ):
@@ -29,9 +25,14 @@ class RandomForest:
             grow each tree until the leaf nodes are pure.
         n_feats : int
             The number of features to sample on each split.
-        criterion : str (default: 'entropy')
-            The error criterion to use when calculating splits. Valid entries
-            are {'entropy', 'gini'}.
+        classifier : bool
+            Whether `Y` contains class labels or real-valued targets. Default
+            is True.
+        criterion : {'entropy', 'gini', 'mse'}
+            The error criterion to use when calculating splits for each weak
+            learner. When ``classifier = False``, valid entries are {'mse'}.
+            When ``classifier = True``, valid entries are {'entropy', 'gini'}.
+            Default is 'entropy'.
         """
         self.trees = []
         self.n_trees = n_trees
@@ -59,17 +60,17 @@ class RandomForest:
 
     def predict(self, X):
         """
-        Predict the target value for each entry in X.
+        Predict the target value for each entry in `X`.
 
         Parameters
         ----------
         X : numpy array of shape (N, M)
-            The training data of N examples, each with M features
+            The training data of `N` examples, each with `M` features.
 
         Returns
         -------
         y_pred : np.array of shape (N,)
-            Model predictions for each entry in X.
+            Model predictions for each entry in `X`.
         """
         tree_preds = np.array([[t._traverse(x, t.root) for x in X] for t in self.trees])
         return self._vote(tree_preds)

@@ -1,56 +1,11 @@
-import copy
 from itertools import product
-from collections import Hashable, defaultdict
+from collections import defaultdict
 
 import numpy as np
-import pandas as pd
 
 import gym
 
 from .tiles.tiles3 import tiles, IHT
-
-
-class Dict(dict):
-    """
-    A dictionary subclass which returns the key value if it is not already in
-    the dict. Also allows for an optional `encoder` function which will
-    translate a key into an intermediate representation before adding it to the
-    dictionary.
-    """
-
-    def __init__(self, encoder=None):
-        super(Dict, self).__init__()
-        self._encoder = encoder
-        self._id_max = 0
-
-    def __setitem__(self, key, value):
-        if self._encoder is not None:
-            key = self._encoder(key)
-        elif not isinstance(key, Hashable):
-            key = tuple(key)
-        super(Dict, self).__setitem__(key, value)
-
-    def _encode_key(self, key):
-        D = super(Dict, self)
-        enc_key = self._encoder(key)
-        if D.__contains__(enc_key):
-            val = D.__getitem__(enc_key)
-        else:
-            val = self._id_max
-            D.__setitem__(enc_key, val)
-            self._id_max += 1
-        return val
-
-    def __getitem__(self, key):
-        self._key = copy.deepcopy(key)
-        if self._encoder is not None:
-            return self._encode_key(key)
-        elif not isinstance(key, Hashable):
-            key = tuple(key)
-        return super(Dict, self).__getitem__(key)
-
-    def __missing__(self, key):
-        return self._key
 
 
 class EnvModel(object):
@@ -107,16 +62,16 @@ class EnvModel(object):
 
         Parameters
         ----------
-        s : int as returned by `self._obs2num`
-            The id for the state/observation
-        a : int as returned by `self._action2num`
-            The id for the action taken from state `s`
+        s : int as returned by ``self._obs2num``
+            The id for the state/observation.
+        a : int as returned by ``self._action2num``
+            The id for the action taken from state `s`.
 
         Returns
         -------
         outcome_probs : list of (state, prob) tuples
             A list of each possible outcome and its associated probability
-            under the model
+            under the model.
         """
         items = list(self._model[(s, a)].items())
         total_count = np.sum([c for (_, c) in items])
@@ -127,18 +82,18 @@ class EnvModel(object):
     def state_action_pairs_leading_to_outcome(self, outcome):
         """
         Return all (state, action) pairs that have a nonzero probability of
-        producing `outcome` under the current model
+        producing `outcome` under the current model.
 
         Parameters
         ----------
         outcome : int
-            The outcome state
+            The outcome state.
 
         Returns
         -------
         pairs : list of (state, action) tuples
             A list of all (state, action) pairs with a nonzero probability of
-            producing `outcome` under the model
+            producing `outcome` under the model.
         """
         pairs = []
         for sa in self.state_action_pairs():
@@ -164,34 +119,36 @@ def tile_state_space(
 
     Arguments
     ---------
-    env : gym.wrappers.time_limit.TimeLimit
-        An openAI environment
+    env : ``gym.wrappers.time_limit.TimeLimit`` instance
+        An openAI environment.
     n_tilings : int
         The number of overlapping tilings to use. Should be a power of 2. This
-        determines the dimension of the discretized tile-encoded state vector
-    obs_max : float or np.ndarray (default: None)
+        determines the dimension of the discretized tile-encoded state vector.
+    obs_max : float or np.ndarray
         The value to treat as the max value of the observation space when
-        calculating the grid widths. If `None`, use env.observation_space.high
-    obs_min : float or np.ndarray (default: None)
+        calculating the grid widths. If None, use
+        ``env.observation_space.high``. Default is None.
+    obs_min : float or np.ndarray
         The value to treat as the min value of the observation space when
-        calculating the grid widths. If `None`, use env.observation_space.low
-    state_action : bool (default: False)
+        calculating the grid widths. If None, use
+        ``env.observation_space.low``. Default is None.
+    state_action : bool
         Whether to use tile coding to encode state-action values (True) or just
-        state values (False)
+        state values (False). Default is False.
     grid_size : list of length 2
         A list of ints representing the coarseness of the tilings. E.g., a
         `grid_size` of [4, 4] would mean each tiling consisted of a 4x4 tile
-        grid
+        grid. Default is [4, 4].
 
     Returns
     -------
     encode_obs_as_tile : function
         A function which takes as input continous observation vector and
         returns a set of the indices of the active tiles in the tile coded
-        observation space
+        observation space.
     n_states : int
         An integer reflecting the total number of unique states possible under
-        this tile coding regimen
+        this tile coding regimen.
     """
     obs_max = np.nan_to_num(env.observation_space.high) if obs_max is None else obs_max
     obs_min = np.nan_to_num(env.observation_space.low) if obs_min is None else obs_min
@@ -223,13 +180,16 @@ def tile_state_space(
 
 
 def get_gym_environs():
-    """
-    List all valid gym environment ids
-    """
+    """ List all valid OpenAI ``gym`` environment ids.  """
     return [e.id for e in gym.envs.registry.all()]
 
 
 def get_gym_stats():
+    """ Return a pandas DataFrame of the environment IDs.  """
+    try:
+        import pandas as pd
+    except:
+        raise ImportError("Cannot import `pandas`; unable to run `get_gym_stats`")
     df = []
     for e in gym.envs.registry.all():
         print(e.id)
@@ -256,9 +216,23 @@ def get_gym_stats():
 
 def is_tuple(env):
     """
-    A Tuple space is a tuple of *several* (possibly multidimensional)
+    Check if the action and observation spaces for `env` are instances of
+    ``gym.spaces.Tuple`` or ``gym.spaces.Dict``.
+
+    Notes
+    -----
+    A tuple space is a tuple of *several* (possibly multidimensional)
     action/observation spaces. For our purposes, a tuple space is necessarily
     multidimensional.
+
+    Returns
+    -------
+    tuple_action : bool
+        Whether the `env`'s action space is an instance of ``gym.spaces.Tuple``
+        or ``gym.spaces.Dict``.
+    tuple_obs : bool
+        Whether the `env`'s observation space is an instance of
+        ``gym.spaces.Tuple`` or ``gym.spaces.Dict``.
     """
     tuple_space, dict_space = gym.spaces.Tuple, gym.spaces.dict.Dict
     tuple_action = isinstance(env.action_space, (tuple_space, dict_space))
@@ -268,9 +242,30 @@ def is_tuple(env):
 
 def is_multidimensional(env):
     """
+    Check if the action and observation spaces for `env` are multidimensional
+    or ``Tuple`` spaces.
+
+    Notes
+    -----
     A multidimensional space is any space whose actions / observations have
-    more than one element in them. This includes Tuple spaces, but also
+    more than one element in them. This includes ``Tuple`` spaces, but also
     includes single action/observation spaces with several dimensions.
+
+    Parameters
+    ----------
+    env : ``gym.wrappers`` or ``gym.envs`` instance
+        The environment to evaluate.
+
+    Returns
+    -------
+    md_action : bool
+        Whether the `env`'s action space is multidimensional.
+    md_obs : bool
+        Whether the `env`'s observation space is multidimensional.
+    tuple_action : bool
+        Whether the `env`'s action space is a ``Tuple`` instance.
+    tuple_obs : bool
+        Whether the `env`'s observation space is a ``Tuple`` instance.
     """
     md_action, md_obs = True, True
     tuple_action, tuple_obs = is_tuple(env)
@@ -287,7 +282,25 @@ def is_multidimensional(env):
 
 def is_continuous(env, tuple_action, tuple_obs):
     """
-    Check if the observation and action spaces are continuous
+    Check if an `env`'s observation and action spaces are continuous.
+
+    Parameters
+    ----------
+    env : ``gym.wrappers`` or ``gym.envs`` instance
+        The environment to evaluate.
+    tuple_action : bool
+        Whether the `env`'s action space is an instance of `gym.spaces.Tuple`
+        or `gym.spaces.Dict`.
+    tuple_obs : bool
+        Whether the `env`'s observation space is an instance of `gym.spaces.Tuple`
+        or `gym.spaces.Dict`.
+
+    Returns
+    -------
+    cont_action : bool
+        Whether the `env`'s action space is continuous.
+    cont_obs : bool
+        Whether the `env`'s observation space is continuous.
     """
     Continuous = gym.spaces.box.Box
     if tuple_obs:
@@ -306,7 +319,24 @@ def is_continuous(env, tuple_action, tuple_obs):
 
 def action_stats(env, md_action, cont_action):
     """
-    Get information on env's action space
+    Get information on `env`'s action space.
+
+    Parameters
+    ----------
+    md_action : bool
+        Whether the `env`'s action space is multidimensional.
+    cont_action : bool
+        Whether the `env`'s action space is continuous.
+
+    Returns
+    -------
+    n_actions_per_dim : list of length (action_dim,)
+        The number of possible actions for each dimension of the action space.
+    action_ids : list or None
+        A list of all valid actions within the space. If `cont_action` is
+        True, this value will be None.
+    action_dim : int or None
+        The number of dimensions in a single action.
     """
     if cont_action:
         action_dim = 1
@@ -337,7 +367,27 @@ def action_stats(env, md_action, cont_action):
 
 def obs_stats(env, md_obs, cont_obs):
     """
-    Get information on env's observation space
+    Get information on the observation space for `env`.
+
+    Parameters
+    ----------
+    env : ``gym.wrappers`` or ``gym.envs`` instance
+        The environment to evaluate.
+    md_obs : bool
+        Whether the `env`'s action space is multidimensional.
+    cont_obs : bool
+        Whether the `env`'s observation space is multidimensional.
+
+    Returns
+    -------
+    n_obs_per_dim : list of length (obs_dim,)
+        The number of possible observation classes for each dimension of the
+        observation space.
+    obs_ids : list or None
+        A list of all valid observations within the space. If `cont_obs` is
+        True, this value will be None.
+    obs_dim : int or None
+        The number of dimensions in a single observation.
     """
     if cont_obs:
         obs_ids = None
@@ -369,14 +419,14 @@ def env_stats(env):
 
     Parameters
     ----------
-    env : gym.wrappers or gym.envs instance
-        The environment to run the agent on
+    env : ``gym.wrappers`` or ``gym.envs`` instance
+        The environment to evaluate.
 
     Returns
     -------
     env_info : dict
         A dictionary containing information about the action and observation
-        spaces of `env`
+        spaces of `env`.
     """
     md_action, md_obs, tuple_action, tuple_obs = is_multidimensional(env)
     cont_action, cont_obs = is_continuous(env, tuple_action, tuple_obs)

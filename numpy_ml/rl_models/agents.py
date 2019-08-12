@@ -3,7 +3,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from ._utils import Dict, EnvModel, env_stats, tile_state_space
+from ._utils import EnvModel, env_stats, tile_state_space
+from ..utils.data_structures import Dict
 
 
 class AgentBase(ABC):
@@ -35,6 +36,7 @@ class AgentBase(ABC):
             self._num2obs = {i: act for act, i in self._obs2num.items()}
 
     def flush_history(self):
+        """Clear the episode history"""
         for k, v in self.episode_history.items():
             self.episode_history[k] = []
 
@@ -58,37 +60,50 @@ class AgentBase(ABC):
 class CrossEntropyAgent(AgentBase):
     def __init__(self, env, n_samples_per_episode=500, retain_prcnt=0.2):
         """
-        A cross-entropy method agent. Operates on envs with discrete action
-        spaces.
+        A cross-entropy method agent.
+
+        Notes
+        -----
+        The cross-entropy method agent only operates on ``envs`` with discrete
+        action spaces.
 
         On each episode the agent generates `n_theta_samples` of the parameters
-        (theta) for its behavior policy. The i'th sample is:
+        (:math:`\\theta`) for its behavior policy. The `i`'th sample at
+        timestep `t` is:
 
-            theta_i ~ N(theta_mean_t, diag(theta_var_t))
-            theta_i = [W_i, b_i]
+        .. math::
 
-        Weights (W_i) and bias (b_i) are the parameters of the softmax policy:
+            \\theta_i  &=  \{\mathbf{W}_i^{(t)}, \mathbf{b}_i^{(t)} \} \\\\
+            \\theta_i  &\sim  \mathcal{N}(\mu^{(t)}, \Sigma^{(t)})
 
-            z_i = obs @ W_i + b_i
-            p(action_i) = e^z_i / sum_j e^z_j
-            action = arg max_j p(action_j)
+        Weights (:math:`\mathbf{W}_i`) and bias (:math:`\mathbf{b}_i`) are the
+        parameters of the softmax policy:
+
+        .. math::
+
+            \mathbf{z}_i  &=  \\text{obs} \cdot \mathbf{W}_i + \mathbf{b}_i \\\\
+            p(a_i^{(t + 1)})  &=  \\frac{e^{\mathbf{z}_i}}{\sum_j e^{z_{ij}}} \\\\
+            a^{(t + 1)}  &=  \\arg \max_j p(a_j^{(t+1)})
 
         At the end of each episode, the agent takes the top `retain_prcnt`
-        highest scoring thetas and combines them to generate the mean and
-        variance for the next theta samples:
+        highest scoring :math:`\\theta` samples and combines them to generate
+        the mean and variance of the distribution of :math:`\\theta` for the
+        next episode:
 
-            theta_mean_{t+1} = mean(best_thetas_t)
-            theta_var_{t+1} = diag( varian
+        .. math::
+
+            \mu^{(t+1)}  &=  \\text{avg}(\\texttt{best_thetas}^{(t)}) \\\\
+            \Sigma^{(t+1)}  &=  \\text{var}(\\texttt{best_thetas}^{(t)})
 
         Parameters
         ----------
-        env : gym.wrappers or gym.envs instance
-            The environment to run the agent on
-        n_samples_per_episode : int (default: 500)
-            The number of theta samples to evaluate on each episode
-        retain_prcnt: float (default: 0.2)
+        env : ``gym.wrappers`` or ``gym.envs`` instance
+            The environment to run the agent on.
+        n_samples_per_episode : int
+            The number of theta samples to evaluate on each episode. Default is 500.
+        retain_prcnt: float
             The percentage of `n_samples_per_episode` to use when calculating
-            the parameter update at the end of the episode.
+            the parameter update at the end of the episode. Default is 0.2.
         """
         super().__init__(env)
 
@@ -131,18 +146,28 @@ class CrossEntropyAgent(AgentBase):
         """
         Generate actions according to a softmax policy.
 
-        The softmax policy assumes that the pmf over actions in state `xt` is
-        given by
+        Notes
+        -----
+        The softmax policy assumes that the pmf over actions in state :math:`x_t` is
+        given by:
 
-            action_probs = softmax( obs @ W + b )
+        .. math::
 
-        where W is a learned weight matrix, obs is the observation at timestep
-        t, and b is a learned bias vector.
+            \pi(a | x^{(t)}) = \\text{softmax}( \\text{obs}^{(t)} \cdot \mathbf{W}_i^{(t)} + \mathbf{b}_i^{(t)} )
+
+        where :math:`\mathbf{W}` is a learned weight matrix, `obs` is the observation
+        at timestep `t`, and **b** is a learned bias vector.
 
         Parameters
         ----------
         obs : int or array
             An observation from the environment.
+
+        Returns
+        -------
+        action : int, float, or np.ndarray
+            An action sampled from the distribution over actions defined by the
+            softmax policy.
         """
         E, P = self.env_info, self.parameters
         W, b = P["W"], P["b"]
@@ -161,26 +186,7 @@ class CrossEntropyAgent(AgentBase):
 
     def run_episode(self, max_steps, render=False):
         """
-        Run an agent on a single episode.
-
-        At each timestep CrossEntropyAagent generates `n_theta_samples` from the
-        distribution:
-
-            theta_i ~ N(theta_mean_t, diag(theta_var_t))
-            theta_i = [W_i, b_i]
-
-        Weights (W_i) and bias (b_i) are parameters of the softmax policy:
-
-            z_i = obs @ W_i + b_i
-            p(action_i) = e^z_i / sum_j e^z_j
-            action = arg max_j p(action_j)
-
-        At the end of each episode, take the top `retain_prcnt` highest scoring
-        thetas and combine them to produce the mean and variance for the next
-        theta samples:
-
-            theta_mean_{t+1} = mean(best_thetas_t)
-            theta_var_{t+1} = diag( variance(best_thetas_t) )
+        Run the agent on a single episode.
 
         Parameters
         ----------
@@ -225,20 +231,20 @@ class CrossEntropyAgent(AgentBase):
         Parameters
         ----------
         W : numpy array of shape (obs_dim, n_actions)
-            The weights for the softmax policy
+            The weights for the softmax policy.
         b : numpy array of shape (bias_len, )
-            The bias for the softmax policy
+            The bias for the softmax policy.
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during training
+            Whether to render the episode during training.
 
         Returns
         -------
         reward : float
-            The total reward on the episode
+            The total reward on the episode.
         steps : float
-            The total number of steps taken on the episode
+            The total number of steps taken on the episode.
         """
         rwds, sa = [], []
         H = self.episode_history
@@ -270,14 +276,14 @@ class CrossEntropyAgent(AgentBase):
 
     def update(self):
         """
-        Update `theta_mean` and `theta_var` according to the rewards accrued on
+        Update :math:`\mu` and :math:`\Sigma` according to the rewards accrued on
         the current episode.
 
         Returns
         -------
         avg_reward : float
             The average reward earned by the best `retain_prcnt` theta samples
-            on the current episode
+            on the current episode.
         """
         D, P = self.derived_variables, self.parameters
         n_retain = int(self.retain_prcnt * self.n_samples_per_episode)
@@ -292,8 +298,8 @@ class CrossEntropyAgent(AgentBase):
 
     def _sample_thetas(self):
         """
-        Sample `n_samples_per_episode` thetas from a MV Gaussian with mean
-        `theta_mean` and covariance `diag(theta_var)`
+        Sample `n_samples_per_episode` thetas from a multivariate Gaussian with
+        mean `theta_mean` and covariance `diag(theta_var)`
         """
         P, N = self.parameters, self.n_samples_per_episode
         Mu, Sigma = P["theta_mean"], np.diag(P["theta_var"])
@@ -307,16 +313,16 @@ class CrossEntropyAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during execution
+            Whether to render the episode during execution.
 
         Returns
         -------
         total_reward : float
-            The total reward on the episode
+            The total reward on the episode.
         n_steps : float
-            The total number of steps taken on the episode
+            The total number of steps taken on the episode.
         """
         E, D, P = self.env_info, self.derived_variables, self.parameters
         Mu, Sigma = P["theta_mean"], np.diag(P["theta_var"])
@@ -332,32 +338,6 @@ class CrossEntropyAgent(AgentBase):
 
 
 class MonteCarloAgent(AgentBase):
-    """
-    Monte Carlo methods are ways of solving RL problems based on averaging
-    sample returns for each state-action pair. Parameters are updated only at
-    the completion of an episode.
-
-    In on-policy learning, the agent maintains a single policy that it updates
-    over the course of training. In order to ensure the policy converges to a
-    (near-) optimal policy, the agent must maintain that the policy assigns
-    non-zero probability to ALL state-action pairs during training to ensure
-    continual exploration.
-        - Thus on-policy learning is a compromise -- it learns action values
-          not for the optimal policy, but for a *near*-optimal policy that
-          still explores.
-
-    In off-policy learning, the agent maintains two separate policies:
-        1. Target Policy - The policy that is learned during training and that
-        will eventually become the optimal policy.
-
-        2. Behavior Policy - A policy that is more exploratory and is used to
-        generate behavior during training.
-
-    Off-policy methods are often of greater variance and are slower to
-    converge. On the other hand, off-policy methods are more powerful and
-    general than on-policy methods.
-    """
-
     def __init__(self, env, off_policy=False, temporal_discount=0.9, epsilon=0.1):
         """
         A Monte-Carlo learning agent trained using either first-visit Monte
@@ -366,18 +346,19 @@ class MonteCarloAgent(AgentBase):
 
         Parameters
         ----------
-        env : gym.wrappers or gym.envs instance
-            The environment to run the agent on
-        off_policy : bool (default: False)
+        env : ``gym.wrappers`` or ``gym.envs`` instance
+            The environment to run the agent on.
+        off_policy : bool
             Whether to use a behavior policy separate from the target policy
             during training. If False, use the same epsilon-soft policy for
-            both behavior and target policies.
-        temporal_discount : float between [0, 1] (default: 0.9)
+            both behavior and target policies. Default is False.
+        temporal_discount : float between [0, 1]
             The discount factor used for downweighting future rewards. Smaller
-            values result in greater discounting of future rewards.
-        epsilon : float between [0, 1] (default: 0.1)
+            values result in greater discounting of future rewards. Default is
+            0.9.
+        epsilon : float between [0, 1]
             The epsilon value in the epsilon-soft policy. Larger values
-            encourage greater exploration during training.
+            encourage greater exploration during training. Default is 0.1.
         """
         super().__init__(env)
 
@@ -425,50 +406,52 @@ class MonteCarloAgent(AgentBase):
 
     def _epsilon_soft_policy(self, s, a=None):
         """
-        Epsilon-soft exploration policy. This is necessary for first-visit
-        Monte Carlo methods, as they require continual exploration (i.e., each
-        state-action pair must have nonzero probability of occurring).
+        Epsilon-soft exploration policy.
 
-        In epsilon-soft policies, pi(a|s) > 0 for all s ∈ S and all a ∈ A(s) at
-        the start of training. As learning progresses, pi gradually shifts
-        closer and closer to a deterministic optimal policy.
+        Notes
+        -----
+        Soft policies are necessary for first-visit Monte Carlo methods, as
+        they require continual exploration (i.e., each state-action pair must
+        have nonzero probability of occurring).
+
+        In epsilon-soft policies, :math:`\pi(a \mid s) > 0` for all :math:`s
+        \in S` and all :math:`a \in A(s)` at the start of training. As learning
+        progresses, :math:`pi` gradually shifts closer and closer to a
+        deterministic optimal policy.
 
         In particular, we have:
 
-            pi(a|s) = 1 - epsilon + (epsilon / |A(s)|) IFF a == a*
-            pi(a|s) = epsilon / |A(s)|                 IFF a != a*
+        .. math::
 
-        where
+            \pi(a \mid s)  &=  1 - \epsilon + \\frac{\epsilon}{|A(s)|}  &&\\text{if} a = a^*
+            \pi(a \mid s)  &=  \\frac{\epsilon}{|A(s)|}                 &&\\text{if} a \\neq a^*
 
-            |A(s)| is the number of actions available in state s
-            a* ∈ A(s) is the greedy action in state s (i.e., a* = argmax_a Q(s, a))
+        where :math:`|A(s)|` is the number of actions available in state `s`
+        and :math:`a^* \in A(s)` is the greedy action in state `s` (i.e.,
+        :math:`a^* = \\arg \max_a Q(s, a)`).
 
         Note that epsilon-greedy policies are instances of epsilon-soft
-        policies, defined as policies for which pi(a|s) >= epsilon / |A(s)| for
-        all states and actions.
+        policies, defined as policies for which :math:`\pi(a|s) \geq \epsilon / |A(s)|`
+        for all states and actions.
 
         Parameters
         ----------
         s : int, float, or tuple
             The state number for the current observation, as returned by
-            self._obs2num[obs]
-        a : int, float, or tuple (default : None)
+            ``self._obs2num[obs]``
+        a : int, float, tuple, or None
             The action number in the current state, as returned by
-            self._action2num[obs]. If None, sample an action from the action
-            probabilities in state s, otherwise, return the probability of
-            action `a` under the epsilon-soft policy.
+            ``self._action2num[obs]``. If None, sample an action from the
+            action probabilities in state `s`, otherwise, return the
+            probability of action `a` under the epsilon-soft policy. Default is
+            None.
 
         Returns
         -------
-        If `a` is None:
-        action : int, float, or np.ndarray as returned by `self._num2action`
-            If `a` is None, returns an action sampled from the distribution
-            over actions defined by the epsilon-soft policy.
-
-        If `a` is not None:
-        action_prob : float in range [0, 1]
-            If `a` is not None, returns the probability of `a` under the
-            epsilon-soft policy.
+        action : int, float, or np.ndarray
+            If `a` is None, this is an action sampled from the distribution
+            over actions defined by the epsilon-soft policy. If `a` is not
+            None, this is the probability of `a` under the epsilon-soft policy.
         """
         E, P = self.env_info, self.parameters
 
@@ -492,30 +475,29 @@ class MonteCarloAgent(AgentBase):
 
     def _greedy(self, s, a=None):
         """
-        A greedy behavior policy. Only used when off-policy is true.
+        A greedy behavior policy.
+
+        Notes
+        -----
+        Only used when off-policy is True.
 
         Parameters
         ----------
         s : int, float, or tuple
             The state number for the current observation, as returned by
-            self._obs2num[obs]
-        a : int, float, or tuple (default : None)
+            ``self._obs2num[obs]``.
+        a : int, float, or tuple
             The action number in the current state, as returned by
-            self._action2num[obs]. If None, sample an action from the action
-            probabilities in state s, otherwise, return the probability of
-            action `a` under the greedy policy.
+            ``self._action2num[obs]``. If None, sample an action from the action
+            probabilities in state `s`, otherwise, return the probability of
+            action `a` under the greedy policy. Default is None.
 
         Returns
         -------
-        If `a` is None:
-        action : int, float, or np.ndarray as returned by `self._num2action`
-            If `a` is None, returns an action sampled from the distribution
-            over actions defined by the greedy policy.
-
-        If `a` is not None:
-        action_prob : float in range [0, 1]
-            If `a` is not None, returns the probability of `a` under the
-            greedy policy.
+        action : int, float, or np.ndarray
+            If `a` is None, this is an action sampled from the distribution
+            over actions defined by the greedy policy. If `a` is not
+            None, this is the probability of `a` under the greedy policy.
         """
         a_star = self.parameters["Q"][s, :].argmax()
         if a is None:
@@ -526,11 +508,16 @@ class MonteCarloAgent(AgentBase):
 
     def _on_policy_update(self):
         """
-        Update the Q function using an on-policy first-visit Monte Carlo
-        update:
+        Update the `Q` function using an on-policy first-visit Monte Carlo
+        update.
 
-        Q'(s, a) <- avg(reward following first visit to (s, a), across all
-                        episodes)
+        Notes
+        -----
+        The on-policy first-visit Monte Carlo update is
+
+        .. math::
+
+            Q'(s, a) \leftarrow \\text{avg}(\\text{reward following first visit to } (s, a) \\text{ across all episodes})
 
         RL agents seek to learn action values conditional on subsequent optimal
         behavior, but they need to behave non-optimally in order to explore all
@@ -556,8 +543,10 @@ class MonteCarloAgent(AgentBase):
 
     def _off_policy_update(self):
         """
-        Update Q using weighted importance sampling.
+        Update `Q` using weighted importance sampling.
 
+        Notes
+        -----
         In importance sampling updates, we account for the fact that we are
         updating a different policy from the one we used to generate behavior
         by weighting the accumulated rewards by the ratio of the probability of
@@ -597,12 +586,19 @@ class MonteCarloAgent(AgentBase):
 
     def act(self, obs):
         """
-        Behavior policy
+        Execute the behavior policy--an :math:`\epsilon`-soft policy used to
+        generate actions during training.
 
         Parameters
         ----------
-        obs : int, float, or np.ndarray as returned by `env.step(action)`
+        obs : int, float, or np.ndarray as returned by ``env.step(action)``
             An observation from the environment.
+
+        Returns
+        -------
+        action : int, float, or np.ndarray
+            An action sampled from the distribution over actions defined by the
+            epsilon-soft policy.
         """
         s = self._obs2num[obs]
         return self.behavior_policy(s)
@@ -614,9 +610,9 @@ class MonteCarloAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run an episode
+            The maximum number of steps to run an episode.
         render : bool
-            Whether to render the episode during training
+            Whether to render the episode during training.
 
         Returns
         -------
@@ -638,16 +634,16 @@ class MonteCarloAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during training
+            Whether to render the episode during training.
 
         Returns
         -------
         reward : float
-            The total reward on the episode
+            The total reward on the episode.
         steps : float
-            The number of steps taken on the episode
+            The number of steps taken on the episode.
         """
         obs = self.env.reset()
         HS = self.episode_history
@@ -681,7 +677,7 @@ class MonteCarloAgent(AgentBase):
     def update(self):
         """
         Update the parameters of the model following the completion of an
-        episode. Flush the episode history after update is complete.
+        episode. Flush the episode history after the update is complete.
         """
         H = self.hyperparameters
         if H["off_policy"]:
@@ -698,16 +694,16 @@ class MonteCarloAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during execution
+            Whether to render the episode during execution.
 
         Returns
         -------
         total_reward : float
-            The total reward on the episode
+            The total reward on the episode.
         n_steps : float
-            The total number of steps taken on the episode
+            The total number of steps taken on the episode.
         """
         H = self.episode_history
         obs = self.env.reset()
@@ -740,23 +736,6 @@ class MonteCarloAgent(AgentBase):
 
 
 class TemporalDifferenceAgent(AgentBase):
-    """
-    TD methods are an example of bootstrapping in that they update their
-    estimate for the value of state s on the basis of a previous estimate.
-
-    Advantages of TD algorithms:
-        1. They do not require a model of the environment, its reward, or its
-           next-state probability distributions.
-        2. They are implemented in an on-line, fully incremental fashion. This
-           allows them to be used in infinite-horizon cases where episodes may
-           never finish, or in cases where episodes take prohibitively long to
-           finish.
-        3. TD algorithms learn from each transition regardless of what
-           subsequent actions are taken.
-        4. In practice, TD methods have usually been found to converge faster
-           than constant-α Monte Carlo methods on stochastic tasks.
-    """
-
     def __init__(
         self,
         env,
@@ -771,43 +750,48 @@ class TemporalDifferenceAgent(AgentBase):
     ):
         """
         A temporal difference learning agent with expected SARSA (on-policy) or
-        TD(0) Q-learning (off-policy) updates. Requires a discrete action
-        space, but will try to discretize the observation space via tiling if
-        it is continuous
+        TD(0) `Q`-learning (off-policy) updates.
+
+        Notes
+        -----
+        The agent requires a discrete action space, but will try to discretize
+        the observation space via tiling if it is continuous.
 
         Parameters
         ----------
         env : gym.wrappers or gym.envs instance
-            The environment to run the agent on
-        lr : float (default: 0.05)
-            Learning rate for the Q function updates
-        epsilon : float between [0, 1] (default: 0.1)
+            The environment to run the agent on.
+        lr : float
+            Learning rate for the Q function updates. Default is 0.05.
+        epsilon : float between [0, 1]
             The epsilon value in the epsilon-soft policy. Larger values
-            encourage greater exploration during training.
-        n_tilings : int (default: 8)
-            The number of overlapping tilings to use if the env observation
+            encourage greater exploration during training. Default is 0.1.
+        n_tilings : int
+            The number of overlapping tilings to use if the ``env`` observation
             space is continuous. Unused if observation space is discrete.
-        obs_max : float or np.ndarray (default: None)
+            Default is 8.
+        obs_max : float or np.ndarray
             The value to treat as the max value of the observation space when
             calculating the grid widths if the observation space is continuous.
-            If `None`, use `env.observation_space.high`. Unused if observation
-            space is discrete.
-        obs_min : float or np.ndarray (default: None)
+            If None, use ``env.observation_space.high``. Unused if observation
+            space is discrete. Default is None.
+        obs_min : float or np.ndarray
             The value to treat as the min value of the observation space when
             calculating grid widths if the observation space is continuous. If
-            `None`, use `env.observation_space.low`. Unused if observation
-            space is discrete.
-        grid_dims : list (default: [8, 8])
+            None, use ``env.observation_space.low``. Unused if observation
+            space is discrete. Default is None.
+        grid_dims : list
            The number of rows and columns in each tiling grid if the env
            observation space is continuous. Unused if observation space is
-           discrete.
-        off_policy : bool (default: False)
+           discrete. Default is [8, 8].
+        off_policy : bool
             Whether to use a behavior policy separate from the target policy
             during training. If False, use the same epsilon-soft policy for
-            both behavior and target policies.
-        temporal_discount : float between [0, 1] (default: 0.9)
+            both behavior and target policies. Default is False.
+        temporal_discount : float between [0, 1]
             The discount factor used for downweighting future rewards. Smaller
-            values result in greater discounting of future rewards.
+            values result in greater discounting of future rewards. Default is
+            0.9.
         """
         super().__init__(env)
 
@@ -867,6 +851,25 @@ class TemporalDifferenceAgent(AgentBase):
         self.episode_history = {"state_actions": [], "rewards": []}
 
     def run_episode(self, max_steps, render=False):
+        """
+        Run the agent on a single episode without updating the priority queue
+        or performing backups.
+
+        Parameters
+        ----------
+        max_steps : int
+            The maximum number of steps to run an episode
+        render : bool
+            Whether to render the episode during training
+
+        Returns
+        -------
+        reward : float
+            The total reward on the episode, averaged over the theta samples.
+        steps : float
+            The total number of steps taken on the episode, averaged over the
+            theta samples.
+        """
         return self._episode(max_steps, render, update=False)
 
     def train_episode(self, max_steps, render=False):
@@ -876,9 +879,9 @@ class TemporalDifferenceAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run an episode
+            The maximum number of steps to run an episode.
         render : bool
-            Whether to render the episode during training
+            Whether to render the episode during training.
 
         Returns
         -------
@@ -896,21 +899,24 @@ class TemporalDifferenceAgent(AgentBase):
 
     def _episode(self, max_steps, render, update=True):
         """
-        Train agent on an episode.
+        Run or train the agent on an episode.
 
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during training
+            Whether to render the episode during training.
+        update : bool
+            Whether to perform the Q function backups after each step. Default
+            is True.
 
         Returns
         -------
         reward : float
-            The total reward on the episode
+            The total reward on the episode.
         steps : float
-            The number of steps taken on the episode
+            The number of steps taken on the episode.
         """
         self.flush_history()
 
@@ -945,7 +951,8 @@ class TemporalDifferenceAgent(AgentBase):
             # store next (state, action) tuple
             HS["state_actions"].append((s_, a_))
 
-            self.update()
+            if update:
+                self.update()
 
             if done:
                 break
@@ -956,7 +963,7 @@ class TemporalDifferenceAgent(AgentBase):
         """
         Epsilon-soft exploration policy.
 
-        In epsilon-soft policies, pi(a|s) > 0 for all s ∈ S and all a ∈ A(s) at
+        In epsilon-soft policies, :math:`\pi(a|s) > 0` for all s ∈ S and all a ∈ A(s) at
         the start of training. As learning progresses, pi gradually shifts
         closer and closer to a deterministic optimal policy.
 
@@ -1096,20 +1103,20 @@ class TemporalDifferenceAgent(AgentBase):
 
     def _off_policy_update(self, s, a, r, s_):
         """
-        Update the Q function using the TD(0) Q-learning update:
+        Update the `Q` function using the TD(0) Q-learning update:
 
             Q[s, a] <- Q[s, a] + lr * (r + temporal_discount * max_a { Q[s', a] } - Q[s, a])
 
         Parameters
         ----------
         s : int as returned by `self._obs2num`
-            The id for the state/observation at timestep t-1
+            The id for the state/observation at timestep `t-1`
         a : int as returned by `self._action2num`
-            The id for the action taken at timestep t-1
+            The id for the action taken at timestep `t-1`
         r : float
-            The reward after taking action `a` in state `s` at timestep t-1
+            The reward after taking action `a` in state `s` at timestep `t-1`
         s_ : int as returned by `self._obs2num`
-            The id for the state/observation at timestep t
+            The id for the state/observation at timestep `t`
         """
         Q, E = self.parameters["Q"], self.env_info
         n_actions = np.prod(E["n_actions_per_dim"])
@@ -1133,12 +1140,19 @@ class TemporalDifferenceAgent(AgentBase):
 
     def act(self, obs):
         """
-        Use the behavior policy to generate an action given `obs`.
+        Execute the behavior policy--an :math:`\epsilon`-soft policy used to
+        generate actions during training.
 
         Parameters
         ----------
-        obs : int, float, or np.ndarray as returned by `env.step(action)`
+        obs : int, float, or np.ndarray as returned by ``env.step(action)``
             An observation from the environment.
+
+        Returns
+        -------
+        action : int, float, or np.ndarray
+            An action sampled from the distribution over actions defined by the
+            epsilon-soft policy.
         """
         s = self._obs2num[obs]
         return self.behavior_policy(s)
@@ -1151,16 +1165,16 @@ class TemporalDifferenceAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during execution
+            Whether to render the episode during execution.
 
         Returns
         -------
         total_reward : float
-            The total reward on the episode
+            The total reward on the episode.
         n_steps : float
-            The total number of steps taken on the episode
+            The total number of steps taken on the episode.
         """
         self.flush_history()
 
@@ -1209,46 +1223,49 @@ class DynaAgent(AgentBase):
         n_simulated_actions=50,
     ):
         """
-        A Dyna-Q / Dyna-Q+ agent with full TD(0) Q-learning updates via
+        A Dyna-`Q` / Dyna-`Q+` agent with full TD(0) `Q`-learning updates via
         prioritized-sweeping.
 
         Parameters
         ----------
         env : gym.wrappers or gym.envs instance
             The environment to run the agent on
-        lr : float (default: 0.05)
-            Learning rate for the Q function updates
-        epsilon : float between [0, 1] (default: 0.1)
+        lr : float
+            Learning rate for the Q function updates. Default is 0.05.
+        epsilon : float between [0, 1]
             The epsilon value in the epsilon-soft policy. Larger values
-            encourage greater exploration during training.
-        n_tilings : int (default: 8)
+            encourage greater exploration during training. Default is 0.1.
+        n_tilings : int
             The number of overlapping tilings to use if the env observation
             space is continuous. Unused if observation space is discrete.
-        obs_max : float or np.ndarray (default: None)
+            Default is 8.
+        obs_max : float or np.ndarray or None
             The value to treat as the max value of the observation space when
             calculating the grid widths if the observation space is continuous.
-            If `None`, use `env.observation_space.high`. Unused if observation
-            space is discrete.
-        obs_min : float or np.ndarray (default: None)
+            If `None`, use ``env.observation_space.high``. Unused if observation
+            space is discrete. Default is None.
+        obs_min : float or np.ndarray or None
             The value to treat as the min value of the observation space when
             calculating grid widths if the observation space is continuous. If
-            `None`, use `env.observation_space.low`. Unused if observation
-            space is discrete.
-        grid_dims : list (default: [8, 8])
+            None, use ``env.observation_space.low``. Unused if observation
+            space is discrete. Default is None.
+        grid_dims : list
             The number of rows and columns in each tiling grid if the env
             observation space is continuous. Unused if observation space is
-            discrete.
+            discrete. Default is `[8, 8]`.
         q_plus : bool (default: False)
             Whether to add incentives for visiting states that the agent hasn't
             encountered recently
-        explore_weight : float (default: 0.05)
+        explore_weight : float
             Amount to incentivize exploring states that the agent hasn't
-            recently visited. Only used if `q_plus` is True.
-        temporal_discount : float between [0, 1] (default: 0.9)
+            recently visited. Only used if `q_plus` is True. Default is 0.05.
+        temporal_discount : float between [0, 1]
             The discount factor used for downweighting future rewards. Smaller
-            values result in greater discounting of future rewards.
-        n_simulated_actions : int (default: 50)
-            THe number of simulated actions to perform for each "real" action
+            values result in greater discounting of future rewards. Default is
+            0.9.
+        n_simulated_actions : int
+            THe number of simulated actions to perform for each "real" action.
+            Default is 50.
         """
         super().__init__(env)
 
@@ -1319,12 +1336,19 @@ class DynaAgent(AgentBase):
 
     def act(self, obs):
         """
-        Behavior policy
+        Execute the behavior policy--an :math:`\epsilon`-soft policy used to
+        generate actions during training.
 
         Parameters
         ----------
-        obs : int, float, or np.ndarray as returned by `env.step(action)`
+        obs : int, float, or np.ndarray as returned by ``env.step(action)``
             An observation from the environment.
+
+        Returns
+        -------
+        action : int, float, or np.ndarray
+            An action sampled from the distribution over actions defined by the
+            epsilon-soft policy.
         """
         s = self._obs2num[obs]
         return self.behavior_policy(s)
@@ -1431,6 +1455,21 @@ class DynaAgent(AgentBase):
         return out
 
     def update(self):
+        """
+        Update the priority queue with the most recent (state, action) pair and
+        perform random-sample one-step tabular Q-planning.
+
+        Notes
+        -----
+        The planning algorithm uses a priority queue to retrieve the
+        state-action pairs from the agent's history which will result in the
+        largest change to its `Q`-value if backed up. When the first pair in
+        the queue is backed up, the effect on each of its predecessor pairs is
+        computed. If the predecessor's priority is greater than a small
+        threshold the pair is added to the queue and the process is repeated
+        until either the queue is empty or we exceed `n_simulated_actions`
+        updates.
+        """
         s, a = self.episode_history["state_actions"][-1]
         self._update_queue(s, a)
         self._simulate_behavior()
@@ -1498,6 +1537,8 @@ class DynaAgent(AgentBase):
         Perform random-sample one-step tabular Q-planning with prioritized
         sweeping.
 
+        Notes
+        -----
         This approach uses a priority queue to retrieve the state-action pairs
         from the agent's history with largest change to their Q-values if
         backed up. When the first pair in the queue is backed up, the effect on
@@ -1541,9 +1582,9 @@ class DynaAgent(AgentBase):
 
         Parameters
         ----------
-        s : int as returned by `self._obs2num`
+        s : int as returned by ``self._obs2num``
             The id for the state/observation
-        a : int as returned by `self._action2num`
+        a : int as returned by ``self._action2num``
             The id for the action taken from state `s`
         """
         update = 0.0
@@ -1566,6 +1607,25 @@ class DynaAgent(AgentBase):
         Q[(s, a)] += self.lr * update
 
     def run_episode(self, max_steps, render=False):
+        """
+        Run the agent on a single episode without performing Q-function
+        backups.
+
+        Parameters
+        ----------
+        max_steps : int
+            The maximum number of steps to run an episode.
+        render : bool
+            Whether to render the episode during training.
+
+        Returns
+        -------
+        reward : float
+            The total reward on the episode.
+        steps : float
+            The number of steps taken on the episode.
+        """
+
         return self._episode(max_steps, render, update=False)
 
     def train_episode(self, max_steps, render=False):
@@ -1593,7 +1653,7 @@ class DynaAgent(AgentBase):
 
     def _episode(self, max_steps, render, update=True):
         """
-        Train agent on an episode.
+        Run or train the agent on an episode.
 
         Parameters
         ----------
@@ -1601,6 +1661,9 @@ class DynaAgent(AgentBase):
             The maximum number of steps to run the episode
         render : bool
             Whether to render the episode during training
+        update : bool
+            Whether to perform the Q function backups after each step. Default
+            is True.
 
         Returns
         -------
@@ -1668,16 +1731,16 @@ class DynaAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during execution
+            Whether to render the episode during execution.
 
         Returns
         -------
         total_reward : float
-            The total reward on the episode
+            The total reward on the episode.
         n_steps : float
-            The total number of steps taken on the episode
+            The total number of steps taken on the episode.
         """
         self.flush_history()
 

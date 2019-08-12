@@ -1,5 +1,3 @@
-import sys
-
 from ..utils.kernels import KernelInitializer
 
 
@@ -8,13 +6,21 @@ class KernelRegression:
         """
         A Nadaraya-Watson kernel regression model.
 
-            f(x) = sum_i w_i(x) * y_i
+        Notes
+        -----
+        The Nadaraya-Watson regression model is
 
-        where the sample weighting functions, w_i, are simply
+        .. math::
 
-            w_i(x) = k(x, x_i) / sum_j k(x, x_j)
+            f(x) = \sum_i w_i(x) y_i
 
-        with k being the kernel function.
+        where the sample weighting functions, :math:`w_i`, are simply
+
+        .. math::
+
+            w_i(x) = \frac{k(x, x_i)}{\sum_j k(x, x_j)}
+
+        with `k` being the kernel function.
 
         Observe that k-nearest neighbors (KNN) regression is a special case of
         kernel regression where the k closest observations have a weight 1/k,

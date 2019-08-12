@@ -1,5 +1,6 @@
 import heapq
 from copy import copy
+from collections import Hashable
 
 import numpy as np
 
@@ -53,6 +54,25 @@ class PQNode(object):
 
 class PriorityQueue:
     def __init__(self, capacity, heap_order="max"):
+        """
+        A priority queue implementation using a binary heap.
+
+        Notes
+        -----
+        A priority queue is a data structure useful for storing the top
+        `capacity` largest or smallest elements in a collection of values. As a
+        result of using a binary heap, ``PriorityQueue`` offers O(log n)
+        ``push`` and ``pop`` operations.
+
+        Parameters
+        ----------
+        capacity: int
+            The maximum number of items that can be held in the queue.
+        heap_order: {"max", "min"}
+            Whether the priority queue should retain the items with the
+            `capacity` smallest (`heap_order` = 'min') or `capacity` largest
+            (`heap_order` = 'max') priorities.
+        """
         assert heap_order in ["max", "min"], "heap_order must be either 'max' or 'min'"
         self.capacity = capacity
         self.heap_order = heap_order
@@ -72,6 +92,24 @@ class PriorityQueue:
         return iter(self._pq)
 
     def push(self, key, priority, val=None):
+        """
+        Add a new (key, value) pair with priority `priority` to the queue.
+
+        Notes
+        -----
+        If the queue is at capacity and `priority` exceeds the priority of the
+        item with the largest/smallest priority currently in the queue, replace
+        the current queue item with (`key`, `val`).
+
+        Parameters
+        ----------
+        key : hashable object
+            The key to insert into the queue.
+        priority : comparable
+            The priority for the `key`, `val` pair.
+        val : object
+            The value associated with `key`. Default is None.
+        """
         if self.heap_order == "max":
             priority = -1 * priority
 
@@ -85,6 +123,20 @@ class PriorityQueue:
             self.pop()
 
     def pop(self):
+        """
+        Remove the item with the largest/smallest (depending on
+        ``self.heap_order``) priority from the queue and return it.
+
+        Notes
+        -----
+        In contrast to ``self.peek``, this operation is O(log n).
+
+        Returns
+        -------
+        item : `PQNode` instance or None
+            Item with the largest/smallest priority, depending on
+            ``self.heap_order``.
+        """
         item = heapq.heappop(self._pq).to_dict()
         if self.heap_order == "max":
             item["priority"] = -1 * item["priority"]
@@ -92,6 +144,20 @@ class PriorityQueue:
         return item
 
     def peek(self):
+        """
+        Return the item with the largest/smallest (depending on
+        ``self.heap_order``) priority *without* removing it from the queue.
+
+        Notes
+        -----
+        In contrast to ``self.pop``, this operation is O(1).
+
+        Returns
+        -------
+        item : `PQNode` instance or None
+            Item with the largest/smallest priority, depending on
+            ``self.heap_order``.
+        """
         item = None
         if self._count > 0:
             item = copy(self._pq[0].to_dict())
@@ -131,8 +197,10 @@ class BallTree:
         """
         A ball tree data structure.
 
+        Notes
+        -----
         A ball tree is a binary tree in which every node defines a
-        D-dimensional hypersphere ("ball") containing a subset of the points
+        `D`-dimensional hypersphere ("ball") containing a subset of the points
         to be searched. Each internal node of the tree partitions the data
         points into two disjoint sets which are associated with different
         balls. While the balls themselves may intersect, each point is assigned
@@ -142,18 +210,20 @@ class BallTree:
 
         Parameters
         ----------
-        leaf_size : int (default: 40)
-            The maximum number of datapoints at each leaf
-        metric : function (default: None)
-            The distance metric to use for computing nearest neighbors
+        leaf_size : int
+            The maximum number of datapoints at each leaf. Default is 40.
+        metric : function or None
+            The distance metric to use for computing nearest neighbors. Default
+            is None.
 
         References
         ----------
-        - Omohundro, S. M. (1989). Five balltree construction algorithms. ICSI
-          Technical Report TR-89-063
-        - Liu, T., Moore, A., & Gray A. (2006). New algorithms for efficient
-          high-dimensional nonparametric classification. J. Mach. Learn. Res.,
-          7, 1135-1158.
+        [1] Omohundro, S. M. (1989). "Five balltree construction algorithms". *ICSI
+        Technical Report TR-89-063*.
+
+        [2] Liu, T., Moore, A., & Gray A. (2006). "New algorithms for efficient
+        high-dimensional nonparametric classification". *J. Mach. Learn. Res.,
+        7*, 1135-1158.
         """
         self.root = None
         self.leaf_size = leaf_size
@@ -161,19 +231,22 @@ class BallTree:
 
     def fit(self, X, y=None):
         """
-        Build a ball tree recursively using the O(M log N) k-d construction
+        Build a ball tree recursively using the O(M log N) `k`-d construction
         algorithm.
 
-        Recursively divides data into nodes defined by a centroid C and radius
-        r such that each point below the node lies within the hyper-sphere
-        defined by C and r.
+        Notes
+        -----
+        Recursively divides data into nodes defined by a centroid `C` and radius
+        `r` such that each point below the node lies within the hyper-sphere
+        defined by `C` and `r`.
 
         Parameters
         ----------
         X : numpy array of shape (N, M)
-            An array of N examples each with M features
-        y : numpy array of shape (N, ...) (default: None)
-            An array of target values / labels associated with the entries in X
+            An array of `N` examples each with `M` features.
+        y : numpy array of shape (N, ...) or None
+            An array of target values / labels associated with the entries in
+            `X`. Default is None.
         """
         centroid, left_X, left_y, right_X, right_y = self._split(X, y)
         self.root = BallTreeNode(centroid=centroid)
@@ -216,7 +289,7 @@ class BallTree:
 
     def nearest_neighbors(self, k, x):
         """
-        Find the k nearest neighbors in the ball tree to a query vector `x`
+        Find the `k` nearest neighbors in the ball tree to a query vector `x`
         using the KNS1 algorithm.
 
         Parameters
@@ -228,11 +301,11 @@ class BallTree:
 
         Returns
         -------
-        nearest : list of `PQNode`s of length k
-            List of the k points in X to closest to the query vector. The `key`
-            attribute of each PQNode contains the point itself, the `val`
-            attribute contains its target, and the `distance` attribute
-            contains its distance to the query vector.
+        nearest : list of ``PQNode``s of length `k`
+            List of the `k` points in `X` to closest to the query vector. The
+            ``key`` attribute of each ``PQNode`` contains the point itself, the
+            ``val`` attribute contains its target, and the ``distance``
+            attribute contains its distance to the query vector.
         """
         # maintain a max-first priority queue with priority = distance to x
         PQ = PriorityQueue(capacity=k, heap_order="max")
@@ -271,32 +344,37 @@ class BallTree:
 class DiscreteSampler:
     def __init__(self, probs, log=False, with_replacement=True):
         """
-        Sample from an arbitrary multinomial PMF over the first N nonnegative
+        Sample from an arbitrary multinomial PMF over the first `N` nonnegative
         integers using Vose's algorithm for the alias method.
 
-        For an overview of the various implementations of the alias method, see
-        Keith Schwarz's discussion at `http://www.keithschwarz.com/darts-dice-coins/`
-
+        Notes
+        -----
         Vose's algorithm takes O(n) time to initialize, requires O(n) memory,
         and generates samples in constant time.
+
+        References
+        ----------
+        [1] Walker, A. J. (1977) "An efficient method for generating discrete
+        random variables with general distributions". *ACM Transactions on
+        Mathematical Software, 3(3)*, 253-256.
+
+        [2] Vose, M. D. (1991) "A linear algorithm for generating random numbers
+        with a given distribution". *IEEE Trans. Softw. Eng., 9*, 972-974.
+
+        [3] Schwarz, K (2011) "Darts, dice, and coins: sampling from a discrete
+        distribution". http://www.keithschwarz.com/darts-dice-coins/
 
         Parameters
         ----------
         probs : numpy array of length (N,)
-            A list of probabilities of the N outcomes in the sample space.
-            probs[i] returns the probability of outcome i.
-        log : bool (default: False)
-            Whether the probabilities in `probs` are in logspace.
-        with_replacement : bool (default: True)
-            Whether to generate samples with or without replacement
-
-        References
-        ----------
-        - Walker, A. J. (1977). An efficient method for generating discrete
-          random variables with general distributions. ACM Transactions on
-          Mathematical Software. 3(3), 253-256.
-        - Vose, M. D. (1991). A linear algorithm for generating random numbers
-          with a given distribution, IEEE Trans. Softw. Eng., 9, 972-974.
+            A list of probabilities of the `N` outcomes in the sample space.
+            `probs[i]` returns the probability of outcome `i`.
+        log : bool
+            Whether the probabilities in `probs` are in logspace. Default is
+            False.
+        with_replacement : bool
+            Whether to generate samples with or without replacement. Default is
+            True.
         """
         if not isinstance(probs, np.ndarray):
             probs = np.array(probs)
@@ -347,14 +425,14 @@ class DiscreteSampler:
 
         Parameters
         ----------
-        n_samples: int (default: 1)
-            The number of samples to generate
+        n_samples: int
+            The number of samples to generate. Default is 1.
 
         Returns
         -------
         sample : numpy array of shape (n_samples,)
             A collection of draws from the distribution defined by `probs`.
-            Each sample is an int in [0, N)
+            Each sample is an int in the range `[0, N)`.
         """
         return self.sample(n_samples)
 
@@ -365,14 +443,14 @@ class DiscreteSampler:
 
         Parameters
         ----------
-        n_samples: int (default: 1)
-            The number of samples to generate
+        n_samples: int
+            The number of samples to generate. Default is 1.
 
         Returns
         -------
         sample : numpy array of shape (n_samples,)
             A collection of draws from the distribution defined by `probs`.
-            Each sample is an int in [0, N)
+            Each sample is an int in the range `[0, N)`.
         """
         ixs = np.random.randint(0, self.N, n_samples)
         p = np.exp(self.prob_table[ixs]) if self.log else self.prob_table[ixs]
@@ -388,3 +466,55 @@ class DiscreteSampler:
                 unique = list(set(samples))
 
         return np.array(samples, dtype=int)
+
+
+#######################################################################
+#                                Dict                                 #
+#######################################################################
+
+
+class Dict(dict):
+    def __init__(self, encoder=None):
+        """
+        A dictionary subclass which returns the key value if it is not in the
+        dict.
+
+        Parameters
+        ----------
+        encoder : function or None
+            A function which is applied to a key before adding / retrieving it
+            from the dictionary. If None, the function defaults to the
+            identity. Default is None.
+        """
+        super(Dict, self).__init__()
+        self._encoder = encoder
+        self._id_max = 0
+
+    def __setitem__(self, key, value):
+        if self._encoder is not None:
+            key = self._encoder(key)
+        elif not isinstance(key, Hashable):
+            key = tuple(key)
+        super(Dict, self).__setitem__(key, value)
+
+    def _encode_key(self, key):
+        D = super(Dict, self)
+        enc_key = self._encoder(key)
+        if D.__contains__(enc_key):
+            val = D.__getitem__(enc_key)
+        else:
+            val = self._id_max
+            D.__setitem__(enc_key, val)
+            self._id_max += 1
+        return val
+
+    def __getitem__(self, key):
+        self._key = copy.deepcopy(key)
+        if self._encoder is not None:
+            return self._encode_key(key)
+        elif not isinstance(key, Hashable):
+            key = tuple(key)
+        return super(Dict, self).__getitem__(key)
+
+    def __missing__(self, key):
+        return self._key

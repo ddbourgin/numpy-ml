@@ -28,25 +28,26 @@ class DecisionTree:
         seed=None,
     ):
         """
-        A decision tree model for regression or classification problems.
+        A decision tree model for regression and classification problems.
 
         Parameters
         ----------
-        classifier : bool (default: True)
-            Whether to treat target values as categorical (True) or
-            continuous (False)
-        max_depth: int (default: None)
+        classifier : bool
+            Whether to treat target values as categorical (``classifier =
+            True``) or continuous (``classifier = False``). Default is True.
+        max_depth: int or None
             The depth at which to stop growing the tree. If None, grow the tree
-            until all leaves are pure.
-        n_feats : int (default: None)
+            until all leaves are pure. Default is None.
+        n_feats : int
             Specifies the number of features to sample on each split. If None,
-            use all features on each split.
-        criterion : str (default: 'entropy')
+            use all features on each split. Default is None.
+        criterion : {'mse', 'entropy', 'gini'}
             The error criterion to use when calculating splits. When
             `classifier` is False, valid entries are {'mse'}. When `classifier`
-            is True, valid entries are {'entropy', 'gini'}.
-        seed : int (default: None)
-            Seed for the random number generator
+            is True, valid entries are {'entropy', 'gini'}. Default is
+            'entropy'.
+        seed : int or None
+            Seed for the random number generator. Default is None.
         """
         if seed:
             np.random.seed(seed)
@@ -68,16 +69,16 @@ class DecisionTree:
 
     def fit(self, X, Y):
         """
-        Trains a binary decision tree classifier.
+        Fit a binary decision tree to a dataset.
 
         Parameters
         ----------
         X : numpy array of shape (N, M)
-            The training data of N examples, each with M features
+            The training data of `N` examples, each with `M` features
         Y : numpy array of shape (N,)
-            An array of integer labels ranging between [0, n_classes-1] for
-            each example in X if `self.classifier`=True else the set of target
-            values for each example in X.
+            An array of integer class labels for each example in `X` if
+            ``self.classifier = True``, otherwise the set of target values for
+            each example in `X`.
         """
         self.n_classes = max(Y) + 1 if self.classifier else None
         self.n_feats = X.shape[1] if not self.n_feats else min(self.n_feats, X.shape[1])
@@ -85,35 +86,35 @@ class DecisionTree:
 
     def predict(self, X):
         """
-        Use the trained decision tree to classify or predict the examples in X.
+        Use the trained decision tree to classify or predict the examples in `X`.
 
         Parameters
         ----------
         X : numpy array of shape (N, M)
-            The training data of N examples, each with M features
+            The training data of `N` examples, each with `M` features
 
         Returns
         -------
         preds : numpy array of shape (N,)
-            The integer class labels predicted for each example in X if
-            classifier = True, otherwise the predicted target values.
+            The integer class labels predicted for each example in `X` if
+            ``self.classifier = True``, otherwise the predicted target values.
         """
         return np.array([self._traverse(x, self.root) for x in X])
 
     def predict_class_probs(self, X):
         """
         Use the trained decision tree to return the class probabilities for the
-        examples in X.
+        examples in `X`.
 
         Parameters
         ----------
         X : numpy array of shape (N, M)
-            The training data of N examples, each with M features
+            The training data of `N` examples, each with `M` features
 
         Returns
         -------
         preds : numpy array of shape (N, n_classes)
-            The class probabilities predicted for each example in X
+            The class probabilities predicted for each example in `X`.
         """
         assert self.classifier, "`predict_class_probs` undefined for classifier = False"
         return np.array([self._traverse(x, self.root, prob=True) for x in X])

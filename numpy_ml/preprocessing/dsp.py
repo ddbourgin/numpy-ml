@@ -681,8 +681,8 @@ def mel2hz(mel, formula="htk"):
         Markov Model Toolkit, and described in O'Shaughnessy (1987). "slaney"
         uses the formula used in the MATLAB auditory toolbox (Slaney, 1998)
 
-    Parameters
-    ----------
+    Returns
+    -------
     hz : numpy array of shape (N, ...)
         The frequencies of the items in `mel`, in Hz
     """
@@ -706,8 +706,8 @@ def hz2mel(hz, formula="htk"):
         Markov Model Toolkit, and described in O'Shaughnessy (1987). "slaney"
         uses the formula used in the MATLAB auditory toolbox (Slaney, 1998)
 
-    Parameters
-    ----------
+    Returns
+    -------
     mel : numpy array of shape (N, ...)
         An array of mel frequencies to convert
     """
