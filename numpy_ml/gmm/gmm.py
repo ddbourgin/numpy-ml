@@ -10,21 +10,38 @@ class GMM(object):
 
         Parameters
         ----------
-        C : int (default: 3)
-            The number of clusters / mixture components in the GMM
-        seed : int (default: None)
-            Seed for the random number generator
+        C : int
+            The number of clusters / mixture components in the GMM. Default is
+            3.
+        seed : int
+            Seed for the random number generator. Default is None.
+
+        Attributes
+        ----------
+        N : int
+            The number of examples in the training dataset.
+        d : int
+            The dimension of each example in the training dataset.
+        pi : numpy array of shape (C,)
+            The cluster priors.
+        Q : numpy array of shape (N, C)
+            The variational distribution q(T).
+        mu : numpy array of shape (C, d)
+            The cluster means.
+        sigma : numpy array of shape (C, d, d)
+            The cluster covariance matrices.
         """
         self.C = C  # number of clusters
         self.N = None  # number of objects
         self.d = None  # dimension of each object
+        self.seed = seed
 
-        if seed:
-            np.random.seed(seed)
+        if self.seed:
+            np.random.seed(self.seed)
 
     def _initialize_params(self):
         """
-        Randomly initialize the starting GMM parameters
+        Randomly initialize the starting GMM parameters.
         """
         C, d = self.C, self.d
         rr = np.random.rand(C)
@@ -41,7 +58,7 @@ class GMM(object):
 
     def likelihood_lower_bound(self):
         """
-        Compute the LLB under the current GMM parameters
+        Compute the LLB under the current GMM parameters.
         """
         N = self.N
         C = self.C
@@ -74,23 +91,24 @@ class GMM(object):
         Parameters
         ----------
         X : numpy array of shape (N, d)
-            A collection of `N` training data points, each with dimension `d`
-        max_iter : int (default: 100)
+            A collection of `N` training data points, each with dimension `d`.
+        max_iter : int
             The maximum number of EM updates to perform before terminating
-            training
-        tol : float (default 1e-3)
+            training. Default is 100.
+        tol : float
             The convergence tolerance. Training is terminated if the difference
             in VLB between the current and previous iteration is less than
-            `tol`.
-        verbose : bool (default: False)
-            Whether to print the VLB at each training iteration.
+            `tol`. Default is 1e-3.
+        verbose : bool
+            Whether to print the VLB at each training iteration. Default is
+            False.
 
         Returns
         -------
-        success : 0 or -1
+        success : {0, -1}
             Whether training terminated without incident (0) or one of the
             mixture components collapsed and training was halted prematurely
-            (-1)
+            (-1).
         """
         self.X = X
         self.N = X.shape[0]  # number of objects

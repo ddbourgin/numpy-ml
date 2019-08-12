@@ -8,17 +8,39 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        A : numpy array of shape (N, N) (default: None)
+        A : numpy array of shape (N, N) or None
             The transition matrix between latent states in the HMM. Index i,j
             gives the probability of transitioning from latent state i to
-            latent state j.
-        B : numpy array of shape (N, V) (default: None)
+            latent state j. Default is None.
+        B : numpy array of shape (N, V) or None
             The emission matrix. Entry i,j gives the probability of latent
-            state i emitting an observation of type j.
-        pi : numpy array of shape (N,) (default: None)
-            The prior probability of each latent state.
-        eps : float (default : None)
-            Epsilon value to avoid log(0) errors
+            state i emitting an observation of type j. Default is None.
+        pi : numpy array of shape (N,) or None
+            The prior probability of each latent state. If None, use a uniform
+            prior over states. Default is None.
+        eps : float or None
+            Epsilon value to avoid :math:`\log(0)` errors. If None, defaults to
+            the machine epsilon. Default is None.
+
+        Attributes
+        ----------
+        A : numpy array of shape (N, N)
+            The transition matrix between latent states in the HMM. Index `i`,
+            `j` gives the probability of transitioning from latent state `i` to
+            latent state `j`.
+        B : numpy array of shape (N, V)
+            The emission matrix. Entry `i`, `j` gives the probability of latent
+            state `i` emitting an observation of type `j`.
+        N : int
+            The number of unique latent states
+        V : int
+            The number of unique observation types
+        O : numpy array of shape (I, T)
+            The collection of observed training sequences.
+        I : int
+            The number of sequences in `O`.
+        T : int
+            The number of observations in each sequence in `O`.
         """
         self.eps = np.finfo(float).eps if eps is None else eps
 
@@ -56,7 +78,23 @@ class MultinomialHMM:
 
     def generate(self, n_steps, latent_state_types, obs_types):
         """
-        Sample sequences from the HMM.
+        Sample a sequence from the HMM.
+
+        Parameters
+        ----------
+        n_steps : int
+            The length of the generated sequence
+        latent_state_types : numpy array of shape (N,)
+            A collection of labels for the latent states
+        obs_types : numpy array of shape (V,)
+            A collection of labels for the observations
+
+        Returns
+        -------
+        states : numpy array of shape (n_steps,)
+            The sampled latent states.
+        emissions : numpy array of shape (n_steps,)
+            The sampled emissions.
         """
         # sample the initial latent state
         s = np.random.multinomial(1, self.pi).argmax()
@@ -78,29 +116,38 @@ class MultinomialHMM:
 
     def log_likelihood(self, O):
         """
-        Given the HMM parameterized by (A, B, pi) and an observation sequence
-        O, compute the marginal likelihood of the observations: P(O|A,B,pi),
-        summing over latent states.
+        Given the HMM parameterized by :math:`(A`, B, \pi)` and an observation
+        sequence `O`, compute the marginal likelihood of the observations:
+        :math:`P(O|A,B,\pi)`, summing over latent states.
 
-        This is done efficiently via DP using the forward algorithm, which
-        produces a 2D trellis, `forward` (sometimes referred to as `alpha` in the
-        literature), where entry i,j represents the probability under the HMM
-        of being in latent state i after seeing the first j observations:
+        Notes
+        -----
+        The log likelihood is computed efficiently via DP using the forward
+        algorithm, which produces a 2D trellis, ``forward`` (sometimes referred
+        to as `alpha` in the literature), where entry `i`, `j` represents the
+        probability under the HMM of being in latent state `i` after seeing the
+        first `j` observations:
 
-            forward[i,j] = P(o_1,o_2,...,o_j,q_j=i|A,B,pi)
+        .. math:: \mathtt{forward[i,j]} = P(o_1,o_2,...,o_j,q_j=i|A,B,\pi)
 
-        Here q_j = i indicates that the hidden state at time j is of type i.
+        Here :math:`q_j = i` indicates that the hidden state at time `j` is of
+        type `i`.
 
         The DP step is:
 
-            forward[i,j] = sum_{s'=1}^N forward[s',j-1] * A[s',i] * B[i,o_j]
-                         = sum_{s'=1}^N P(o_1,o_2,...,o_{j-1},q_{j-1}=s'|A,B,pi) *
-                           P(q_j=i|q_{j-1}=s') * P(o_j|q_j=i)
+        .. math::
 
-        In words, forward[i,j] is the weighted sum of the values computed on
+            \mathtt{forward[i,j]}  &=  \sum_{s'=1}^N \mathtt{forward[s',j-1]}
+            \cdot \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
+
+                                   &=  \sum_{s'=1}^N
+                                   P(o_1,o_2,...,o_{j-1},q_{j-1}=s'|A,B,\pi) \cdot
+                                   P(q_j=i|q_{j-1}=s') \cdot P(o_j|q_j=i)
+
+        In words, ``forward[i,j]`` is the weighted sum of the values computed on
         the previous timestep. The weight on each previous state value is the
-        product of the probability of transitioning from that state to state i
-        and the probability of emitting observation j in state i.
+        product of the probability of transitioning from that state to state `i`
+        and the probability of emitting observation `j` in state `i`.
 
         Parameters
         ----------
@@ -110,7 +157,7 @@ class MultinomialHMM:
         Returns
         -------
         likelihood : float
-            The likelihood of the observations O under the HMM.
+            The likelihood of the observations `O` under the HMM.
         """
         if O.ndim == 1:
             O = O.reshape(1, -1)
@@ -126,62 +173,66 @@ class MultinomialHMM:
 
     def decode(self, O):
         """
-        Given the HMM parameterized by (A, B, pi) and an observation sequence O
-        = o_1, ..., o_T, compute the most probable sequence of latent states, Q
-        = q_1, ..., q_T.
+        Given the HMM parameterized by :math:`(A, B, \pi)` and an observation
+        sequence :math:`O = o_1, \ldots, o_T`, compute the most probable
+        sequence of latent states, :math:`Q = q_1, \ldots, q_T`.
 
-        This is done efficiently via DP using the Viterbi algorithm, which
-        produces a 2D trellis, `viterbi`, where entry i,j represents the
-        probability under the HMM of being in state i at time j after having
-        passed through the *most probable* state sequence q_1,...,q_{j-1}:
+        Notes
+        -----
+        HMM decoding is done efficiently via DP using the Viterbi algorithm,
+        which produces a 2D trellis, ``viterbi``, where entry `i`, `j` represents the
+        probability under the HMM of being in state `i` at time `j` after having
+        passed through the *most probable* state sequence :math:`q_1,...,q_{j-1}`:
 
-            viterbi[i,j] = max_{q_1,...,q_{j-1}} P(o_1,...,o_j,q_1,...,q_{j-1},q_j=i|A,B,pi)
+        .. math:: \mathtt{viterbi[i,j]} = \max_{q_1,...,q_{j-1}} P(o_1,...,o_j,q_1,...,q_{j-1},q_j=i|A,B,\pi)
 
-        Here q_j = i indicates that the hidden state at time j is of type i,
-        and max_{q_1,...,q_{j-1}} represents the maximum over all possible
-        latent state sequences for the first j-1 observations.
+        Here :math:`q_j = i` indicates that the hidden state at time `j` is of
+        type `i`, and :math:`\max_{q_1,...,q_{j-1}}` represents the maximum over
+        all possible latent state sequences for the first `j-1` observations.
 
         The DP step is:
 
-            viterbi[i,j] = max_{s'=1}^N viterbi[s',j-1] * A[s',i] * B[i,o_j]
-                         = max_{s'=1}^N P(o_1,...,o_j,q_1,...,q_{j-1},q_j=i|A,B,pi) *
-                           P(q_j=i|q_{j-1}=s') * P(o_j|q_j=i)
+        .. math::
 
-        In words, viterbi[i,j] is the weighted sum of the values computed on
-        the previous timestep. The weight on each value is the product of the
-        probability of transitioning from that state to state i and the
-        probability of emitting observation j in state i.
+            \mathtt{viterbi[i,j]}  &=  \max_{s'=1}^N \mathtt{viterbi[s',j-1]} \cdot
+            \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
+
+                                   &=  \max_{s'=1}^N
+                                   P(o_1,...,o_j,q_1,...,q_{j-1},q_j=i|A,B,\pi) \cdot
+                                   P(q_j=i|q_{j-1}=s') \cdot P(o_j|q_j=i)
+
+        In words, ``viterbi[i,j]`` is the weighted sum of the values computed
+        on the previous timestep. The weight on each value is the product of
+        the probability of transitioning from that state to state `i` and the
+        probability of emitting observation `j` in state `i`.
 
         To compute the most probable state sequence we maintain a second
-        trellis, `back_pointer`, whose i,j entry contains the value of the
-        latent state at timestep j-1 that is most likely to lead to latent
-        state i at timestep j.
+        trellis, ``back_pointer``, whose `i`, `j` entry contains the value of the
+        latent state at timestep `j-1` that is most likely to lead to latent
+        state `i` at timestep `j`.
 
-        When we have completed the `viterbi` and `back_pointer` trellises for
-        all T timseteps/observations, we greedily move backwards through the
-        `back_pointer` trellis to construct the best path for the full sequence
-        of observations.
+        When we have completed the ``viterbi`` and ``back_pointer`` trellises for
+        all `T` timseteps/observations, we greedily move backwards through the
+        ``back_pointer`` trellis to construct the best path for the full
+        sequence of observations.
 
         Parameters
         ----------
         O : np.array of shape (T,)
-            An observation sequence of length T
+            An observation sequence of length `T`.
 
         Returns
         -------
         best_path : list of length T
-            The most probable sequence of latent states for observations O
+            The most probable sequence of latent states for observations `O`.
         best_path_prob : float
             The probability of the latent state sequence in `best_path` under
-            the HMM
+            the HMM.
         """
         eps = self.eps
 
         if O.ndim == 1:
             O = O.reshape(1, -1)
-
-        # observations
-        #  self.O = O
 
         # number of observations in each sequence
         T = O.shape[1]
@@ -228,35 +279,40 @@ class MultinomialHMM:
     def _forward(self, Obs):
         """
         Computes the forward probability trellis for an HMM parameterized by
-        (A, B, pi). `forward` (sometimes referred to as `alpha` in the HMM
-        literature), is a 2D trellis where entry i,j represents the probability
-        under the HMM of being in latent state i after seeing the first j
+        :math:`(A, B, \pi)`.
+
+        Notes
+        -----
+        The forward trellis (sometimes referred to as `alpha` in the HMM
+        literature), is a 2D array where entry `i`, `j` represents the probability
+        under the HMM of being in latent state `i` after seeing the first `j`
         observations:
 
-            forward[i,j] = P(o_1,o_2,...,o_j,q_j=i|A,B,pi)
+        .. math:: \mathtt{forward[i,j]} = P(o_1,o_2,...,o_j,q_j=i|A,B,\pi)
 
-        Here q_j = i indicates that the hidden state at time j is of type i.
+        Here :math:`q_j = i` indicates that the hidden state at time `j` is of
+        type `i`.
 
-        The DP step is:
+        The DP step is::
 
             forward[i,j] = sum_{s'=1}^N forward[s',j-1] * A[s',i] * B[i,o_j]
                          = sum_{s'=1}^N P(o_1,o_2,...,o_{j-1},q_{j-1}=s'|A,B,pi) *
                            P(q_j=i|q_{j-1}=s') * P(o_j|q_j=i)
 
-        In words, forward[i,j] is the weighted sum of the values computed on
-        the previous timestep. The weight on each previous state value is the
-        product of the probability of transitioning from that state to state i
-        and the probability of emitting observation j in state i.
+        In words, ``forward[i,j]`` is the weighted sum of the values computed
+        on the previous timestep. The weight on each previous state value is
+        the product of the probability of transitioning from that state to
+        state `i` and the probability of emitting observation `j` in state `i`.
 
         Parameters
         ----------
         Obs : numpy array of shape (T,)
-            An observation sequence of length T
+            An observation sequence of length `T`.
 
         Returns
         -------
         forward : numpy array of shape (N, T)
-            The forward trellis
+            The forward trellis.
         """
         eps = self.eps
         T = Obs.shape[0]
@@ -283,37 +339,41 @@ class MultinomialHMM:
 
     def _backward(self, Obs):
         """
-        Computes the backward probability trellis for an HMM parameterized by
-        (A, B, pi). `backward` (sometimes referred to as `beta` in the HMM
-        literature), is a 2D trellis where entry i,j represents the probability
-        of seeing the observations from time j+1 onward given that the HMM
-        is in state i at time j:
+        Compute the backward probability trellis for an HMM parameterized by
+        :math:`(A, B, \pi)`.
 
-            backward[i,j] = P(o_{j+1},o_{j+2},...,o_T|q_j=i,A,B,pi)
+        Notes
+        -----
+        The backward trellis (sometimes referred to as `beta` in the HMM
+        literature), is a 2D array where entry `i`,`j` represents the probability
+        of seeing the observations from time `j+1` onward given that the HMM is
+        in state `i` at time `j`
 
-        Here q_j = i indicates that the hidden state at time j is of type i.
+        .. math:: \mathtt{backward[i,j]} = P(o_{j+1},o_{j+2},...,o_T|q_j=i,A,B,\pi)
 
-        The DP step is:
+        Here :math:`q_j = i` indicates that the hidden state at time `j` is of type `i`.
+
+        The DP step is::
 
             backward[i,j] = sum_{s'=1}^N backward[s',j+1] * A[i, s'] * B[s',o_{j+1}]
                           = sum_{s'=1}^N P(o_{j+1},o_{j+2},...,o_T|q_j=i,A,B,pi) *
                             P(q_{j+1}=s'|q_{j}=i) * P(o_{j+1}|q_{j+1}=s')
 
-        In words, backward[i,j] is the weighted sum of the values computed on
-        the following timestep. The weight on each state value from the j+1'th
-        timestep is the product of the probability of transitioning from state
-        i to that state and the probability of emitting observation j+1 from
-        that state.
+        In words, ``backward[i,j]`` is the weighted sum of the values computed
+        on the following timestep. The weight on each state value from the
+        `j+1`'th timestep is the product of the probability of transitioning from
+        state i to that state and the probability of emitting observation `j+1`
+        from that state.
 
         Parameters
         ----------
         Obs : numpy array of shape (T,)
-            A single observation sequence of length T
+            A single observation sequence of length `T`.
 
         Returns
         -------
         backward : numpy array of shape (N, T)
-            The backward trellis
+            The backward trellis.
         """
         eps = self.eps
         T = Obs.shape[0]
@@ -341,41 +401,46 @@ class MultinomialHMM:
         self, O, latent_state_types, observation_types, pi=None, tol=1e-5, verbose=False
     ):
         """
-        Given an observation sequence O and the set of possible latent states,
-        learn the MLE HMM parameters A and B.
+        Given an observation sequence `O` and the set of possible latent states,
+        learn the MLE HMM parameters `A` and `B`.
 
-        This is done iterativly using the Baum-Welch/Forward-Backward
-        algorithm, a special case of the EM algorithm. We start with an intial
-        estimate for the transition (A) and emission (B) matrices and then use
-        this to derive better and better estimates by computing the forward
-        probability for an observation and then dividing that probability mass
-        among all the different paths that contributed to it.
+        Notes
+        -----
+        Model fitting is done iterativly using the Baum-Welch/Forward-Backward
+        algorithm, a special case of the EM algorithm.
+
+        We begin with an intial estimate for the transition (`A`) and emission
+        (`B`) matrices and then use these to derive better and better estimates
+        by computing the forward probability for an observation and then
+        dividing that probability mass among all the paths that contributed to
+        it.
 
         Parameters
         ----------
         O : np.array of shape (I, T)
-            The set of I training observations, each of length T
+            The set of `I` training observations, each of length `T`.
         latent_state_types : list of length N
-            The collection of valid latent states
+            The collection of valid latent states.
         observation_types : list of length V
-            The collection of valid observation states
-        pi : numpy array of shape (N,) (default : None)
-            The prior probability of each latent state. If `None`, assume each
-            latent state is equally likely a priori
-        tol : float (default 1e-5)
+            The collection of valid observation states.
+        pi : numpy array of shape (N,)
+            The prior probability of each latent state. If None, assume each
+            latent state is equally likely a priori. Default is None.
+        tol : float
             The tolerance value. If the difference in log likelihood between
-            two epochs is less than this value, terminate training.
-        verbose : bool (default : True)
-            Print training stats after each epoch
+            two epochs is less than this value, terminate training. Default is
+            1e-5.
+        verbose : bool
+            Print training stats after each epoch. Default is True.
 
         Returns
         -------
         A : numpy array of shape (N, N)
-            The estimated transition matrix
+            The estimated transition matrix.
         B : numpy array of shape (N, V)
-            The estimated emission matrix
+            The estimated emission matrix.
         pi : numpy array of shape (N,)
-            The estimated prior probabilities of each latent state
+            The estimated prior probabilities of each latent state.
         """
         if O.ndim == 1:
             O = O.reshape(1, -1)
@@ -426,13 +491,13 @@ class MultinomialHMM:
     def _Estep(self):
         """
         Run a single E-step update for the Baum-Welch/Forward-Backward
-        algorithm. This step estimates xi and gamma, the excepted state-state
-        transition counts and the expected state-occupancy counts,
+        algorithm. This step estimates ``xi`` and ``gamma``, the excepted
+        state-state transition counts and the expected state-occupancy counts,
         respectively.
 
-        xi[i,j,k] gives the probability of being in state i at time k and
-        state j at time k+1 given the observed sequence O and the current
-        estimates for transition (A) and emission (B) matrices:
+        ``xi[i,j,k]`` gives the probability of being in state `i` at time `k`
+        and state `j` at time `k+1` given the observed sequence `O` and the
+        current estimates for transition (`A`) and emission (`B`) matrices::
 
             xi[i,j,k] = P(q_k=i,q_{k+1}=j|O,A,B,pi)
                       = P(q_k=i,q_{k+1}=j,O|A,B,pi) / P(O|A,B,pi)
@@ -446,21 +511,21 @@ class MultinomialHMM:
                             self.B[i, o_{k+1}] * bwd[i, k + 1]
                         ] / fwd[:, T].sum()
 
-        The expected number of transitions from state i to state j across the
-        entire sequence is then the sum over all timesteps: xi[i,j,:].sum().
+        The expected number of transitions from state `i` to state `j` across the
+        entire sequence is then the sum over all timesteps: ``xi[i,j,:].sum()``.
 
-        gamma[i,j] gives the probability of being in state i at time j:
+        ``gamma[i,j]`` gives the probability of being in state `i` at time `j`
 
-            gamma[i,j] = P(q_j=i|O,A,B,pi)
+        .. math:: \mathtt{gamma[i,j]{ = P(q_j=i|O,A,B,\pi)
 
         Returns
         -------
         gamma : numpy array of shape (I, N, T)
-            The estimated state-occupancy count matrix
+            The estimated state-occupancy count matrix.
         xi : numpy array of shape (I, N, N, T)
-            The estimated state-state transition count matrix
+            The estimated state-state transition count matrix.
         phi : numpy array of shape (I, N)
-            The estimated prior counts for each latent state
+            The estimated prior counts for each latent state.
         """
         eps = self.eps
 
@@ -502,20 +567,20 @@ class MultinomialHMM:
         Parameters
         ----------
         gamma : numpy array of shape (I, N, T)
-            The estimated state-occupancy count matrix
+            The estimated state-occupancy count matrix.
         xi : numpy array of shape (I, N, N, T)
-            The estimated state-state transition count matrix
+            The estimated state-state transition count matrix.
         phi : numpy array of shape (I, N)
-            The estimated starting count matrix for each latent state
+            The estimated starting count matrix for each latent state.
 
         Returns
         -------
         A : numpy array of shape (N, N)
-            The estimated transition matrix
+            The estimated transition matrix.
         B : numpy array of shape (N, V)
-            The estimated emission matrix
+            The estimated emission matrix.
         pi : numpy array of shape (N,)
-            The estimated prior probabilities for each latent state
+            The estimated prior probabilities for each latent state.
         """
         eps = self.eps
 
