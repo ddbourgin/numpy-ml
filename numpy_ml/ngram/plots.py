@@ -8,7 +8,7 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("notebook", font_scale=1)
 
-from ngram import MLENGram, AdditiveNGram, GoodTuringNGram
+from .ngram import MLENGram, AdditiveNGram, GoodTuringNGram
 
 
 def plot_count_models(GT, N):
