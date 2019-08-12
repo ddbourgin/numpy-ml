@@ -1,9 +1,6 @@
-import sys
 import textwrap
 from abc import ABC, abstractmethod
 from collections import Counter
-
-sys.path.append("..")
 
 import numpy as np
 
@@ -16,8 +13,10 @@ class NGramBase(ABC):
         """
         A simple word-level N-gram language model.
 
-        NB. This is not optimized code and will be slow for large corpora. To
-        see how industry-scale NGram models are handled, see the SRLIM-format:
+        Notes
+        -----
+        This is not optimized code and will be slow for large corpora. To see
+        how industry-scale NGram models are handled, see the SRLIM-format:
 
             http://www.speech.sri.com/projects/srilm/
         """
@@ -35,22 +34,25 @@ class NGramBase(ABC):
 
     def train(self, corpus_fp, vocab=None, encoding=None):
         """
-        Compile the n-gram counts for the text(s) in `corpus_fp`. Upon
-        completion the `self.counts` attribute will store dictionaries of the
-        N, N-1, ..., 1-gram counts.
+        Compile the n-gram counts for the text(s) in `corpus_fp`.
+
+        Notes
+        -----
+        After running `train`, the ``self.counts`` attribute will store
+        dictionaries of the `N`, `N-1`, ..., 1-gram counts.
 
         Parameters
         ----------
         corpus_fp : str
-            The path to a newline-separated text corpus file
-        vocab : `preprocessing.nlp.Vocabulary` instance (default: None)
+            The path to a newline-separated text corpus file.
+        vocab : `preprocessing.nlp.Vocabulary` instance or None
             If not `None`, only the words in `vocab` will be used to construct
             the language model; all out-of-vocabulary words will either be
-            mappend to <unk> (if self.unk = True) or removed (if self.unk =
-            False).
-        encoding : str (default: None)
+            mappend to ``<unk>`` (if ``self.unk = True``) or removed (if ``self.unk =
+            False``). Default is None.
+        encoding : str or None
             Specifies the text encoding for corpus. Common entries are 'utf-8',
-            'utf-8-sig', 'utf-16'.
+            'utf-8-sig', 'utf-16'. Default is None.
         """
         return self._train(corpus_fp, vocab=vocab, encoding=encoding)
 
@@ -136,11 +138,12 @@ class NGramBase(ABC):
         ----------
         N : int
             The gram-size of the model to generate from
-        seed_words : list of strs (default: ["<bol>"])
+        seed_words : list of strs
             A list of seed words to use to condition the initial sentence
-            generation
-        sentences : int (default : 50)
-            The number of sentences to generate from the `N`-gram model
+            generation. Default is ``["<bol>"]``.
+        sentences : int
+            The number of sentences to generate from the `N`-gram model.
+            Default is 50.
 
         Returns
         -------
@@ -172,58 +175,77 @@ class NGramBase(ABC):
 
     def perplexity(self, words, N):
         """
-        Calculate the model perplexity on a sequence of words. Perplexity,
-        PP, is defined as
+        Calculate the model perplexity on a sequence of words.
 
-                PP(W) = ( 1 / p(W) ) ^ (1 / n)
-            log PP(W) = (1 / n) * log(1 / p(W))
-                      = -(1 / n) * log p(W)
-                PP(W) = np.exp(-(1 / n) * log p(W))
-                      = np.exp(cross_entropy(W))
+        Notes
+        -----
+        Perplexity, `PP`, is defined as
 
-        where n is the number of `N`-grams in W.
+        .. math::
 
-        The higher the conditional probability of the word sequence, the lower
-        the perplexity. Thus, minimizing perplexity is equivalent to maximizing
-        the probability of `words` under the `N`-gram model.
+            PP(W)  =  \\left( \\frac{1}{p(W)} \\right)^{1 / n}
 
-        Perplexity is equivalent to the average branching factor in predicting
-        the next word.
+        or simply
+
+        .. math::
+
+            PP(W)  &=  \exp(-\log p(W) / n) \\\\
+                   &=  \exp(H(W))
+
+        where :math:`W = [w_1, \ldots, w_k]` is a sequence of words, `H(w)` is
+        the cross-entropy of `W` under the current model, and `n` is the number
+        of `N`-grams in `W`.
+
+        Minimizing perplexity is equivalent to maximizing the probability of
+        `words` under the `N`-gram model. It may also be interpreted as the
+        average branching factor when predicting the next word under the
+        language model.
 
         Parameters
         ----------
         N : int
-            The gram-size of the model to calculate perplexity with
+            The gram-size of the model to calculate perplexity with.
         words : list or tuple of strings
-            The sequence of words to compute perplexity on
+            The sequence of words to compute perplexity on.
 
         Returns
         -------
         perplexity : float
-            The model perlexity for the words in `words`
+            The model perlexity for the words in `words`.
         """
         return np.exp(self.cross_entropy(words, N))
 
     def cross_entropy(self, words, N):
         """
-        Calculate the model cross-entropy on a sequence of words. Cross-entropy,
-        XE, is defined as
+        Calculate the model cross-entropy on a sequence of words against the
+        empirical distribution of words in a sample.
 
-                XE(W) = -(1 / n) * log p(W)
+        Notes
+        -----
+        Model cross-entropy, `H`, is defined as
 
-        where n is the number of N-grams in W.
+        .. math::
+
+            H(W) = -\\frac{\log p(W)}{n}
+
+        where :math:`W = [w_1, \ldots, w_k]` is a sequence of words, and `n` is
+        the number of `N`-grams in `W`.
+
+        The model cross-entropy is proportional (not equal, since we use base
+        `e`) to the average number of bits necessary to encode `W` under the
+        model distribution.
 
         Parameters
         ----------
         N : int
-            The gram-size of the model to calculate cross-entropy on
+            The gram-size of the model to calculate cross-entropy on.
         words : list or tuple of strings
-            The sequence of words to compute cross-entropy on
+            The sequence of words to compute cross-entropy on.
 
         Returns
         -------
-        cross_entropy : float
-            The model cross-entropy for the words in `words`
+        H : float
+            The model cross-entropy for the words in `words`.
         """
         n_ngrams = len(ngrams(words, N))
         return -(1 / n_ngrams) * self.log_prob(words, N)
@@ -287,13 +309,14 @@ class MLENGram(NGramBase):
         ----------
         N : int
             The maximum length (in words) of the context-window to use in the
-            langauge model. Model will compute all n-grams from 1, ..., N
-        unk : bool (default: True)
-            Whether to include the <unk> (unknown) token in the LM
-        filter_stopwords : bool (default: True)
-            Whether to remove stopwords before training
-        filter_punctuation : bool (default: True)
-            Whether to remove punctuation before training
+            langauge model. Model will compute all n-grams from 1, ..., N.
+        unk : bool
+            Whether to include the ``<unk>`` (unknown) token in the LM. Default
+            is True.
+        filter_stopwords : bool
+            Whether to remove stopwords before training. Default is True.
+        filter_punctuation : bool
+            Whether to remove punctuation before training. Default is True.
         """
         super().__init__(N, unk, filter_stopwords, filter_punctuation)
         self.hyperparameters["id"] = "MLENGram"
@@ -301,8 +324,7 @@ class MLENGram(NGramBase):
     def log_prob(self, words, N):
         """
         Compute the log probability of a sequence of words under the
-        unsmoothed, maximum-likelihood `N`-gram language model. For a bigram,
-        this amounts to:
+        unsmoothed, maximum-likelihood `N`-gram language model.
 
         Parameters
         ----------
@@ -334,26 +356,32 @@ class AdditiveNGram(NGramBase):
     ):
         """
         An N-Gram model with smoothed probabilities calculated via additive /
-        Lidstone smoothing. The resulting estimates correspond to the expected
-        value of the posterior, p(ngram_prob | counts), when using a symmetric
-        Dirichlet prior on counts with parameter K.
+        Lidstone smoothing.
+
+        Notes
+        -----
+        The resulting estimates correspond to the expected value of the
+        posterior, `p(ngram_prob | counts)`, when using a symmetric Dirichlet
+        prior on counts with parameter `K`.
 
         Parameters
         ----------
         N : int
             The maximum length (in words) of the context-window to use in the
             langauge model. Model will compute all n-grams from 1, ..., N
-        K : float (default: 1)
+        K : float
             The pseudocount to add to each observation. Larger values allocate
-            more probability toward unseen events. When K = 1, the model is
-            known as Laplace smoothing.  When K = 0.5, the model is known as
-            expected likelihood estimation (ELE) or the Jeffreys-Perks law
-        unk : bool (default: True)
-            Whether to include the <unk> (unknown) token in the LM
-        filter_stopwords : bool (default: True)
-            Whether to remove stopwords before training
-        filter_punctuation : bool (default: True)
-            Whether to remove punctuation before training
+            more probability toward unseen events. When `K` = 1, the model is
+            known as Laplace smoothing.  When `K` = 0.5, the model is known as
+            expected likelihood estimation (ELE) or the Jeffreys-Perks law.
+            Default is 1.
+        unk : bool
+            Whether to include the ``<unk>`` (unknown) token in the LM. Default
+            is True.
+        filter_stopwords : bool
+            Whether to remove stopwords before training. Default is True.
+        filter_punctuation : bool
+            Whether to remove punctuation before training. Default is True.
         """
         super().__init__(N, unk, filter_stopwords, filter_punctuation)
         self.hyperparameters["id"] = "AdditiveNGram"
@@ -362,35 +390,44 @@ class AdditiveNGram(NGramBase):
     def log_prob(self, words, N):
         """
         Compute the smoothed log probability of a sequence of words under the
-        `N`-gram language model with additive smoothing. For a bigram, this
-        amounts to:
+        `N`-gram language model with additive smoothing.
 
-            P(w_i | w_{i-1}) = (A + K) / (B + K * V)
+        Notes
+        -----
+        For a bigram, additive smoothing amounts to:
+
+        .. math::
+
+            P(w_i \mid w_{i-1}) = \\frac{A + K}{B + KV}
 
         where
 
-            A = Count(w_{i-1}, w_i)
-            B = sum_j Count(w_{i-1}, w_j)
-            V = |{ w_j : Count(w_{i-1}, w_j) > 0 }|
+        .. math::
 
-        This is equivalent to pretending we've seen every possible N-gram
-        sequence at least `K` times. This can be problematic, as it:
-            - Treats each predicted word in the same way (uniform prior counts)
-            - Can assign too much probability mass to unseen N-grams (too aggressive)
+            A  &=  \\text{Count}(w_{i-1}, w_i) \\\\
+            B  &=  \sum_j \\text{Count}(w_{i-1}, w_j) \\\\
+            V  &= |\{ w_j \ : \ \\text{Count}(w_{i-1}, w_j) > 0 \}|
+
+        This is equivalent to pretending we've seen every possible `N`-gram
+        sequence at least `K` times.
+
+        Additive smoothing can be problematic, as it:
+            - Treats each predicted word in the same way
+            - Can assign too much probability mass to unseen `N`-grams
 
         Parameters
         ----------
         words : list of strings
-            A sequence of words
+            A sequence of words.
         N : int
             The gram-size of the language model to use when calculating the log
-            probabilities of the sequence
+            probabilities of the sequence.
 
         Returns
         -------
         total_prob : float
             The total log-probability of the sequence `words` under the
-            `N`-gram language model
+            `N`-gram language model.
         """
         return self._log_prob(words, N)
 
@@ -419,18 +456,19 @@ class GoodTuringNGram(NGramBase):
         ----------
         N : int
             The maximum length (in words) of the context-window to use in the
-            langauge model. Model will compute all n-grams from 1, ..., N
-        conf: float (default: 1.96)
+            langauge model. Model will compute all n-grams from 1, ..., N.
+        conf: float
             The multiplier of the standard deviation of the empirical smoothed
             count (the default, 1.96, corresponds to a 95% confidence
             interval). Controls how many datapoints are smoothed using the
             log-linear model.
-        unk : bool (default: True)
-            Whether to include the <unk> (unknown) token in the LM
-        filter_stopwords : bool (default: True)
-            Whether to remove stopwords before training
-        filter_punctuation : bool (default: True)
-            Whether to remove punctuation before training
+        unk : bool
+            Whether to include the ``<unk>`` (unknown) token in the LM. Default
+            is True.
+        filter_stopwords : bool
+            Whether to remove stopwords before training. Default is True.
+        filter_punctuation : bool
+            Whether to remove punctuation before training. Default is True.
         """
         super().__init__(N, unk, filter_stopwords, filter_punctuation)
         self.hyperparameters["id"] = "GoodTuringNGram"
@@ -440,20 +478,20 @@ class GoodTuringNGram(NGramBase):
         """
         Compile the n-gram counts for the text(s) in `corpus_fp`. Upon
         completion the `self.counts` attribute will store dictionaries of the
-        N, N-1, ..., 1-gram counts.
+        `N`, `N-1`, ..., 1-gram counts.
 
         Parameters
         ----------
         corpus_fp : str
             The path to a newline-separated text corpus file
-        vocab : `preprocessing.nlp.Vocabulary` instance (default: None)
+        vocab : `preprocessing.nlp.Vocabulary` instance or None.
             If not `None`, only the words in `vocab` will be used to construct
             the language model; all out-of-vocabulary words will either be
-            mappend to <unk> (if self.unk = True) or removed (if self.unk =
-            False).
-        encoding : str (default: None)
+            mappend to ``<unk>`` (if ``self.unk = True``) or removed (if
+            ``self.unk = False``). Default is None.
+        encoding : str  or None
             Specifies the text encoding for corpus. Common entries are 'utf-8',
-            'utf-8-sig', 'utf-16'.
+            'utf-8-sig', 'utf-16'. Default is None.
         """
         self._train(corpus_fp, vocab=None, encoding=None)
         self._calc_smoothed_counts()
@@ -461,45 +499,58 @@ class GoodTuringNGram(NGramBase):
     def log_prob(self, words, N):
         """
         Compute the smoothed log probability of a sequence of words under the
-        `N`-gram language model with Good-Turing smoothing.  For a bigram,
-        this amounts to:
+        `N`-gram language model with Good-Turing smoothing.
 
-            P(w_i | w_{i-1}) = C* / Count(w_{i-1})
+        Notes
+        -----
+        For a bigram, Good-Turing smoothing amounts to:
 
-        where C* is the Good-Turing smoothed estimate of the bigram count:
+        .. math::
 
-            C* = [ (c + 1) * NumCounts(c + 1, 2) ] / NumCounts(c, 2)
+            P(w_i \mid w_{i-1}) = \\frac{C^*}{\\text{Count}(w_{i-1})}
+
+        where :math:`C^*` is the Good-Turing smoothed estimate of the bigram
+        count:
+
+        .. math::
+
+            C^* = \\frac{(c + 1) \\text{NumCounts}(c + 1, 2)}{\\text{NumCounts}(c, 2)}
 
         where
 
-            c = Count(w_{i-1}, w_i)
-            NumCounts(r, k) = |{ k-gram : Count(k-gram) = r }|
+        .. math::
 
-        In words, the probability of an N-gram that occurs r times in the
+            c  &=  \\text{Count}(w_{i-1}, w_i) \\\\
+            \\text{NumCounts}(r, k)  &=  |\{ k\\text{-gram} : \\text{Count}(k\\text{-gram}) = r \}|
+
+        In words, the probability of an `N`-gram that occurs `r` times in the
         corpus is estimated by dividing up the probability mass occupied by
-        N-grams that occur r+1 times.
+        N-grams that occur `r+1` times.
 
-        For large values of r, NumCounts becomes unreliable. In this case, we
-        compute a smoothed version of NumCounts using a power law function,
-        log(NumCounts(r)) = a * log(r) + b.
+        For large values of `r`, NumCounts becomes unreliable. In this case, we
+        compute a smoothed version of NumCounts using a power law function:
+
+        .. math::
+
+            \log \\text{NumCounts}(r) = b + a \log r
 
         Under the Good-Turing estimator, the total probability assigned to
-        unseen N-grams is equal to the relative occurrence of N-grams that
+        unseen `N`-grams is equal to the relative occurrence of `N`-grams that
         appear only once.
 
         Parameters
         ----------
         words : list of strings
-            A sequence of words
+            A sequence of words.
         N : int
             The gram-size of the language model to use when calculating the log
-            probabilities of the sequence
+            probabilities of the sequence.
 
         Returns
         -------
         total_prob : float
             The total log-probability of the sequence `words` under the
-            `N`-gram language model
+            `N`-gram language model.
         """
         return self._log_prob(words, N)
 
