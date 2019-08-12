@@ -173,3 +173,6 @@ tags
 
 # No TODOs ;-)
 TODO
+
+_build
+_static
