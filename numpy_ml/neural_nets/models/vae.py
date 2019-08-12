@@ -33,66 +33,86 @@ class BernoulliVAE(object):
         A variational autoencoder (VAE) with 2D convolutional encoder and Bernoulli
         input and output units.
 
+        Notes
+        -----
+        The VAE architecture is
+
+        .. code-block:: text
+
                             |-- t_mean ----|
             X -> [Encoder] -|              |--> [Sampler] -> [Decoder] -> X_recon
                             |-- t_log_var -|
 
-        where
+        where ``[Encoder]`` is
 
-            [Encoder]
-                Conv1 -> ReLU -> MaxPool1 -> Conv2 -> ReLU -> MaxPool2 ->
-                    Flatten -> FC1 -> ReLU -> FC2
+        .. code-block:: text
 
-            [Decoder]
-                FC1 -> FC2 -> Sigmoid
+            Conv1 -> ReLU -> MaxPool1 -> Conv2 -> ReLU ->
+                MaxPool2 -> Flatten -> FC1 -> ReLU -> FC2
 
-            [Sampler]
-                Draws a sample from the distribution N(t_mean,
-                diag(exp(t_log_var))) using the reparameterization trick.
+        ``[Decoder]`` is
+
+        .. code-block:: text
+
+            FC1 -> FC2 -> Sigmoid
+
+        and ``[Sampler]`` draws a sample from the distribution
+
+        .. math::
+
+            \mathcal{N}(\\text{t_mean}, \exp \left\{\\text{t_log_var}\\right\} I)
+
+        using the reparameterization trick.
 
         Parameters
         ----------
-        T : int (default: 5)
-            The dimension of the variational parameter `t`
-        enc_conv1_pad : int (default: 0)
-            The padding for the first convolutional layer of the encoder
-        enc_conv1_stride : int (default: 1)
-            The stride for the first convolutional layer of the encoder
-        enc_conv1_out_ch : int (default: 32)
+        T : int
+            The dimension of the variational parameter `t`. Default is 5.
+        enc_conv1_pad : int
+            The padding for the first convolutional layer of the encoder. Default is 0.
+        enc_conv1_stride : int
+            The stride for the first convolutional layer of the encoder. Default is 1.
+        enc_conv1_out_ch : int
             The number of output channels for the first convolutional layer of
-            the encoder
-        enc_conv1_kernel_shape : tuple (default: (5, 5))
+            the encoder. Default is 32.
+        enc_conv1_kernel_shape : tuple
             The number of rows and columns in each filter of the first
-            convolutional layer of the encoder
-        enc_pool1_kernel_shape : tuple (default: (2, 2))
+            convolutional layer of the encoder. Default is (5, 5).
+        enc_pool1_kernel_shape : tuple
             The number of rows and columns in the receptive field of the first
-            max pool layer of the encoder
-        enc_pool1_stride : int (default: 2)
-            The stride for the first MaxPool layer of the encoder
-        enc_conv2_pad : int (default: 0)
-            The padding for the second convolutional layer of the encoder
-        enc_conv2_out_ch : int (default: 64)
+            max pool layer of the encoder. Default is (2, 3).
+        enc_pool1_stride : int
+            The stride for the first MaxPool layer of the encoder. Default is
+            2.
+        enc_conv2_pad : int
+            The padding for the second convolutional layer of the encoder.
+            Default is 0.
+        enc_conv2_out_ch : int
             The number of output channels for the second convolutional layer of
-            the encoder
-        enc_conv2_kernel_shape : tuple (default: (5, 5))
+            the encoder. Default is 64.
+        enc_conv2_kernel_shape : tuple
             The number of rows and columns in each filter of the second
-            convolutional layer of the encoder
-        enc_conv2_stride : int (default: 1)
-            The stride for the second convolutional layer of the encoder
-        enc_pool2_stride : int (default: 1)
-            The stride for the second MaxPool layer of the encoder
-        enc_pool2_kernel_shape : tuple (default: (2, 2))
+            convolutional layer of the encoder. Default is (5, 5).
+        enc_conv2_stride : int
+            The stride for the second convolutional layer of the encoder.
+            Default is 1.
+        enc_pool2_stride : int
+            The stride for the second MaxPool layer of the encoder. Default is
+            1.
+        enc_pool2_kernel_shape : tuple
             The number of rows and columns in the receptive field of the second
-            max pool layer of the encoder
-        latent_dim : int (default: 256)
-            The dimension of the output for the first FC layer of the encoder
-        optimizer : str or `OptimizerBase` instance or `None` (default: "RMSProp(lr=0.0001)")
+            max pool layer of the encoder. Default is (2, 3).
+        latent_dim : int
+            The dimension of the output for the first FC layer of the encoder.
+            Default is 256.
+        optimizer : str or :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object or None
             The optimization strategy to use when performing gradient updates.
-            If `None`, use the `SGD` optimizer with default parameters.
-        init : str (default: "glorot_uniform")
+            If None, use the :class:`~numpy_ml.neural_nets.optimizers.SGD`
+            optimizer with default parameters. Default is "RMSProp(lr=0.0001)".
+        init : str
             The weight initialization strategy. Valid entries are
             {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform',
-            'std_normal', 'trunc_normal'}
+            'std_normal', 'trunc_normal'}. Default is 'glorot_uniform'.
         """
         self.T = T
         self.init = init
@@ -270,14 +290,14 @@ class BernoulliVAE(object):
 
         Parameters
         ----------
-        t_mean : numpy array of shape (n_ex, latent_dim)
-            Mean of the desired distribution
-        t_log_var : numpy array of shape (n_ex, latent_dim)
-            Log variance vector of the desired distribution
+        t_mean : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, latent_dim)`
+            Mean of the desired distribution.
+        t_log_var : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, latent_dim)`
+            Log variance vector of the desired distribution.
 
         Returns
         -------
-        samples: numpy array of shape (n_ex, latent_dim)
+        samples: :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, latent_dim)`
         """
         noise = np.random.normal(loc=0.0, scale=1.0, size=t_mean.shape)
         samples = noise * np.exp(t_log_var) + t_mean
@@ -373,7 +393,7 @@ class BernoulliVAE(object):
         self.flush_gradients()
 
     def flush_gradients(self):
-        """Reset parameter gradients after upate"""
+        """Reset parameter gradients after update"""
         for k, v in self.decoder.items():
             v.flush_gradients()
         for k, v in self.encoder.items():
@@ -385,14 +405,14 @@ class BernoulliVAE(object):
 
         Parameters
         ----------
-        X_train : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+        X_train : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The input volume
-        n_epochs : int (default: 20)
-            The maximum number of training epochs to run
-        batchsize : int (default: 128)
-            The desired number of examples in each training batch
-        verbose : bool (default: True)
-            Print batch information during training
+        n_epochs : int
+            The maximum number of training epochs to run. Default is 20.
+        batchsize : int
+            The desired number of examples in each training batch. Default is 128.
+        verbose : bool
+            Print batch information during training. Default is True.
         """
         self.verbose = verbose
         self.n_epochs = n_epochs

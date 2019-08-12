@@ -129,39 +129,45 @@ class WavenetResidualModule(ModuleBase):
         """
         A WaveNet-like residual block with causal dilated convolutions.
 
-        *Skip path in* >-------------------------------------------> + --------> *Skip path out*
-                          Causal      |--> Tanh --|                  |
-        *Main    |--> Dilated Conv1D -|           * --> 1x1 Conv1D --|
-         path >--|                    |--> Sigm --|                  |
-         in*     |-------------------------------------------------> + --------> *Main path out*
-                                     *Residual path*
+        .. code-block:: text
+
+            *Skip path in* >-------------------------------------------> + ---> *Skip path out*
+                              Causal      |--> Tanh --|                  |
+            *Main    |--> Dilated Conv1D -|           * --> 1x1 Conv1D --|
+             path >--|                    |--> Sigm --|                  |
+             in*     |-------------------------------------------------> + ---> *Main path out*
+                                         *Residual path*
 
         On the final block, the output of the skip path is further processed to
         produce the network predictions.
 
-        See van den Oord et al. (2016) at https://arxiv.org/pdf/1609.03499.pdf
-        for further details.
+        References
+        ----------
+        .. [1] van den Oord et al. (2016). "Wavenet: a generative model for raw
+           audio". https://arxiv.org/pdf/1609.03499.pdf
 
         Parameters
         ----------
         ch_residual : int
-            The number of output channels for the 1x1 Conv1D layer in the main
-            path
+            The number of output channels for the 1x1
+            :class:`~numpy_ml.neural_nets.layers.Conv1D` layer in the main path.
         ch_dilation : int
-            The number of output channels for the causal dilated Conv1D layer
-            in the main path
+            The number of output channels for the causal dilated
+            :class:`~numpy_ml.neural_nets.layers.Conv1D` layer in the main path.
         dilation : int
-            The dilation rate for the causal dilated Conv1D layer in the main
-            path
+            The dilation rate for the causal dilated
+            :class:`~numpy_ml.neural_nets.layers.Conv1D` layer in the main path.
         kernel_width : int
-            The width of the causal dilated Conv1D kernel in the main path
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            The width of the causal dilated
+            :class:`~numpy_ml.neural_nets.layers.Conv1D` kernel in the main
+            path.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is 'glorot_uniform'.
+        optimizer : str or :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the
+            :class:`~numpy_ml.neural_nets.optimizers.SGD` optimizer with default
+            parameters. Default is None.
         """
         super().__init__()
 
@@ -208,6 +214,7 @@ class WavenetResidualModule(ModuleBase):
 
     @property
     def parameters(self):
+        """A dictionary of the module parameters."""
         return {
             "components": {
                 "conv_1x1": self.conv_1x1.parameters,
@@ -220,6 +227,7 @@ class WavenetResidualModule(ModuleBase):
 
     @property
     def hyperparameters(self):
+        """A dictionary of the module hyperparameters"""
         return {
             "layer": "WavenetResidualModule",
             "init": self.init,
@@ -246,6 +254,8 @@ class WavenetResidualModule(ModuleBase):
 
     @property
     def derived_variables(self):
+        """A dictionary of intermediate values computed during the
+        forward/backward passes."""
         dv = {
             "conv_1x1_out": None,
             "conv_dilation_out": None,
@@ -263,6 +273,7 @@ class WavenetResidualModule(ModuleBase):
 
     @property
     def gradients(self):
+        """A dictionary of the module parameter gradients."""
         return {
             "components": {
                 "conv_1x1": self.conv_1x1.gradients,
@@ -274,6 +285,25 @@ class WavenetResidualModule(ModuleBase):
         }
 
     def forward(self, X_main, X_skip=None):
+        """
+        Compute the module output on a single minibatch.
+
+        Parameters
+        ----------
+        X_main : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
+            The input volume consisting of `n_ex` examples, each with dimension
+            (`in_rows`, `in_cols`, `in_ch`).
+        X_skip : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`, or None
+            The output of the preceding skip-connection if this is not the
+            first module in the network.
+
+        Returns
+        -------
+        Y_main : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
+            The output of the main pathway.
+        Y_skip : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
+            The output of the skip-connection pathway.
+        """
         self.X_main, self.X_skip = X_main, X_skip
         conv_dilation_out = self.conv_dilation.forward(X_main)
 
@@ -342,45 +372,59 @@ class SkipConnectionIdentityModule(ModuleBase):
         init="glorot_uniform",
     ):
         """
-        A ResNet-like "identity" shortcut module. Enforces `same`
-        padding during each convolution to ensure module output has same dims
-        as its input.
+        A ResNet-like "identity" shortcut module.
 
-        X -> Conv2D -> Act_fn -> BatchNorm2D -> Conv2D -> BatchNorm2D -> + -> Act_fn
-         \______________________________________________________________/
+        Notes
+        -----
+        The identity module enforces `same` padding during each convolution to
+        ensure module output has same dims as its input.
 
-        See He et al. (2015) at https://arxiv.org/pdf/1512.03385.pdf for
-        further details.
+        .. code-block:: text
+
+            X -> Conv2D -> Act_fn -> BatchNorm2D -> Conv2D -> BatchNorm2D -> + -> Act_fn
+             \______________________________________________________________/
+
+        References
+        ----------
+        .. [1] He et al. (2015). "Deep residual learning for image
+           recognition." https://arxiv.org/pdf/1512.03385.pdf
 
         Parameters
         ----------
         out_ch : int
             The number of filters/kernels to compute in the first convolutional
-            layer
+            layer.
         kernel_shape1 : 2-tuple
             The dimension of a single 2D filter/kernel in the first
-            convolutional layer
+            convolutional layer.
         kernel_shape2 : 2-tuple
             The dimension of a single 2D filter/kernel in the second
-            convolutional layer
-        stride1 : int (default: 1)
-            The stride/hop of the convolution kernels in the first convolutional layer
-        stride2 : int (default: 1)
-            The stride/hop of the convolution kernels in the second convolutional layer
-        act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use the
-            identity f(x) = x by default
-        epsilon : float (default : 1e-5)
-            A small smoothing constant to use during BatchNorm2D computation to
-            avoid divide-by-zero errors.
-        momentum : float (default: 0.9)
+            convolutional layer.
+        stride1 : int
+            The stride/hop of the convolution kernels in the first
+            convolutional layer. Default is 1.
+        stride2 : int
+            The stride/hop of the convolution kernels in the second
+            convolutional layer. Default is 1.
+        act_fn : :doc:`Activation <numpy_ml.neural_nets.activations>` object or None
+            The activation function for computing Y[t]. If None, use the
+            identity :math:`f(x) = x` by default. Default is None.
+        epsilon : float
+            A small smoothing constant to use during
+            :class:`~numpy_ml.neural_nets.layers.BatchNorm2D` computation to
+            avoid divide-by-zero errors. Default is 1e-5.
+        momentum : float
             The momentum term for the running mean/running std calculations in
-            the BatchNorm2D layers.  The closer this is to 1, the less weight
-            will be given to the mean/std of the current batch (i.e., higher
-            smoothing)
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            the :class:`~numpy_ml.neural_nets.layers.BatchNorm2D` layers.  The
+            closer this is to 1, the less weight will be given to the mean/std
+            of the current batch (i.e., higher smoothing). Default is 0.9.
+        optimizer : str or :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object or None
+            The optimization strategy to use when performing gradient updates
+            within the :meth:`update` method.  If None, use the
+            :class:`~numpy_ml.neural_nets.optimizers.SGD` optimizer with
+            default parameters. Default is None.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is 'glorot_uniform'.
         """
         super().__init__()
 
@@ -429,6 +473,7 @@ class SkipConnectionIdentityModule(ModuleBase):
 
     @property
     def parameters(self):
+        """A dictionary of the module parameters."""
         return {
             "components": {
                 "add3": self.add3.parameters,
@@ -441,6 +486,7 @@ class SkipConnectionIdentityModule(ModuleBase):
 
     @property
     def hyperparameters(self):
+        """A dictionary of the module hyperparameters."""
         return {
             "layer": "SkipConnectionIdentityModule",
             "init": self.init,
@@ -466,6 +512,8 @@ class SkipConnectionIdentityModule(ModuleBase):
 
     @property
     def derived_variables(self):
+        """A dictionary of intermediate values computed during the
+        forward/backward passes."""
         dv = {
             "conv1_out": None,
             "conv2_out": None,
@@ -484,6 +532,7 @@ class SkipConnectionIdentityModule(ModuleBase):
 
     @property
     def gradients(self):
+        """A dictionary of the accumulated module parameter gradients."""
         return {
             "components": {
                 "add3": self.add3.gradients,
@@ -494,29 +543,66 @@ class SkipConnectionIdentityModule(ModuleBase):
             }
         }
 
-    def forward(self, X):
+    def forward(self, X, retain_derived=True):
+        """
+        Compute the module output given input volume `X`.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The input volume consisting of `n_ex` examples, each with dimension
+            (`in_rows`, `in_cols`, `in_ch`).
+        retain_derived : bool
+            Whether to retain the variables calculated during the forward pass
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
+
+        Returns
+        -------
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+            The module output volume.
+        """
         if not hasattr(self, "conv2"):
             self.in_ch = X.shape[3]
             self._init_conv2()
 
-        conv1_out = self.conv1.forward(X)
-        bn1_out = self.batchnorm1.forward(conv1_out)
-        conv2_out = self.conv2.forward(bn1_out)
-        bn2_out = self.batchnorm2.forward(conv2_out)
-        Y = self.add3.forward([X, bn2_out])
+        conv1_out = self.conv1.forward(X, retain_derived)
+        bn1_out = self.batchnorm1.forward(conv1_out, retain_derived)
+        conv2_out = self.conv2.forward(bn1_out, retain_derived)
+        bn2_out = self.batchnorm2.forward(conv2_out, retain_derived)
+        Y = self.add3.forward([X, bn2_out], retain_derived)
 
-        self._dv["conv1_out"] = conv1_out
-        self._dv["conv2_out"] = conv2_out
-        self._dv["batchnorm1_out"] = bn1_out
-        self._dv["batchnorm2_out"] = bn2_out
+        if retain_derived:
+            self._dv["conv1_out"] = conv1_out
+            self._dv["conv2_out"] = conv2_out
+            self._dv["batchnorm1_out"] = bn1_out
+            self._dv["batchnorm2_out"] = bn2_out
         return Y
 
-    def backward(self, dLdY):
-        dX, dBn2_out = self.add3.backward(dLdY)
-        dConv2_out = self.batchnorm2.backward(dBn2_out)
-        dBn1_out = self.conv2.backward(dConv2_out)
-        dConv1_out = self.batchnorm1.backward(dBn1_out)
-        dX += self.conv1.backward(dConv1_out)
+    def backward(self, dLdY, retain_grads=True):
+        """
+        Compute the gradient of the loss with respect to the layer parameters.
+
+        Parameters
+        ----------
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows, out_cols, out_ch`) or list of arrays
+            The gradient(s) of the loss with respect to the module output(s).
+        retain_grads : bool
+            Whether to include the intermediate parameter gradients computed
+            during the backward pass in the final parameter update. Default is
+            True.
+
+        Returns
+        -------
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss with respect to the module input volume.
+        """
+        dX, dBn2_out = self.add3.backward(dLdY, retain_grads)
+        dConv2_out = self.batchnorm2.backward(dBn2_out, retain_grads)
+        dBn1_out = self.conv2.backward(dConv2_out, retain_grads)
+        dConv1_out = self.batchnorm1.backward(dBn1_out, retain_grads)
+        dX += self.conv1.backward(dConv1_out, retain_grads)
 
         self._dv["dLdAdd3_X"] = dX
         self._dv["dLdBn2"] = dBn2_out
@@ -546,64 +632,77 @@ class SkipConnectionConvModule(ModuleBase):
         init="glorot_uniform",
     ):
         """
-        A ResNet-like "convolution" shortcut module. The additional
+        A ResNet-like "convolution" shortcut module.
+
+        Notes
+        -----
+        In contrast to :class:`SkipConnectionIdentityModule`, the additional
         `conv2d_skip` and `batchnorm_skip` layers in the shortcut path allow
-        adjusting the dimensions of X to match the output of the main set of
+        adjusting the dimensions of `X` to match the output of the main set of
         convolutions.
 
-        X -> Conv2D -> Act_fn -> BatchNorm2D -> Conv2D -> BatchNorm2D -> + -> Act_fn
-         \_____________________ Conv2D -> Batchnorm2D __________________/
+        .. code-block:: text
 
-        See He et al. (2015) at https://arxiv.org/pdf/1512.03385.pdf for
-        further details.
+            X -> Conv2D -> Act_fn -> BatchNorm2D -> Conv2D -> BatchNorm2D -> + -> Act_fn
+             \_____________________ Conv2D -> Batchnorm2D __________________/
+
+        References
+        ----------
+        .. [1] He et al. (2015). "Deep residual learning for image
+           recognition." https://arxiv.org/pdf/1512.03385.pdf
 
         Parameters
         ----------
         out_ch1 : int
             The number of filters/kernels to compute in the first convolutional
-            layer
+            layer.
         out_ch2 : int
             The number of filters/kernels to compute in the second
-            convolutional layer
+            convolutional layer.
         kernel_shape1 : 2-tuple
             The dimension of a single 2D filter/kernel in the first
-            convolutional layer
+            convolutional layer.
         kernel_shape2 : 2-tuple
             The dimension of a single 2D filter/kernel in the second
-            convolutional layer
+            convolutional layer.
         kernel_shape_skip : 2-tuple
             The dimension of a single 2D filter/kernel in the "skip"
-            convolutional layer
-        stride1 : int (default: 1)
-            The stride/hop of the convolution kernels in the first convolutional layer
-        stride2 : int (default: 1)
-            The stride/hop of the convolution kernels in the second convolutional layer
-        stride_skip : int (default: 1)
-            The stride/hop of the convolution kernels in the "skip" convolutional layer
-        pad1 : int, tuple, or 'same' (default: 0)
+            convolutional layer.
+        stride1 : int
+            The stride/hop of the convolution kernels in the first
+            convolutional layer. Default is 1.
+        stride2 : int
+            The stride/hop of the convolution kernels in the second
+            convolutional layer. Default is 1.
+        stride_skip : int
+            The stride/hop of the convolution kernels in the "skip"
+            convolutional layer. Default is 1.
+        pad1 : int, tuple, or 'same'
             The number of rows/columns of 0's to pad the input to the first
-            convolutional layer with
-        pad2 : int, tuple, or 'same' (default: 0)
+            convolutional layer with. Default is 0.
+        pad2 : int, tuple, or 'same'
             The number of rows/columns of 0's to pad the input to the second
-            convolutional layer with
-        act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use the
-            identity f(x) = x by default
-        epsilon : float (default : 1e-5)
-            A small smoothing constant to use during BatchNorm2D computation to
-            avoid divide-by-zero errors.
-        momentum : float (default: 0.9)
+            convolutional layer with. Default is 0.
+        act_fn : :doc:`Activation <numpy_ml.neural_nets.activations>` object or None
+            The activation function for computing ``Y[t]``. If None, use the
+            identity :math:`f(x) = x` by default. Default is None.
+        epsilon : float
+            A small smoothing constant to use during
+            :class:`~numpy_ml.neural_nets.layers.BatchNorm2D` computation to
+            avoid divide-by-zero errors. Default is 1e-5.
+        momentum : float
             The momentum term for the running mean/running std calculations in
-            the BatchNorm2D layers.  The closer this is to 1, the less weight
-            will be given to the mean/std of the current batch (i.e., higher
-            smoothing)
-        init : str (default: 'glorot_uniform')
+            the :class:`~numpy_ml.neural_nets.layers.BatchNorm2D` layers.  The
+            closer this is to 1, the less weight will be given to the mean/std
+            of the current batch (i.e., higher smoothing). Default is 0.9.
+        init : str
             The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}.
+        optimizer : str or :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :class:`update` method.  If None, use the
+            :class:`~numpy_ml.neural_nets.optimizers.SGD` optimizer with
+            default parameters. Default is None.
         """
         super().__init__()
 
@@ -702,6 +801,7 @@ class SkipConnectionConvModule(ModuleBase):
 
     @property
     def parameters(self):
+        """A dictionary of the module parameters."""
         return {
             "components": {
                 "add3": self.add3.parameters,
@@ -718,6 +818,7 @@ class SkipConnectionConvModule(ModuleBase):
 
     @property
     def hyperparameters(self):
+        """A dictionary of the module hyperparameters."""
         return {
             "layer": "SkipConnectionConvModule",
             "init": self.init,
@@ -760,6 +861,8 @@ class SkipConnectionConvModule(ModuleBase):
 
     @property
     def derived_variables(self):
+        """A dictionary of intermediate values computed during the
+        forward/backward passes."""
         dv = {
             "conv1_out": None,
             "conv2_out": None,
@@ -784,6 +887,7 @@ class SkipConnectionConvModule(ModuleBase):
 
     @property
     def gradients(self):
+        """A dictionary of the accumulated module parameter gradients."""
         return {
             "components": {
                 "add3": self.add3.gradients,
@@ -798,30 +902,68 @@ class SkipConnectionConvModule(ModuleBase):
             }
         }
 
-    def forward(self, X):
+    def forward(self, X, retain_derived=True):
+        """
+        Compute the layer output given input volume `X`.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
+            The input volume consisting of `n_ex` examples, each with dimension
+            (`in_rows`, `in_cols`, `in_ch`).
+        retain_derived : bool
+            Whether to retain the variables calculated during the forward pass
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
+
+        Returns
+        -------
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
+            The module output volume.
+        """
         # now that we have the input dims for X we can initialize the proper
         # padding in the `conv_skip` layer
         if not hasattr(self, "conv_skip"):
             self._init_conv_skip(X)
             self.in_ch = X.shape[3]
 
-        conv1_out = self.conv1.forward(X)
-        bn1_out = self.batchnorm1.forward(conv1_out)
-        conv2_out = self.conv2.forward(bn1_out)
-        bn2_out = self.batchnorm2.forward(conv2_out)
-        conv_skip_out = self.conv_skip.forward(X)
-        bn_skip_out = self.batchnorm_skip.forward(conv_skip_out)
-        Y = self.add3.forward([bn_skip_out, bn2_out])
+        conv1_out = self.conv1.forward(X, retain_derived)
+        bn1_out = self.batchnorm1.forward(conv1_out, retain_derived)
+        conv2_out = self.conv2.forward(bn1_out, retain_derived)
+        bn2_out = self.batchnorm2.forward(conv2_out, retain_derived)
+        conv_skip_out = self.conv_skip.forward(X, retain_derived)
+        bn_skip_out = self.batchnorm_skip.forward(conv_skip_out, retain_derived)
+        Y = self.add3.forward([bn_skip_out, bn2_out], retain_derived)
 
-        self._dv["conv1_out"] = conv1_out
-        self._dv["conv2_out"] = conv2_out
-        self._dv["batchnorm1_out"] = bn1_out
-        self._dv["batchnorm2_out"] = bn2_out
-        self._dv["conv_skip_out"] = conv_skip_out
-        self._dv["batchnorm_skip_out"] = bn_skip_out
+        if retain_derived:
+            self._dv["conv1_out"] = conv1_out
+            self._dv["conv2_out"] = conv2_out
+            self._dv["batchnorm1_out"] = bn1_out
+            self._dv["batchnorm2_out"] = bn2_out
+            self._dv["conv_skip_out"] = conv_skip_out
+            self._dv["batchnorm_skip_out"] = bn_skip_out
         return Y
 
-    def backward(self, dLdY):
+    def backward(self, dLdY, retain_grads=True):
+        """
+        Compute the gradient of the loss with respect to the module parameters.
+
+        Parameters
+        ----------
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
+        or list of arrays
+            The gradient(s) of the loss with respect to the module output(s).
+        retain_grads : bool
+            Whether to include the intermediate parameter gradients computed
+            during the backward pass in the final parameter update. Default is
+            True.
+
+        Returns
+        -------
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
+            The gradient of the loss with respect to the module input volume.
+        """
         dBnskip_out, dBn2_out = self.add3.backward(dLdY)
         dConvskip_out = self.batchnorm_skip.backward(dBnskip_out)
         dX = self.conv_skip.backward(dConvskip_out)
@@ -831,13 +973,14 @@ class SkipConnectionConvModule(ModuleBase):
         dConv1_out = self.batchnorm1.backward(dBn1_out)
         dX += self.conv1.backward(dConv1_out)
 
-        self._dv["dLdAdd3_X"] = dX
-        self._dv["dLdBn1"] = dBn1_out
-        self._dv["dLdBn2"] = dBn2_out
-        self._dv["dLdConv1"] = dConv1_out
-        self._dv["dLdConv2"] = dConv2_out
-        self._dv["dLdBnSkip"] = dBnskip_out
-        self._dv["dLdConvSkip"] = dConvskip_out
+        if retain_grads:
+            self._dv["dLdAdd3_X"] = dX
+            self._dv["dLdBn1"] = dBn1_out
+            self._dv["dLdBn2"] = dBn2_out
+            self._dv["dLdConv1"] = dConv1_out
+            self._dv["dLdConv2"] = dConv2_out
+            self._dv["dLdBnSkip"] = dBnskip_out
+            self._dv["dLdConvSkip"] = dConvskip_out
         return dX
 
 
@@ -858,22 +1001,23 @@ class BidirectionalLSTM(ModuleBase):
         ----------
         n_out : int
             The dimension of a single hidden state / output on a given timestep
-        act_fn : `activations.Activation` instance (default: None)
-            The activation function for computing A[t]. If not specified, use
-            Tanh by default.
-        gate_fn : `activations.Activation` instance (default: None)
+        act_fn : :doc:`Activation <numpy_ml.neural_nets.activations>` object or None
+            The activation function for computing ``A[t]``. If not specified,
+            use :class:`~numpy_ml.neural_nets.activations.Tanh` by default.
+        gate_fn : :doc:`Activation <numpy_ml.neural_nets.activations>` object or None
             The gate function for computing the update, forget, and output
-            gates. If not specified, use Sigmoid by default.
-        merge_mode : str (default: "concat")
+            gates. If not specified, use
+            :class:`~numpy_ml.neural_nets.activations.Sigmoid` by default.
+        merge_mode : {"sum", "multiply", "concat", "average"}
             Mode by which outputs of the forward and backward LSTMs will be
-            combined. Valid values are {"sum", "multiply", "concat", "average"}.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            combined. Default is 'concat'.
+        optimizer : str or :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the `update` method.  If None, use the
+            :class:`~numpy_ml.neural_nets.optimizers.SGD` optimizer with
+            default parameters. Default is None.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is 'glorot_uniform'.
         """
         super().__init__()
 
@@ -903,6 +1047,21 @@ class BidirectionalLSTM(ModuleBase):
         )
 
     def forward(self, X):
+        """
+        Run a forward pass across all timesteps in the input.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in, n_t)`
+            Input consisting of `n_ex` examples each of dimensionality `n_in`
+            and extending for `n_t` timesteps.
+
+        Returns
+        -------
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out, n_t)`
+            The value of the hidden state for each of the `n_ex` examples
+            across each of the `n_t` timesteps.
+        """
         Y_fwd, Y_bwd, Y = [], [], []
         n_ex, self.n_in, n_t = X.shape
 
@@ -931,6 +1090,21 @@ class BidirectionalLSTM(ModuleBase):
         return np.dstack(Y)
 
     def backward(self, dLdA):
+        """
+        Run a backward pass across all timesteps in the input.
+
+        Parameters
+        ----------
+        dLdA : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out, n_t)`
+            The gradient of the loss with respect to the layer output for each
+            of the `n_ex` examples across all `n_t` timesteps.
+
+        Returns
+        -------
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in, n_t)`
+            The value of the hidden state for each of the `n_ex` examples
+            across each of the `n_t` timesteps.
+        """
         assert self.trainable, "Layer is frozen"
 
         n_ex, n_out, n_t = dLdA.shape
@@ -967,6 +1141,8 @@ class BidirectionalLSTM(ModuleBase):
 
     @property
     def derived_variables(self):
+        """A dictionary of intermediate values computed during the
+        forward/backward passes."""
         return {
             "components": {
                 "cell_fwd": self.cell_fwd.derived_variables,
@@ -976,6 +1152,7 @@ class BidirectionalLSTM(ModuleBase):
 
     @property
     def gradients(self):
+        """A dictionary of the accumulated module parameter gradients."""
         return {
             "components": {
                 "cell_fwd": self.cell_fwd.gradients,
@@ -985,6 +1162,7 @@ class BidirectionalLSTM(ModuleBase):
 
     @property
     def parameters(self):
+        """A dictionary of the module parameters."""
         return {
             "components": {
                 "cell_fwd": self.cell_fwd.parameters,
@@ -994,6 +1172,7 @@ class BidirectionalLSTM(ModuleBase):
 
     @property
     def hyperparameters(self):
+        """A dictionary of the module hyperparameters."""
         return {
             "layer": "BidirectionalLSTM",
             "init": self.init,
@@ -1013,44 +1192,68 @@ class BidirectionalLSTM(ModuleBase):
 class MultiHeadedAttentionModule(ModuleBase):
     def __init__(self, n_heads=8, dropout_p=0, init="glorot_uniform", optimizer=None):
         """
+        A mutli-headed attention module.
+
+        Notes
+        -----
         Multi-head attention allows a model to jointly attend to information from
         different representation subspaces at different positions. With a
         single head, this information would get averaged away when the
         attention weights are combined with the value
 
-            MultiHead(Q, K, V) = concat(head_1, ..., head_h) @ W^(O)
+        .. math::
+
+            \\text{MultiHead}(\mathbf{Q}, \mathbf{K}, \mathbf{V})
+                = [\\text{head}_1; ...; \\text{head}_h] \\mathbf{W}^{(O)}
 
         where
 
-            head_i = SDP_attention(Q @ W_i^(Q), K @ W_i^(K), V @ W_i^(V))
+        .. math::
+
+            \\text{head}_i = \\text{SDP_attention}(
+                \mathbf{Q W}_i^{(Q)}, \mathbf{K W}_i^{(K)}, \mathbf{V W}_i^{(V)})
 
         and the projection weights are parameter matrices:
 
-            W_i^(Q) ∈ ℝ ^(kqv_dim × latent_dim)
-            W_i^(K) ∈ ℝ ^(kqv_dim × latent_dim)
-            W_i^(V) ∈ ℝ ^(kqv_dim × latent_dim)
-            W^(O) ∈ ℝ ^(n_heads * latent_dim × kqv_dim)
+        .. math::
+
+            \mathbf{W}_i^{(Q)}  &\in
+                \mathbb{R}^{(\\text{kqv_dim} \ \\times \ \\text{latent_dim})} \\\\
+            \mathbf{W}_i^{(K)}  &\in
+                \mathbb{R}^{(\\text{kqv_dim} \ \\times \ \\text{latent_dim})} \\\\
+            \mathbf{W}_i^{(V)}  &\in
+                \mathbb{R}^{(\\text{kqv_dim} \ \\times \ \\text{latent_dim})} \\\\
+            \mathbf{W}^{(O)}  &\in
+                \mathbb{R}^{(\\text{n_heads} \cdot \\text{latent_dim} \ \\times \ \\text{kqv_dim})}
 
         Importantly, the current module explicitly assumes that
 
-            kqv_dim = dim(query) = dim(keys) = dim(values)
+        .. math::
+
+            \\text{kqv_dim} = \\text{dim(query)} = \\text{dim(keys)} = \\text{dim(values)}
 
         and that
 
-            latent_dim = kqv_dim / n_heads
+        .. math::
 
-        [MH Attention Head `h`]
+            \\text{latent_dim} = \\text{kqv_dim / n_heads}
 
-            K --> W_h^(K) ------\
+        **[MH Attention Head h]**:
+
+        .. code-block:: text
+
+            K --> W_h^(K) ------\\
             V --> W_h^(V) ------- > DP_Attention --> head_h
             Q --> W_h^(Q) ------/
 
-        The full [MultiHeadedAttentionModule] then becomes:
+        The full **[MultiHeadedAttentionModule]** then becomes
+
+        .. code-block:: text
 
                   -----------------
-            K --> | [Attn Head 1] | --> head_1 --\
-            V --> | [Attn Head 2] | --> head_2 --\
-            Q --> |      ...      |      ...       ---> Concat --> W^(O) --> MH_out
+            K --> | [Attn Head 1] | --> head_1 --\\
+            V --> | [Attn Head 2] | --> head_2 --\\
+            Q --> |      ...      |      ...       --> Concat --> W^(O) --> MH_out
                   | [Attn Head Z] | --> head_Z --/
                   -----------------
 
@@ -1060,23 +1263,22 @@ class MultiHeadedAttentionModule(ModuleBase):
 
         Parameters
         ----------
-        n_heads : int (default: 8)
+        n_heads : int
             The number of simultaneous attention heads to use. Note that the
             larger `n_heads`, the smaller the dimensionality of any single
-            head, since `latent_dim` = `kqv_dim` / `n_heads`.
+            head, since ``latent_dim = kqv_dim / n_heads``. Default is 8.
         dropout_p : float in [0, 1)
             The dropout propbability during training, applied to the output of
             the softmax in each dot-product attention head. If 0, no dropout is
-            applied.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            applied. Default is 0.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is 'glorot_uniform'.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the
+            :class:`~numpy_ml.neural_nets.optimizers.SGD` optimizer with default
+            parameters. Default is None.
         """
-
         self.init = init
         self.kqv_dim = None
         self.projections = {}
@@ -1161,6 +1363,8 @@ class MultiHeadedAttentionModule(ModuleBase):
 
     @property
     def derived_variables(self):
+        """A dictionary of intermediate values computed during the
+        forward/backward passes."""
         dv = {
             "Q_proj": None,
             "K_proj": None,
@@ -1178,6 +1382,7 @@ class MultiHeadedAttentionModule(ModuleBase):
 
     @property
     def gradients(self):
+        """A dictionary of the accumulated module parameter gradients."""
         return {
             "components": {
                 "Q": self.projections["Q"].gradients,
@@ -1190,6 +1395,7 @@ class MultiHeadedAttentionModule(ModuleBase):
 
     @property
     def parameters(self):
+        """A dictionary of the module parameters."""
         return {
             "components": {
                 "Q": self.projections["Q"].parameters,
@@ -1202,6 +1408,7 @@ class MultiHeadedAttentionModule(ModuleBase):
 
     @property
     def hyperparameters(self):
+        """A dictionary of the module hyperparameters."""
         return {
             "layer": "MultiHeadedAttentionModule",
             "init": self.init,

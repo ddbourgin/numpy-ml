@@ -10,19 +10,27 @@ from ..losses import WGAN_GPLoss
 
 class WGAN_GP(object):
     """
-    An example of a Wasserstein generative adversarial network (WGAN)
-    architecture with gradient penalty (GP). In contrast to a regular WGAN,
-    WGAN-GP uses gradient penalty on the generator rather than weight clipping
-    to encourage the 1-Lipschitz constraint:
+    A Wasserstein generative adversarial network (WGAN) architecture with
+    gradient penalty (GP).
 
-        | Generator(x1) - Generator(x2) | <= |x1 - x2| for all x1, x2
+    Notes
+    -----
+    In contrast to a regular WGAN, WGAN-GP uses gradient penalty on the
+    generator rather than weight clipping to encourage the 1-Lipschitz
+    constraint:
+
+    .. math::
+
+        | \\text{Generator}(\mathbf{x}_1) - \\text{Generator}(\mathbf{x}_2) |
+            \leq |\mathbf{x}_1 - \mathbf{x}_2 | \ \ \ \ \\forall \mathbf{x}_1, \mathbf{x}_2
 
     In other words, the generator must have input gradients with a norm of at
-    most 1 under the X_real and X_fake data distributions.
+    most 1 under the :math:`\mathbf{X}_{real}` and :math:`\mathbf{X}_{fake}`
+    data distributions.
 
     To enforce this constraint, WGAN-GP penalizes the model if the generator
-    gradient norm moves away from a target norm of 1. See `losses.WGAN_GPLoss`
-    for more details.
+    gradient norm moves away from a target norm of 1. See
+    :class:`~numpy_ml.neural_nets.losses.WGAN_GPLoss` for more details.
 
     In contrast to a standard WGAN, WGAN-GP avoids using BatchNorm in the
     critic, as correlation between samples in a batch can impact the stability
@@ -30,20 +38,29 @@ class WGAN_GP(object):
 
     WGAP-GP architecture:
 
+    .. code-block:: text
+
         X_real ------------------------|
                                         >---> [Critic] --> Y_out
         Z --> [Generator] --> X_fake --|
 
-    where:
+    where ``[Generator]`` is
 
-        [Generator]
-            FC1 -> ReLU -> FC2 -> ReLU -> FC3 -> ReLU -> FC4
+    .. code-block:: text
 
-        [Critic]
-            FC1 -> ReLU -> FC2 -> ReLU -> FC3 -> ReLU -> FC4
+        FC1 -> ReLU -> FC2 -> ReLU -> FC3 -> ReLU -> FC4
 
-        and
-            Z ~ N(0, 1)
+    and ``[Critic]`` is
+
+    .. code-block:: text
+
+        FC1 -> ReLU -> FC2 -> ReLU -> FC3 -> ReLU -> FC4
+
+    and
+
+    .. math::
+
+        Z \sim \mathcal{N}(0, 1)
     """
 
     def __init__(
@@ -58,18 +75,20 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        g_hidden : int (default: 512)
-            The number of units in the critic and generator hidden layers
-        init : str (default: "he_uniform")
+        g_hidden : int
+            The number of units in the critic and generator hidden layers.
+            Default is 512.
+        init : str
             The weight initialization strategy. Valid entries are
             {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform',
-            'std_normal', 'trunc_normal'}
-        optimizer : str or `OptimizerBase` instance or `None` (default: "RMSProp(lr=0.0001)")
+            'std_normal', 'trunc_normal'}. Default is "he_uniform".
+        optimizer : str or :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object or None
             The optimization strategy to use when performing gradient updates.
-            If `None`, use the `SGD` optimizer with default parameters.
-        debug : bool (default: False)
+            If None, use the :class:`~numpy_ml.neural_nets.optimizers.SGD`
+            optimizer with default parameters. Default is "RMSProp(lr=0.0001)".
+        debug : bool
             Whether to store additional intermediate output within
-            self.derived_variables.
+            ``self.derived_variables``. Default is False.
         """
         self.init = init
         self.debug = debug
@@ -190,24 +209,25 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        X : numpy array of shape (batchsize, <module_in_dim>)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (batchsize, \*)
             Input data
         module : {'C' or 'G'}
             Whether to perform the forward pass for the critic ('C') or for the
             generator ('G').
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        out : numpy array of shape (batchsize, <module_out_dim>)
-            The output of the final layer of the module
+        out : :py:class:`ndarray <numpy.ndarray>` of shape (batchsize, \*)
+            The output of the final layer of the module.
         Xs : dict
             A dictionary with layer ids as keys and values corresponding to the
             input to each intermediate layer during the forward pass. Useful
-            during debugging
+            during debugging.
         """
         if module == "G":
             mod = self.generator
@@ -229,23 +249,23 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        grad : numpy array of shape (batchsize, <module_out_dim>) or list of arrays
-            Gradient of the loss with respect to module output(s)
+        grad : :py:class:`ndarray <numpy.ndarray>` of shape (batchsize, <module_out_dim>) or list of arrays
+            Gradient of the loss with respect to module output(s).
         module : {'C' or 'G'}
             Whether to perform the backward pass for the critic ('C') or for the
             generator ('G').
-        retain_grads : bool (default: True)
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is True.
 
         Returns
         -------
-        out : numpy array of shape (batchsize, <module_in_dim>)
-            The gradient of the loss with respect to the module input
+        out : :py:class:`ndarray <numpy.ndarray>` of shape `(batchsize, \*)`
+            The gradient of the loss with respect to the module input.
         dXs : dict
             A dictionary with layer ids as keys and values corresponding to the
             input to each intermediate layer during the backward pass. Useful
-            during debugging
+            during debugging.
         """
         if module == "G":
             mod = self.generator
@@ -268,11 +288,11 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        dLdGradInterp : numpy array of shape (batchsize, critic_in_dim)
-            Gradient of Y_interp with respect to X_interp
+        dLdGradInterp : :py:class:`ndarray <numpy.ndarray>` of shape `(batchsize, critic_in_dim)`
+            Gradient of `Y_interp` with respect to `X_interp`.
         dYi_outs : dict
             The intermediate outputs generated during the backward pass when
-            computing dLdGradInterp
+            computing `dLdGradInterp`.
         """
         dy = dLdGradInterp
         for k, v in self.critic.items():
@@ -287,13 +307,13 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        X_real : numpy array of shape (batchsize, n_feats)
-            Input data
+        X_real : :py:class:`ndarray <numpy.ndarray>` of shape `(batchsize, n_feats)`
+            Input data.
 
         Returns
         -------
         C_loss : float
-            The critic loss on the current data
+            The critic loss on the current data.
         """
         self.flush_gradients("C")
 
@@ -378,8 +398,8 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        X_shape : tuple of (batchsize, n_feats)
-            Shape for the input batch
+        X_shape : tuple of `(batchsize, n_feats)`
+            Shape for the input batch.
 
         Returns
         -------
@@ -402,7 +422,7 @@ class WGAN_GP(object):
         return G_loss
 
     def flush_gradients(self, module):
-        """Reset parameter gradients after update"""
+        """Reset parameter gradients to 0 after an update."""
         if module == "G":
             mod = self.generator
         elif module == "C":
@@ -414,7 +434,7 @@ class WGAN_GP(object):
             v.flush_gradients()
 
     def update(self, module, module_loss=None):
-        """Perform gradient updates"""
+        """Perform gradient updates and flush gradients upon completion"""
         if module == "G":
             mod = self.generator
         elif module == "C":
@@ -440,19 +460,21 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        X_real : numpy array of shape (n_ex, n_feats)
+        X_real : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_feats)`
             Training dataset
         lambda_ : float
             Gradient penalty coefficient for the critic loss
-        n_steps : int (default: 1000)
-            The maximum number of generator updates to perform
-        batchsize : int (default: 128)
-            Number of examples to use in each training minibatch
+        n_steps : int
+            The maximum number of generator updates to perform. Default is
+            1000.
+        batchsize : int
+            Number of examples to use in each training minibatch. Default is
+            128.
         c_updates_per_epoch : int
-            The number of critic updates to perform at each generator update
-        verbose : bool (default : True)
-            Print loss values after each update. If false, only print loss
-            every 100 steps.
+            The number of critic updates to perform at each generator update.
+        verbose : bool
+            Print loss values after each update. If False, only print loss
+            every 100 steps. Default is True.
         """
         self.lambda_ = lambda_
         self.verbose = verbose

@@ -37,23 +37,23 @@ class Word2Vec(object):
             expense of additional training time. Default is 5.
         min_count : int or None
             Minimum number of times a token must occur in order to be included
-            in vocab. If `None`, include all tokens from `corpus_fp` in vocab.
-            Default is `None`.
+            in vocab. If None, include all tokens from `corpus_fp` in vocab.
+            Default is None.
         skip_gram : bool
             Whether to train the skip-gram or CBOW model. The skip-gram model
             is trained to predict the target word i given its surrounding
-            context, words[i - context:i] and words[i + 1:i + 1 + context] as
-            input. Default is False.
+            context, ``words[i - context:i]`` and ``words[i + 1:i + 1 +
+            context]`` as input. Default is False.
         max_tokens : int or None
             Only add the first `max_tokens` most frequent tokens that occur
-            more than `min_count` to the vocabulary.  If `None`, add all tokens
-            that occur more than than `min_count`. Default is `None`.
+            more than `min_count` to the vocabulary.  If None, add all tokens
+            that occur more than than `min_count`. Default is None.
         embedding_dim : int
             The number of dimensions in the final word embeddings. Default is
             300.
         filter_stopwords : bool
             Whether to remove stopwords before encoding the words in the
-            corpus. Default is `True`.
+            corpus. Default is True.
         noise_dist_power : float
             The power the unigram count is raised to when computing the noise
             distribution for negative sampling. A value of 0 corresponds to a
@@ -66,10 +66,11 @@ class Word2Vec(object):
             The number of negative samples to draw from the noise distribution
             for each positive training sample. If 0, use the hierarchical
             softmax formulation of the model instead. Default is 5.
-        optimizer : str, `OptimizerBase` instance, or None
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters. Default is `None`.
+            within the `update` method.  If None, use the
+            :class:`numpy_ml.neural_nets.optimizers.SGD` optimizer with default
+            parameters. Default is None.
 
         Attributes
         ----------
@@ -208,21 +209,22 @@ class Word2Vec(object):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing a minibatch of `n_ex` examples, each
             consisting of `n_in` integer word indices
-        targets : numpy array of shape (n_ex,)
-            Target word index for each example in the minibatch
-        retain_derived : bool (default : True)
+        targets : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,)`
+            Target word index for each example in the minibatch.
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
             for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            will not be expected to backprop through wrt. this input. Default
+            True.
 
         Returns
         -------
         loss : float
             The loss associated with the current minibatch
-        y_pred : numpy array of shape (`n_ex`,)
+        y_pred : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,)`
             The conditional probabilities of the words in `targets` given the
             corresponding example / context in `X`.
         """
@@ -254,13 +256,13 @@ class Word2Vec(object):
 
         Parameters
         ----------
-        word_ids : numpy array of shape (`M`,)
+        word_ids : :py:class:`ndarray <numpy.ndarray>` of shape `(M,)`
             An array of word IDs to retrieve embeddings for.
 
         Returns
         -------
-        embeddings : numpy array of shape (`M`, `n_out`)
-            The embedding vectors for each of the `M` word IDs
+        embeddings : :py:class:`ndarray <numpy.ndarray>` of shape `(M, n_out)`
+            The embedding vectors for each of the `M` word IDs.
         """
         if isinstance(word_ids, list):
             word_ids = np.array(word_ids)
@@ -327,13 +329,13 @@ class Word2Vec(object):
 
         Yields
         ------
-        X : list of length `batchsize` or numpy array of shape (`batchsize`, `n_in`)
+        X : list of length `batchsize` or :py:class:`ndarray <numpy.ndarray>` of shape (`batchsize`, `n_in`)
             The context IDs for a minibatch of `batchsize` examples. If
-            ``self.skip_gram`` is `False`, `X` will be a ragged list consisting
+            ``self.skip_gram`` is False, `X` will be a ragged list consisting
             of `batchsize` variable-length lists. If ``self.skip_gram`` is
             `True`, all sublists will be of the same length (`n_in`) and `X`
-            will be returned as a numpy array of shape (`batchsize`, `n_in`).
-        target : numpy array of shape (`batchsize`, 1)
+            will be returned as a :py:class:`ndarray <numpy.ndarray>` of shape (`batchsize`, `n_in`).
+        target : :py:class:`ndarray <numpy.ndarray>` of shape (`batchsize`, 1)
             The target IDs associated with each example in `X`
         """
         batchsize = self.batchsize
@@ -417,7 +419,7 @@ class Word2Vec(object):
             The desired number of examples in each training batch. Default is
             128.
         verbose : bool
-            Print batch information during training. Default is `True`.
+            Print batch information during training. Default is True.
         """
         self.verbose = verbose
         self.n_epochs = n_epochs

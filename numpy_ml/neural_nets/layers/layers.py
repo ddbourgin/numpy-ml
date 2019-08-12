@@ -49,12 +49,18 @@ class LayerBase(ABC):
         raise NotImplementedError
 
     def freeze(self):
+        """
+        Freeze the layer parameters at their current values so they can no
+        longer be updated.
+        """
         self.trainable = False
 
     def unfreeze(self):
+        """Unfreeze the layer parameters so they can be updated."""
         self.trainable = True
 
     def flush_gradients(self):
+        """Erase all the layer's derived variables and gradients."""
         assert self.trainable, "Layer is frozen"
         self.X = []
         for k, v in self.derived_variables.items():
@@ -64,6 +70,10 @@ class LayerBase(ABC):
             self.gradients[k] = np.zeros_like(v)
 
     def update(self, cur_loss=None):
+        """
+        Update the layer parameters using the accrued gradients and layer
+        optimizer. Flush all gradients once the update is complete.
+        """
         assert self.trainable, "Layer is frozen"
         self.optimizer.step()
         for k, v in self.gradients.items():
@@ -72,6 +82,22 @@ class LayerBase(ABC):
         self.flush_gradients()
 
     def set_params(self, summary_dict):
+        """
+        Set the layer parameters from a dictionary of values.
+
+        Parameters
+        ----------
+        summary_dict : dict
+            A dictionary of layer parameters and hyperparameters. If a required
+            parameter or hyperparameter is not included within `summary_dict`,
+            this method will use the value in the current layer's
+            :meth:`summary` method.
+
+        Returns
+        -------
+        layer : :doc:`Layer <numpy_ml.neural_nets.layers>` object
+            The newly-initialized layer.
+        """
         layer, sd = self, summary_dict
 
         # collapse `parameters` and `hyperparameters` nested dicts into a single
@@ -98,6 +124,7 @@ class LayerBase(ABC):
         return layer
 
     def summary(self):
+        """Return a dict of the layer parameters, hyperparameters, and ID."""
         return {
             "layer": self.hyperparameters["layer"],
             "parameters": self.parameters,
@@ -110,29 +137,34 @@ class DotProductAttention(LayerBase):
         """
         A single "attention head" layer using a dot-product for the scoring function.
 
-        Equations:
-            Z = K @ Q.T                 if scale = False
-                K @ Q.T / sqrt(d_k)     if scale = True
-            Y = dropout(softmax(Z)) @ V
+        Notes
+        -----
+        The equations for a dot product attention layer are:
+
+        .. math::
+
+            \mathbf{Z}  &=  \mathbf{K Q}^\\top \\ \\ \\ \\ &&\\text{if scale = False} \\\\
+                        &=  \mathbf{K Q}^\\top / \sqrt{d_k} \\ \\ \\ \\ &&\\text{if scale = True} \\\\
+            \mathbf{Y}  &=  \\text{dropout}(\\text{softmax}(\mathbf{Z})) \mathbf{V}
 
         Parameters
         ----------
-        scale : bool (default: True)
+        scale : bool
             Whether to scale the the key-query dot product by the square root
             of the key/query vector dimensionality before applying the Softmax.
             This is useful, since the scale of dot product will otherwise
-            increase as query / key dimensions grow.
+            increase as query / key dimensions grow. Default is True.
         dropout_p : float in [0, 1)
             The dropout propbability during training, applied to the output of
-            the softmax. If 0, no dropout is applied.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}.
+            the softmax. If 0, no dropout is applied. Default is 0.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
             Unused.
-        optimizer : str or `OptimizerBase` instance (default: None)
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters. Unused.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None. Unused.
         """
         super().__init__(optimizer)
 
@@ -151,6 +183,7 @@ class DotProductAttention(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "DotProductAttention",
             "init": self.init,
@@ -173,15 +206,20 @@ class DotProductAttention(LayerBase):
     def forward(self, Q, K, V, retain_derived=True):
         """
         Compute the attention-weighted output of a collection of keys, values,
-        and queries. In the most abstract (ie., hand-wave-y) sense:
+        and queries.
+
+        Notes
+        -----
+        In the most abstract (ie., hand-wave-y) sense:
+
             - Query vectors ask questions
             - Key vectors advertise their relevancy to questions
             - Value vectors give possible answers to questions
             - The dot product between Key and Query vectors provides scores for
               each of the the `n_ex` different Value vectors
 
-        For a single query and n key-value pairs, dot-product attention (with
-        scaling) is:
+        For a single query and `n` key-value pairs, dot-product attention (with
+        scaling) is::
 
             w0 = dropout(softmax( (query @ key[0]) / sqrt(d_k) ))
             w1 = dropout(softmax( (query @ key[1]) / sqrt(d_k) ))
@@ -195,34 +233,37 @@ class DotProductAttention(LayerBase):
         score, which is then passed through a softmax to produce a weight on
         each value vector in Values. We elementwise multiply each value vector
         by its weight, and then take the elementwise sum of each weighted value
-        vector to get the 1 x d_v output for the current example.
+        vector to get the :math:`1 \\times d_v` output for the current example.
 
         In vectorized form,
 
-            Y = dropout(softmax( (K @ Q.T) / sqrt(d_k))) @ V
+        .. math::
+
+            \mathbf{Y} = \\text{dropout}(\\text{softmax}( \mathbf{KQ}^\\top / \sqrt{d_k})) \mathbf{V}
 
         Parameters
         ----------
-        Q : numpy array of shape (n_ex, *, d_k)
+        Q : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k)
             A set of `n_ex` query vectors packed into a single matrix.
             Optional middle dimensions can be used to specify, e.g., the number
             of parallel attention heads.
-        K : numpy array of shape (n_ex, *, d_k)
+        K : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k)
             A set of `n_ex` key vectors packed into a single matrix. Optional
             middle dimensions can be used to specify, e.g., the number of
             parallel attention heads.
-        V : numpy array of shape (n_ex, *, d_v)
+        V : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v)
             A set of `n_ex` value vectors packed into a single matrix. Optional
             middle dimensions can be used to specify, e.g., the number of
             parallel attention heads.
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, *, d_v)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v)
             The attention-weighted output values
         """
         Y, weights = self._fwd(Q, K, V)
@@ -243,24 +284,25 @@ class DotProductAttention(LayerBase):
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, *, d_v)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v)
             The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dQ : numpy array of shape (n_ex, *, d_k) or list of arrays
-            The gradient of the loss wrt. the layer query matrix/matrices Q
-        dK : numpy array of shape (n_ex, *, d_k) or list of arrays
-            The gradient of the loss wrt. the layer key matrix/matrices K
-        dV : numpy array of shape (n_ex, *, d_v) or list of arrays
-            The gradient of the loss wrt. the layer value matrix/matrices V
+        dQ : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k) or list of arrays
+            The gradient of the loss wrt. the layer query matrix/matrices `Q`.
+        dK : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k) or list of arrays
+            The gradient of the loss wrt. the layer key matrix/matrices `K`.
+        dV : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v) or list of arrays
+            The gradient of the loss wrt. the layer value matrix/matrices `V`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -292,7 +334,7 @@ class DotProductAttention(LayerBase):
         return dQ, dK, dV
 
 
-class RestrictedBoltzmannMachine(LayerBase):
+class RBM(LayerBase):
     def __init__(self, n_out, K=1, init="glorot_uniform", optimizer=None):
         """
         A Restricted Boltzmann machine with Bernoulli visible and hidden units.
@@ -301,16 +343,16 @@ class RestrictedBoltzmannMachine(LayerBase):
         ----------
         n_out : int
             The number of output dimensions/units.
-        K : int (default: 1)
+        K : int
             The number of contrastive divergence steps to run before computing
-            a single gradient update.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            a single gradient update. Default is 1.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -352,8 +394,9 @@ class RestrictedBoltzmannMachine(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
-            "layer": "RestrictedBoltzmannMachine",
+            "layer": "RBM",
             "K": self.K,
             "n_in": self.n_in,
             "n_out": self.n_out,
@@ -366,12 +409,12 @@ class RestrictedBoltzmannMachine(LayerBase):
 
     def CD_update(self, X):
         """
-        Perform a single contrastive divergence-k training update using the
-        visible inputs X as a starting point for the Gibbs sampler.
+        Perform a single contrastive divergence-`k` training update using the
+        visible inputs `X` as a starting point for the Gibbs sampler.
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples. Each feature in X should ideally be
             binary-valued, although it is possible to also train on real-valued
@@ -382,35 +425,42 @@ class RestrictedBoltzmannMachine(LayerBase):
 
     def forward(self, V, K=None, retain_derived=True):
         """
-        Hinton recommends: http://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
-        Visible units:
-            Use real-valued probabilities for both the data and the
-            reconstructions
-        Hidden units:
-            For CD1: when the hidden units are being driven by data, always use
-            stochastic binary states. When they are being driven by
-            reconstructions, always use probabilities without sampling.
-            For CD-k: only the final update of the hidden units should use the
-            probability
-        Updates:
-            When collecting the pairwise statistics for learning weights or the
-            individual statistics for learning biases, use the probabilities,
-            not the binary states.
+        Perform the CD-`k` "forward pass" of visible inputs into hidden units
+        and back.
+
+        Notes
+        -----
+        This implementation follows [1]_'s recommendations for the RBM forward
+        pass:
+
+            - Use real-valued probabilities for both the data and the visible
+              unit reconstructions.
+            - Only the final update of the hidden units should use the actual
+              probabilities -- all others should be sampled binary states.
+            - When collecting the pairwise statistics for learning weights or
+              the individual statistics for learning biases, use the
+              probabilities, not the binary states.
+
+        References
+        ----------
+        .. [1] Hinton, G. (2010). "A practical guide to training restricted Boltzmann machines". *UTML TR 2010-003*
 
         Parameters
         ----------
-        V : numpy array of shape (n_ex, n_in)
+        V : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Visible input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples. Each feature in V should ideally be
             binary-valued, although it is possible to also train on real-valued
             features ranging between (0, 1) (e.g., grayscale images).
-        K : int (default: None)
+        K : int
             The number of steps of contrastive divergence steps to run before
-            computing the gradient update. If `None`, use self.K
-        retain_derived : bool (default : True)
+            computing the gradient update. If None, use ``self.K``. Default is
+            None.
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
         """
         if not self.is_initialized:
             self.n_in = V.shape[1]
@@ -474,9 +524,10 @@ class RestrictedBoltzmannMachine(LayerBase):
 
         Parameters
         ----------
-        retain_grads : bool (default: True)
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
         """
         V = self.derived_variables["V"]
         p_H = self.derived_variables["p_H"]
@@ -492,30 +543,30 @@ class RestrictedBoltzmannMachine(LayerBase):
 
     def reconstruct(self, X, n_steps=10, return_prob=False):
         """
-        Reconstruct an input X by running the trained Gibbs sampler for
-        `n_steps`-worth of CD-k.
+        Reconstruct an input `X` by running the trained Gibbs sampler for
+        `n_steps`-worth of CD-`k`.
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer input, representing the `n_in`-dimensional features for a
-            minibatch of `n_ex` examples. Each feature in X should ideally be
+            minibatch of `n_ex` examples. Each feature in `X` should ideally be
             binary-valued, although it is possible to also train on real-valued
-            features ranging between (0, 1) (e.g., grayscale images). If X has
+            features ranging between (0, 1) (e.g., grayscale images). If `X` has
             missing values, it may be sufficient to mark them with random
             entries and allow the reconstruction to impute them.
-        n_steps : int (default: 10)
+        n_steps : int
             The number of Gibbs sampling steps to perform when generating the
-            reconstruction.
-        return_prob : bool (default: False)
+            reconstruction. Default is 10.
+        return_prob : bool
             Whether to return the real-valued feature probabilities for the
-            reconstruction or the binary samples.
+            reconstruction or the binary samples. Default is False.
 
         Returns
         -------
-        V : numpy array of shape (n_ex, in_ch)
+        V : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_ch)
             The reconstruction (or feature probabilities if `return_prob` is
-            true) of the visual input X after running the Gibbs sampler for
+            true) of the visual input `X` after running the Gibbs sampler for
             `n_steps`.
         """
         self.forward(X, K=n_steps)
@@ -544,13 +595,15 @@ class Add(LayerBase):
 
         Parameters
         ----------
-        act_fn : str or `activations.ActivationBase` instance (default: None)
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
             The element-wise output nonlinearity used in computing the final
-            output. If `None`, use the identity function act_fn(x) = x.
-        optimizer : str or `OptimizerBase` instance (default: None)
+            output. If None, use the identity function :math:`f(x) = x`.
+            Default is None.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
         self.act_fn = ActivationInitializer(act_fn)()
@@ -561,6 +614,7 @@ class Add(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Sum",
             "act_fn": str(self.act_fn),
@@ -578,15 +632,16 @@ class Add(LayerBase):
         ----------
         X : list of length `n_inputs`
             A list of tensors, all of the same shape.
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, *dim)
-            The sum over the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+            The sum over the `n_ex` examples.
         """
         out = X[0].copy()
         for i in range(1, len(X)):
@@ -598,20 +653,21 @@ class Add(LayerBase):
 
     def backward(self, dLdY, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, *dim)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
         dX : list of length `n_inputs`
-            The gradient of the loss wrt. each input in `X`
+            The gradient of the loss wrt. each input in `X`.
         """
         if not isinstance(dLdY, list):
             dLdY = [dLdY]
@@ -635,13 +691,15 @@ class Multiply(LayerBase):
 
         Parameters
         ----------
-        act_fn : str or `activations.ActivationBase` instance (default: None)
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
             The element-wise output nonlinearity used in computing the final
-            output. If `None`, use the identity function f(x) = x.
-        optimizer : str or `OptimizerBase` instance (default: None)
+            output. If None, use the identity function :math:`f(x) = x`.
+            Default is None.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
         self.act_fn = ActivationInitializer(act_fn)()
@@ -652,6 +710,7 @@ class Multiply(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Multiply",
             "act_fn": str(self.act_fn),
@@ -669,15 +728,16 @@ class Multiply(LayerBase):
         ----------
         X : list of length `n_inputs`
             A list of tensors, all of the same shape.
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, *dim)
-            The product over the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+            The product over the `n_ex` examples.
         """
         out = X[0].copy()
         for i in range(1, len(X)):
@@ -689,20 +749,21 @@ class Multiply(LayerBase):
 
     def backward(self, dLdY, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, *dim)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
         dX : list of length `n_inputs`
-            The gradient of the loss wrt. each input in `X`
+            The gradient of the loss wrt. each input in `X`.
         """
         if not isinstance(dLdY, list):
             dLdY = [dLdY]
@@ -727,14 +788,14 @@ class Flatten(LayerBase):
 
         Parameters
         ----------
-        keep_dim : str, int (default : 'first')
+        keep_dim : {'first', 'last', -1}
             The dimension of the original input to retain. Typically used for
-            retaining the minibatch dimension. Valid entries are {'first',
-            'last', -1} If -1, flatten all dimensions.
-        optimizer : str or `OptimizerBase` instance (default: None)
+            retaining the minibatch dimension.. If -1, flatten all dimensions.
+            Default is 'first'.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
+            optimizer with default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -749,6 +810,7 @@ class Flatten(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Flatten",
             "keep_dim": self.keep_dim,
@@ -764,18 +826,19 @@ class Flatten(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (*in_dims)
+        X : :py:class:`ndarray <numpy.ndarray>`
             Input volume to flatten.
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (*out_dims)
-            Flattened output. If `keep_dim` is `first`, X is reshaped to
-            (X.shape[0], -1), otherwise (-1, X.shape[0]).
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (\*`out_dims`)
+            Flattened output. If `keep_dim` is `'first'`, `X` is reshaped to
+            ``(X.shape[0], -1)``, otherwise ``(-1, X.shape[0])``.
         """
         if retain_derived:
             self.derived_variables["in_dims"].append(X.shape)
@@ -786,20 +849,21 @@ class Flatten(LayerBase):
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (*out_dims)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (*out_dims)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (*in_dims) or list of arrays
-            The gradient of the loss wrt. the layer input(s) X
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (\*`in_dims`) or list of arrays
+            The gradient of the loss wrt. the layer input(s) `X`.
         """
         if not isinstance(dLdy, list):
             dLdy = [dLdy]
@@ -814,56 +878,57 @@ class Flatten(LayerBase):
 
 
 class BatchNorm2D(LayerBase):
-    """
-    BatchNorm Motivation:
-        The distribution of layer inputs changes during training as the
-        parameters of the previous layers change.  This slows down training by
-        requiring lower learning rates + careful parameter initialization, and
-        makes it hard to train models with saturating nonlinearities.  This
-        phenomenon is known as *internal covariate shift*. BatchNorm is an
-        attempt address the problem by normalizing layer inputs.
-
-    Issues with BatchNorm:
-        1. Puts a lower limit on the batch size: smaller mini-batch sizes
-        increase the variance of the estimates for the global mean and variance
-        estimates.
-
-        2. Difficult to apply in RNNs: have to fit a separate BatchNorm layer
-        for *each* time-step. This makes the model significantly more
-        complicated and forces us to store the layer statistics for each
-        timestep during training.
-    """
-
     def __init__(self, momentum=0.9, epsilon=1e-5, optimizer=None):
         """
         A batch normalization layer for two-dimensional inputs with an
-        additional channel dimension. This is sometimes known as "spatial batch
-        normalization" in the literature.
+        additional channel dimension.
 
-        Equations [train]:
+        Notes
+        -----
+        BatchNorm is an attempt address the problem of internal covariate
+        shift (ICS) during training by normalizing layer inputs.
+
+        ICS refers to the change in the distribution of layer inputs during
+        training as a result of the changing parameters of the previous
+        layer(s). ICS can make it difficult to train models with saturating
+        nonlinearities, and in general can slow training by requiring a lower
+        learning rate.
+
+        Equations [train]::
+
             Y = scaler * norm(X) + intercept
             norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
 
-        Equations [test]:
+        Equations [test]::
+
             Y = scaler * running_norm(X) + intercept
             running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
 
-        In contrast to a LayerNorm, the BatchNorm layer calculates the mean and
-        var across the *batch* rather than the output features.
+        In contrast to :class:`LayerNorm2D`, the BatchNorm layer calculates
+        the mean and var across the *batch* rather than the output features.
+        This has two disadvantages:
+
+            1. It is highly affected by batch size: smaller mini-batch sizes
+            increase the variance of the estimates for the global mean and
+            variance.
+
+            2. It is difficult to apply in RNNs -- one must fit a separate
+            BatchNorm layer for *each* time-step.
 
         Parameters
         ----------
-        momentum : float (default: 0.9)
+        momentum : float
             The momentum term for the running mean/running std calculations.
             The closer this is to 1, the less weight will be given to the
-            mean/std of the current batch (i.e., higher smoothing)
-        epsilon : float (default : 1e-5)
-            A small smoothing constant to use during computation of norm(X) to
-            avoid divide-by-zero errors.
-        optimizer : str or `OptimizerBase` instance (default: None)
+            mean/std of the current batch (i.e., higher smoothing). Default is
+            0.9.
+        epsilon : float
+            A small smoothing constant to use during computation of ``norm(X)``
+            to avoid divide-by-zero errors. Default is 1e-5.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
+            optimizer with default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -903,6 +968,7 @@ class BatchNorm2D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "BatchNorm2D",
             "act_fn": None,
@@ -917,6 +983,7 @@ class BatchNorm2D(LayerBase):
         }
 
     def reset_running_stats(self):
+        """Reset the running mean and variance estimates to 0 and 1."""
         assert self.trainable, "Layer is frozen"
         self.parameters["running_mean"] = np.zeros(self.in_ch)
         self.parameters["running_var"] = np.ones(self.in_ch)
@@ -925,31 +992,35 @@ class BatchNorm2D(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations [train]:
+        Notes
+        -----
+        Equations [train]::
+
             Y = scaler * norm(X) + intercept
             norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
 
-        Equations [test]:
+        Equations [test]::
+
             Y = scaler * running_norm(X) + intercept
             running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
 
-        In contrast to a LayerNorm, the BatchNorm layer calculates the mean and
-        var across the *batch* rather than the output features.
+        In contrast to :class:`LayerNorm2D`, the BatchNorm layer calculates the
+        mean and var across the *batch* rather than the output features.
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
             Input volume containing the `in_rows` x `in_cols`-dimensional
             features for a minibatch of `n_ex` examples.
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to use the current intput to adjust the running mean and
-            running_var computations. Setting this to `True` is the same as
-            freezing the layer for the current input.
+            running_var computations. Setting this to True is the same as
+            freezing the layer for the current input. Default is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            Layer output for each of the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
             self.in_ch = self.out_ch = X.shape[3]
@@ -982,20 +1053,21 @@ class BatchNorm2D(LayerBase):
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss wrt. the layer input X
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -1040,53 +1112,57 @@ class BatchNorm2D(LayerBase):
 
 
 class BatchNorm1D(LayerBase):
-    """
-    Motivation:
-        The distribution of layer inputs changes during training as the
-        parameters of the previous layers change.  This slows down training by
-        requiring lower learning rates + careful parameter initialization, and
-        makes it hard to train models with saturating nonlinearities.  This
-        phenomenon is known as *internal covariate shift*. BatchNorm is an
-        attempt address the problem by normalizing layer inputs.
-
-    Issues:
-        1. Puts a lower limit on the batch size: smaller mini-batch sizes
-        increase the variance of the estimates for the global mean and variance.
-
-        2. Difficult to apply in RNNs: have to fit a separate BatchNorm layer
-        for *each* time-step. This makes the model significantly more
-        complicated and forces us to store the layer statistics for each
-        timestep during training.
-    """
-
     def __init__(self, momentum=0.9, epsilon=1e-5, optimizer=None):
         """
         A batch normalization layer for 1D inputs.
 
-        Equations [train]:
+        Notes
+        -----
+        BatchNorm is an attempt address the problem of internal covariate
+        shift (ICS) during training by normalizing layer inputs.
+
+        ICS refers to the change in the distribution of layer inputs during
+        training as a result of the changing parameters of the previous
+        layer(s). ICS can make it difficult to train models with saturating
+        nonlinearities, and in general can slow training by requiring a lower
+        learning rate.
+
+        Equations [train]::
+
             Y = scaler * norm(X) + intercept
             norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
 
-        Equations [test]:
+        Equations [test]::
+
             Y = scaler * running_norm(X) + intercept
             running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
 
-        In contrast to a LayerNorm, the BatchNorm layer calculates the mean and
-        var across the *batch* rather than the output features.
+        In contrast to :class:`LayerNorm1D`, the BatchNorm layer calculates
+        the mean and var across the *batch* rather than the output features.
+        This has two disadvantages:
+
+            1. It is highly affected by batch size: smaller mini-batch sizes
+            increase the variance of the estimates for the global mean and
+            variance.
+
+            2. It is difficult to apply in RNNs -- one must fit a separate
+            BatchNorm layer for *each* time-step.
 
         Parameters
         ----------
-        momentum : float (default: 0.9)
+        momentum : float
             The momentum term for the running mean/running std calculations.
             The closer this is to 1, the less weight will be given to the
-            mean/std of the current batch (i.e., higher smoothing)
-        epsilon : float (default : 1e-5)
-            A small smoothing constant to use during computation of norm(X) to
-            avoid divide-by-zero errors.
-        optimizer : str or `OptimizerBase` instance (default: None)
+            mean/std of the current batch (i.e., higher smoothing). Default is
+            0.9.
+        epsilon : float
+            A small smoothing constant to use during computation of ``norm(X)``
+            to avoid divide-by-zero errors. Default is 1e-5.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -1125,6 +1201,7 @@ class BatchNorm1D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "BatchNorm1D",
             "act_fn": None,
@@ -1139,6 +1216,7 @@ class BatchNorm1D(LayerBase):
         }
 
     def reset_running_stats(self):
+        """Reset the running mean and variance estimates to 0 and 1."""
         assert self.trainable, "Layer is frozen"
         self.parameters["running_mean"] = np.zeros(self.n_in)
         self.parameters["running_var"] = np.ones(self.n_in)
@@ -1147,30 +1225,19 @@ class BatchNorm1D(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations [train]:
-            Y = scaler * norm(X) + intercept
-            norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
-
-        Equations [test]:
-            Y = scaler * running_norm(X) + intercept
-            running_norm(X) = (X - running_mean) / sqrt(running_var + epsilon)
-
-        In contrast to a LayerNorm, the BatchNorm layer calculates the mean and
-        var across the *batch* rather than the output features.
-
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer input, representing the `n_in`-dimensional features for a
-            minibatch of `n_ex` examples
-        retain_derived : bool (default : True)
+            minibatch of `n_ex` examples.
+        retain_derived : bool
             Whether to use the current intput to adjust the running mean and
-            running_var computations. Setting this to `True` is the same as
-            freezing the layer for the current input.
+            running_var computations. Setting this to True is the same as
+            freezing the layer for the current input. Default is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_in)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer output for each of the `n_ex` examples
         """
         if not self.is_initialized:
@@ -1204,20 +1271,21 @@ class BatchNorm1D(LayerBase):
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer input X
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -1256,41 +1324,36 @@ class BatchNorm1D(LayerBase):
 
 
 class LayerNorm2D(LayerBase):
-    """
-    Motivation:
-        An alternative to `BatchNorm` that computes input statistics over
-        *features* rather than *examples*, making it independent of batch size,
-        and allows for straightforward application in RNNs.
-
-    Advantages of LayerNorm:
-        1. Independence between inputs means that each input has a different
-        normalization operation, allowing for arbitrary mini-batch sizes.
-    """
-
     def __init__(self, epsilon=1e-5, optimizer=None):
         """
         A layer normalization layer for 2D inputs with an additional channel
         dimension.
 
-        Equations [train & test]:
+        Notes
+        -----
+        In contrast to :class:`BatchNorm2D`, the LayerNorm layer calculates the
+        mean and variance across *features* rather than examples in the batch
+        ensuring that the mean and variance estimates are independent of batch
+        size and permitting straightforward application in RNNs.
+
+        Equations [train & test]::
+
             Y = scaler * norm(X) + intercept
             norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
 
-        In contrast to a BatchNorm, the LayerNorm layer calculates the mean and
-        variance across *features* rather than examples in the batch.
-
-        Also in contrast to BatchNorm, `scaler` and `intercept` are applied
-        *elementwise* to norm(X)
+        Also in contrast to :class:`BatchNorm2D`, `scaler` and `intercept` are applied
+        *elementwise* to ``norm(X)``.
 
         Parameters
         ----------
-        epsilon : float (default : 1e-5)
-            A small smoothing constant to use during computation of norm(X) to
-            avoid divide-by-zero errors.
-        optimizer : str or `OptimizerBase` instance (default: None)
+        epsilon : float
+            A small smoothing constant to use during computation of ``norm(X)``
+            to avoid divide-by-zero errors. Default is 1e-5.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -1317,6 +1380,7 @@ class LayerNorm2D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "LayerNorm2D",
             "act_fn": None,
@@ -1333,24 +1397,28 @@ class LayerNorm2D(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations [train & test]:
+        Notes
+        -----
+        Equations [train & test]::
+
             Y = scaler * norm(X) + intercept
             norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
             Input volume containing the `in_rows` x `in_cols`-dimensional
             features for a minibatch of `n_ex` examples.
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            Layer output for each of the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
             self.in_ch = self.out_ch = X.shape[3]
@@ -1371,20 +1439,21 @@ class LayerNorm2D(LayerBase):
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss wrt. the layer input X
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -1431,40 +1500,35 @@ class LayerNorm2D(LayerBase):
 
 
 class LayerNorm1D(LayerBase):
-    """
-    Motivation:
-        An alternative to `BatchNorm` that computes input statistics over
-        *features* rather than *examples*, making it independent of batch size,
-        and allows for straightforward application in RNNs.
-
-    Advantages of LayerNorm:
-        1. Independence between inputs means that each input has a different
-           normalization operation, allowing for arbitrary mini-batch sizes.
-    """
-
     def __init__(self, epsilon=1e-5, optimizer=None):
         """
         A layer normalization layer for 1D inputs.
 
-        Equations [train & test]:
+        Notes
+        -----
+        In contrast to :class:`BatchNorm1D`, the LayerNorm layer calculates the
+        mean and variance across *features* rather than examples in the batch
+        ensuring that the mean and variance estimates are independent of batch
+        size and permitting straightforward application in RNNs.
+
+        Equations [train & test]::
+
             Y = scaler * norm(X) + intercept
             norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
 
-        In contrast to a BatchNorm, the LayerNorm layer calculates the mean and
-        variance across *features* rather than examples in the batch.
-
-        Also in contrast to BatchNorm, `scaler` and `intercept` are applied
-        *elementwise* to norm(X)
+        Also in contrast to :class:`BatchNorm1D`, `scaler` and `intercept` are applied
+        *elementwise* to ``norm(X)``.
 
         Parameters
         ----------
-        epsilon : float (default : 1e-5)
-            A small smoothing constant to use during computation of norm(X) to
-            avoid divide-by-zero errors.
-        optimizer : str or `OptimizerBase` instance (default: None)
+        epsilon : float
+            A small smoothing constant to use during computation of ``norm(X)``
+            to avoid divide-by-zero errors. Default is 1e-5.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -1488,6 +1552,7 @@ class LayerNorm1D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "LayerNorm1D",
             "act_fn": None,
@@ -1504,30 +1569,21 @@ class LayerNorm1D(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations [train & test]:
-            Y = scaler * norm(X) + intercept
-            norm(X) = (X - mean(X)) / sqrt(var(X) + epsilon)
-
-        In contrast to BatchNorm, the LayerNorm layer calculates the mean and
-        variance across *features* rather than the examples in the batch.
-
-        Also in contrast to BatchNorm, `scaler` and `intercept` are applied
-        *elementwise* to norm(X)
-
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer input, representing the `n_in`-dimensional features for a
-            minibatch of `n_ex` examples
-        retain_derived : bool (default : True)
+            minibatch of `n_ex` examples.
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_in)
-            Layer output for each of the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
             self.n_in = self.n_out = X.shape[1]
@@ -1547,20 +1603,21 @@ class LayerNorm1D(LayerBase):
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer input X
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -1612,7 +1669,10 @@ class Embedding(LayerBase):
         """
         An embedding layer.
 
-        Equations:
+        Notes
+        -----
+        Equations::
+
             Y = W[x]
 
         NB. This layer must be the first in a neural network as the gradients
@@ -1625,16 +1685,17 @@ class Embedding(LayerBase):
         vocab_size : int
             The total number of items in the vocabulary. All integer indices
             are expected to range between 0 and `vocab_size - 1`.
-        pool : {'sum', 'mean', None} (default: None)
+        pool : {'sum', 'mean', None}
             If not None, apply this function to the collection of `n_in`
             encodings in each example to produce a single, pooled embedding.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            Default is None.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
         fstr = "'pool' must be either 'sum', 'mean', or None but got '{}'"
@@ -1659,6 +1720,7 @@ class Embedding(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Embedding",
             "init": self.init,
@@ -1677,12 +1739,12 @@ class Embedding(LayerBase):
 
         Parameters
         ----------
-        word_ids : numpy array of shape (`M`,)
+        word_ids : :py:class:`ndarray <numpy.ndarray>` of shape (`M`,)
             An array of `M` IDs to retrieve embeddings for.
 
         Returns
         -------
-        embeddings : numpy array of shape (`M`, `n_out`)
+        embeddings : :py:class:`ndarray <numpy.ndarray>` of shape (`M`, `n_out`)
             The embedding vectors for each of the `M` IDs.
         """
         return self.parameters["W"][ids]
@@ -1691,25 +1753,27 @@ class Embedding(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
+        Notes
+        -----
         Equations:
             Y = W[x]
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in) or list of length `n_ex`
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in) or list of length `n_ex`
             Layer input, representing a minibatch of `n_ex` examples. If
-            `self.pool` is None, each example must consist of exactly `n_in`
+            ``self.pool`` is None, each example must consist of exactly `n_in`
             integer token IDs. Otherwise, `X` can be a ragged array, with each
             example consisting of a variable number of token IDs.
         retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
+            for use later during backprop. If False, this suggests the layer
             will not be expected to backprop through with regard to this input.
             Default is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_in, n_out)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_out)
             Embeddings for each coordinate of each of the `n_ex` examples
         """
         # if X is a ragged array
@@ -1742,19 +1806,19 @@ class Embedding(LayerBase):
         """
         Backprop from layer outputs to embedding weights.
 
+        Notes
+        -----
+        Because the items in `X` are interpreted as indices, we cannot compute
+        the gradient of the layer output wrt. `X`.
+
         Parameters
         ----------
-        dLdy : numpy array of shape (n_ex, n_in, n_out) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_out) or list of arrays
             The gradient(s) of the loss wrt. the layer output(s)
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
             during the backward pass in the final parameter update. Default is
             True.
-
-        Notes
-        -----
-        Because the items in `X` are interpreted as indices, we cannot compute
-        the gradient of the layer output wrt. `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -1788,23 +1852,30 @@ class FullyConnected(LayerBase):
         """
         A fully-connected (dense) layer.
 
-        Equations:
-            Y = act_fn( W @ X + b )
+        Notes
+        -----
+        A fully connected layer computes the function
+
+        .. math::
+
+            \mathbf{Y} = f( \mathbf{WX} + \mathbf{b} )
+
+        where `f` is the activation nonlinearity, **W** and **b** are
+        parameters of the layer, and **X** is the minibatch of input examples.
 
         Parameters
         ----------
         n_out : int
             The dimensionality of the layer output
-        act_fn : str or `activations.ActivationBase` instance (default: None)
-            The element-wise output nonlinearity used in computing Y. If None,
-            use the identity function act_fn(X) = X
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The element-wise output nonlinearity used in computing `Y`. If None,
+            use the identity function :math:`f(X) = X`. Default is NOne.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
+            optimizer with default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -1828,6 +1899,7 @@ class FullyConnected(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "FullyConnected",
             "init": self.init,
@@ -1844,23 +1916,21 @@ class FullyConnected(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations:
-            Y = act_fn( W @ X + b )
-
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer input, representing the `n_in`-dimensional features for a
-            minibatch of `n_ex` examples
-        retain_derived : bool (default : True)
+            minibatch of `n_ex` examples.
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_out)
-            Layer output for each of the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+            Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
             self.n_in = X.shape[1]
@@ -1885,20 +1955,21 @@ class FullyConnected(LayerBase):
 
     def backward(self, dLdy, retain_grads=True):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdy : numpy array of shape (n_ex, n_out) or list of arrays
-            The gradient(s) of the loss wrt. the layer output(s)
-        retain_grads : bool (default: True)
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out) or list of arrays
+            The gradient(s) of the loss wrt. the layer output(s).
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dLdX : numpy array of shape (n_ex, n_in) or list of arrays
-            The gradient of the loss wrt. the layer input(s) X
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in) or list of arrays
+            The gradient of the loss wrt. the layer input(s) `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -1946,19 +2017,34 @@ class FullyConnected(LayerBase):
 class Softmax(LayerBase):
     def __init__(self, dim=-1, optimizer=None):
         """
-        A softmax layer.
+        A softmax nonlinearity layer.
 
-        Equations:
-            Y = e^X / sum(e^X)
+        Notes
+        -----
+        This is implemented as a layer rather than an activation primarily
+        because it requires retaining the layer input in order to compute the
+        softmax gradients properly. In other words, in contrast to other
+        simple activations, the softmax function and its gradient are not
+        computed elementwise, and thus are more easily expressed as a layer.
+
+        The softmax function computes:
+
+        .. math::
+
+            y_i = \\frac{e^{x_i}}{\sum_j e^{x_j}}
+
+        where :math:`x_i` is the `i` th element of input example **x**.
 
         Parameters
         ----------
-        dim: int (default: -1)
-            The dimension in X along which the softmax will be computed
-        optimizer : str or `OptimizerBase` instance (default: None)
+        dim: int
+            The dimension in `X` along which the softmax will be computed.
+            Default is -1.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters. Unused for this layer.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None. Unused for this layer.
         """
         super().__init__(optimizer)
 
@@ -1974,6 +2060,7 @@ class Softmax(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "SoftmaxLayer",
             "n_in": self.n_in,
@@ -1988,23 +2075,21 @@ class Softmax(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations:
-            Y = e^X / sum(e^X)
-
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer input, representing the `n_in`-dimensional features for a
-            minibatch of `n_ex` examples
-        retain_derived : bool (default : True)
+            minibatch of `n_ex` examples.
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_out)
-            Layer output for each of the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+            Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
             self.n_in = X.shape[1]
@@ -2025,20 +2110,21 @@ class Softmax(LayerBase):
 
     def backward(self, dLdy):
         """
-        Backprop from layer outputs to inputs
+        Backprop from layer outputs to inputs.
 
         Parameters
         ----------
-        dLdy : numpy array of shape (n_ex, n_out) or list of arrays
-            The gradient(s) of the loss wrt. the layer output(s)
-        retain_grads : bool (default: True)
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out) or list of arrays
+            The gradient(s) of the loss wrt. the layer output(s).
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dLdX : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer input X
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -2088,28 +2174,34 @@ class SparseEvolution(LayerBase):
         A sparse Erdos-Renyi layer with evolutionary rewiring via the sparse
         evolutionary training (SET) algorithm.
 
-        Equations:
-            Y = act_fn( (W * W_mask) @ X + b )
+        Notes
+        -----
+        .. math::
+
+            Y = f( (\mathbf{W} \odot \mathbf{W}_{mask}) \mathbf{X} + \mathbf{b} )
+
+        where :math:`\odot` is the elementwise multiplication operation, `f` is
+        the layer activation function, and :math:`\mathbf{W}_{mask}` is an
+        evolved binary mask.
 
         Parameters
         ----------
         n_out : int
             The dimensionality of the layer output
-        zeta : float (default: 0.3)
+        zeta : float
             Proportion of the positive and negative weights closest to zero to
-            drop after each training update
-        epsilon : float (default: 20)
-            Layer sparsity parameter
-        act_fn : str or `activations.ActivationBase` instance (default: None)
-            The element-wise output nonlinearity used in computing Y. If None,
-            use the identity function act_fn(X) = X
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            drop after each training update. Default is 0.3.
+        epsilon : float
+            Layer sparsity parameter. Default is 20.
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The element-wise output nonlinearity used in computing `Y`. If None,
+            use the identity function :math:`f(X) = X`. Default is None.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
+            optimizer with default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -2140,6 +2232,7 @@ class SparseEvolution(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "SparseEvolutionary",
             "init": self.init,
@@ -2158,23 +2251,21 @@ class SparseEvolution(LayerBase):
         """
         Compute the layer output on a single minibatch.
 
-        Equations:
-            Y = act_fn( (W * W_mask) @ X + b )
-
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Layer input, representing the `n_in`-dimensional features for a
-            minibatch of `n_ex` examples
-        retain_derived : bool (default : True)
+            minibatch of `n_ex` examples.
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_out)
-            Layer output for each of the `n_ex` examples
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+            Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
             self.n_in = X.shape[1]
@@ -2204,16 +2295,17 @@ class SparseEvolution(LayerBase):
 
         Parameters
         ----------
-        dLdy : numpy array of shape (n_ex, n_out) or list of arrays
-            The gradient(s) of the loss wrt. the layer output(s)
-        retain_grads : bool (default: True)
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out) or list of arrays
+            The gradient(s) of the loss wrt. the layer output(s).
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dLdX : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer input X
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -2262,7 +2354,7 @@ class SparseEvolution(LayerBase):
     def update(self):
         """
         Update parameters using current gradients and evolve network
-        connections via SET
+        connections via SET.
         """
         assert self.trainable, "Layer is frozen"
         for k, v in self.gradients.items():
@@ -2319,11 +2411,14 @@ class Conv1D(LayerBase):
         """
         Apply a one-dimensional convolution kernel over an input volume.
 
-        Equations:
+        Notes
+        -----
+        Equations::
+
             out = act_fn(pad(X) * W + b)
             out_dim = floor(1 + (n_rows_in + pad_left + pad_right - kernel_width) / stride)
 
-            where '*' denotes the cross-correlation operation with stride `s` and dilation `d`
+        where '`*`' denotes the cross-correlation operation with stride `s` and dilation `d`.
 
         Parameters
         ----------
@@ -2331,29 +2426,29 @@ class Conv1D(LayerBase):
             The number of filters/kernels to compute in the current layer
         kernel_width : int
             The width of a single 1D filter/kernel in the current layer
-        act_fn : str or `activations.ActivationBase` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use the
-            identity function f(x) = x by default
-        pad : int, tuple, or {'same', 'causal'} (default: 0)
-            The number of rows/columns to zero-pad the input with. If 'same',
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The activation function for computing ``Y[t]``. If None, use the
+            identity function :math:`f(x) = x` by default. Default is None.
+        pad : int, tuple, or {'same', 'causal'}
+            The number of rows/columns to zero-pad the input with. If `'same'`,
             calculate padding to ensure the output length matches in the input
-            length. If 'causal' compute padding such that the output both has
-            the same length as the input AND output[t] does not depend on
-            input[t + 1:].
-        stride : int (default: 1)
+            length. If `'causal'` compute padding such that the output both has
+            the same length as the input AND ``output[t]`` does not depend on
+            ``input[t + 1:]``. Default is 0.
+        stride : int
             The stride/hop of the convolution kernels as they move over the
-            input volume
-        dilation : int (default: 0)
+            input volume. Default is 1.
+        dilation : int
             Number of pixels inserted between kernel elements. Effective kernel
-            shape after dilation is:
-                [kernel_rows * (d + 1) - d, kernel_cols * (d + 1) - d]
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            shape after dilation is: ``[kernel_rows * (d + 1) - d, kernel_cols
+            * (d + 1) - d]``. Default is 0.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -2381,6 +2476,7 @@ class Conv1D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Conv1D",
             "pad": self.pad,
@@ -2403,18 +2499,19 @@ class Conv1D(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, l_in, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
             The input volume consisting of `n_ex` examples, each of length
             `l_in` and with `in_ch` input channels
-        retain_derived : bool (default : True)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, l_out, out_ch)
-            The layer output
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch)
+            The layer output.
         """
         if not self.is_initialized:
             self.in_ch = X.shape[2]
@@ -2441,22 +2538,26 @@ class Conv1D(LayerBase):
     def backward(self, dLdy, retain_grads=True):
         """
         Compute the gradient of the loss with respect to the layer parameters.
-        Relies on `im2col` and `col2im` to vectorize the gradient calculation.
-        See the private method `_backward_naive` for a more straightforward
+
+        Notes
+        -----
+        Relies on :meth:`~numpy_ml.neural_nets.utils.utils.im2col` and :meth:`~numpy_ml.neural_nets.utils.utils.col2im` to vectorize the gradient calculation.
+        See the private method :meth:`_backward_naive` for a more straightforward
         implementation.
 
         Parameters
         ----------
-        dLdy : numpy array of shape (n_ex, l_out, out_ch) or list of arrays
-            The gradient(s) of the loss with respect to the layer output(s)
-        retain_grads : bool (default: True)
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch) or list of arrays
+            The gradient(s) of the loss with respect to the layer output(s).
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, l_in, in_ch)
-            The gradient of the loss with respect to the layer input volume
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
+            The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -2517,16 +2618,17 @@ class Conv1D(LayerBase):
 
         Parameters
         ----------
-        dLdy : numpy array of shape (n_ex, l_out, out_ch) or list of arrays
-            The gradient(s) of the loss with respect to the layer output(s)
-        retain_grads : bool (default: True)
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch) or list of arrays
+            The gradient(s) of the loss with respect to the layer output(s).
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, l_in, in_ch)
-            The gradient of the loss with respect to the layer input volume
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
+            The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -2586,12 +2688,16 @@ class Conv2D(LayerBase):
         """
         Apply a two-dimensional convolution kernel over an input volume.
 
-        Equations:
+        Notes
+        -----
+        Equations::
+
             out = act_fn(pad(X) * W + b)
             n_rows_out = floor(1 + (n_rows_in + pad_left + pad_right - filter_rows) / stride)
             n_cols_out = floor(1 + (n_cols_in + pad_top + pad_bottom - filter_cols) / stride)
 
-            where '*' denotes the cross-correlation operation with stride `s` and dilation `d`
+        where `'*'` denotes the cross-correlation operation with stride `s` and
+        dilation `d`.
 
         Parameters
         ----------
@@ -2599,25 +2705,26 @@ class Conv2D(LayerBase):
             The number of filters/kernels to compute in the current layer
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
-        act_fn : str or `activations.ActivationBase` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use the
-            identity function f(X) = X by default
-        pad : int, tuple, or 'same' (default: 0)
-            The number of rows/columns to zero-pad the input with
-        stride : int (default: 1)
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The activation function for computing ``Y[t]``. If None, use the
+            identity function :math:`f(X) = X` by default. Default is None.
+        pad : int, tuple, or 'same'
+            The number of rows/columns to zero-pad the input with. Default is
+            0.
+        stride : int
             The stride/hop of the convolution kernels as they move over the
-            input volume
-        dilation : int (default: 0)
+            input volume. Default is 1.
+        dilation : int
             Number of pixels inserted between kernel elements. Effective kernel
-            shape after dilation is:
-                [kernel_rows * (d + 1) - d, kernel_cols * (d + 1) - d]
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            shape after dilation is: ``[kernel_rows * (d + 1) - d, kernel_cols
+            * (d + 1) - d]``. Default is 0.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -2646,6 +2753,7 @@ class Conv2D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Conv2D",
             "pad": self.pad,
@@ -2668,18 +2776,19 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
             The input volume consisting of `n_ex` examples, each with dimension
-            (in_rows x in_cols x in_ch)
-        retain_derived : bool (default : True)
+            (`in_rows` x `in_cols` x `in_ch`).
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-            The layer output
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+            The layer output.
         """
         if not self.is_initialized:
             self.in_ch = X.shape[3]
@@ -2706,23 +2815,30 @@ class Conv2D(LayerBase):
     def backward(self, dLdy, retain_grads=True):
         """
         Compute the gradient of the loss with respect to the layer parameters.
-        Relies on `im2col` and `col2im` to vectorize the gradient calculation.
-        See the private method `_backward_naive` for a more straightforward
+
+        Notes
+        -----
+        Relies on :meth:`~numpy_ml.neural_nets.utils.utils.im2col` and
+        :meth:`~numpy_ml.neural_nets.utils.utils.col2im` to vectorize the
+        gradient calculation.
+
+        See the private method :meth:`_backward_naive` for a more straightforward
         implementation.
 
         Parameters
         ----------
-        dLdy : numpy array of shape (n_ex, out_rows, out_cols, out_ch) or list
-               of arrays
-            The gradient(s) of the loss with respect to the layer output(s)
-        retain_grads : bool (default: True)
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows,
+        out_cols, out_ch`) or list of arrays
+            The gradient(s) of the loss with respect to the layer output(s).
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss with respect to the layer input volume
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -2774,13 +2890,13 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
             The gradient of the loss with respect to the layer output.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss with respect to the layer input volume
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+            The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdy, list):
@@ -2839,18 +2955,18 @@ class Pool2D(LayerBase):
         ----------
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
-        stride : int (default: 1)
+        stride : int
             The stride/hop of the convolution kernels as they move over the
-            input volume
-        pad : int, tuple, or 'same' (default: 0)
-            The number of rows/columns of 0's to pad the input.
-        mode : str (default: 'max')
-            The pooling function to apply. Valid entries are {"max",
-            "average"}.
-        optimizer : str or `OptimizerBase` instance (default: None)
+            input volume. Default is 1.
+        pad : int, tuple, or 'same'
+            The number of rows/columns of 0's to pad the input. Default is 0.
+        mode : {"max", "average"}
+            The pooling function to apply.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -2868,6 +2984,7 @@ class Pool2D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Pool2D",
             "act_fn": None,
@@ -2889,18 +3006,19 @@ class Pool2D(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
             The input volume consisting of `n_ex` examples, each with dimension
-            (in_rows x in_cols x in_ch)
-        retain_derived : bool (default : True)
+            (`in_rows` x `in_cols` x `in_ch`)
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-            The layer output
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows, out_cols, out_ch`)
+            The layer output.
         """
         if not self.is_initialized:
             self.in_ch = self.out_ch = X.shape[3]
@@ -2943,16 +3061,17 @@ class Pool2D(LayerBase):
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss wrt. the layer output Y
-        retain_grads : bool (default: True)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
+            The gradient of the loss wrt. the layer output `Y`.
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss wrt. the layer input X
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
+            The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdY, list):
@@ -3011,8 +3130,13 @@ class Deconv2D(LayerBase):
         init="glorot_uniform",
     ):
         """
-        Apply a two-dimensional "deconvolution" (more accurately, a transposed
-        convolution / fractionally-strided convolution) to an input volume.
+        Apply a two-dimensional "deconvolution" to an input volume.
+
+        Notes
+        -----
+        The term "deconvolution" in this context does not correspond with the
+        deconvolution operation in mathematics. More accurately, this layer is
+        computing a transposed convolution / fractionally-strided convolution.
 
         Parameters
         ----------
@@ -3020,21 +3144,22 @@ class Deconv2D(LayerBase):
             The number of filters/kernels to compute in the current layer
         kernel_shape : 2-tuple
             The dimension of a single 2D filter/kernel in the current layer
-        act_fn : str or `activations.ActivationBase` instance (default: None)
-            The activation function for computing Y[t]. If `None`, use Affine
-            activations by default
-        pad : int, tuple, or 'same' (default: 0)
-            The number of rows/columns to zero-pad the input with
-        stride : int (default: 1)
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The activation function for computing ``Y[t]``. If None, use
+            :class:`~numpy_ml.neural_nets.activations.activations.Affine`
+            activations by default. Default is None.
+        pad : int, tuple, or 'same'
+            The number of rows/columns to zero-pad the input with. Default is 0.
+        stride : int
             The stride/hop of the convolution kernels as they move over the
-            input volume
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            input volume. Default is 1.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3062,6 +3187,7 @@ class Deconv2D(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "Deconv2D",
             "pad": self.pad,
@@ -3083,18 +3209,19 @@ class Deconv2D(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
             The input volume consisting of `n_ex` examples, each with dimension
-            (in_rows x in_cols x in_ch)
-        retain_derived : bool (default : True)
+            (`in_rows`, `in_cols`, `in_ch`).
+        retain_derived : bool
             Whether to retain the variables calculated during the forward pass
-            for use later during backprop. If `False`, this suggests the layer
-            will not be expected to backprop through wrt. this input.
+            for use later during backprop. If False, this suggests the layer
+            will not be expected to backprop through wrt. this input. Default
+            is True.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-            The layer output
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows, out_cols, out_ch`)
+            The layer output.
         """
         if not self.is_initialized:
             self.in_ch = X.shape[3]
@@ -3121,20 +3248,26 @@ class Deconv2D(LayerBase):
     def backward(self, dLdY, retain_grads=True):
         """
         Compute the gradient of the loss with respect to the layer parameters.
-        Relies on `im2col` and `col2im` to vectorize the gradient calculations.
+
+        Notes
+        -----
+        Relies on :meth:`~numpy_ml.neural_nets.utils.utils.im2col` and
+        :meth:`~numpy_ml.neural_nets.utils.utils.col2im` to vectorize the
+        gradient calculations.
 
         Parameters
         ----------
-        dLdY : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows, out_cols, out_ch`)
             The gradient of the loss with respect to the layer output.
-        retain_grads : bool (default: True)
+        retain_grads : bool
             Whether to include the intermediate parameter gradients computed
-            during the backward pass in the final parameter update
+            during the backward pass in the final parameter update. Default is
+            True.
 
         Returns
         -------
-        dX : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-            The gradient of the loss with respect to the layer input volume
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
+            The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
         if not isinstance(dLdY, list):
@@ -3213,26 +3346,36 @@ class RNNCell(LayerBase):
         """
         A single step of a vanilla (Elman) RNN.
 
-        Equations:
-            Z[t] = Wax . X[t] + bax + Waa . A[t-1] + baa
-            A[t] = act_fn(Z[t])
+        Notes
+        -----
+        At timestep `t`, the vanilla RNN cell computes
 
-        We refer to A[t] as the hidden state at timestep t
+        .. math::
+            \mathbf{Z}^{(t)}  &=  \mathbf{W}_{ax} \mathbf{X}^{(t)} + \mathbf{b}_{ax} + \mathbf{W}_{aa} \mathbf{A}^{(t-1)} + \mathbf{b}_{aa} \\\\
+            \mathbf{A}^{(t)}  &=  f(\mathbf{Z}^{(t)})
+
+        where
+
+        - :math:`\mathbf{X}^{(t)}` is the input at time `t`
+        - :math:`\mathbf{A}^{(t)}` is the hidden state at timestep `t`
+        - `f` is the layer activation function
+        - :math:`\mathbf{W}_{ax}` and :math:`\mathbf{b}_{ax}` are the weights
+          and bias for the input to hidden layer
+        - :math:`\mathbf{W}_{aa}` and :math:`\mathbf{b}_{aa}` are the weights
+          and biases for the hidden to hidden layer
 
         Parameters
         ----------
         n_out : int
             The dimension of a single hidden state / output on a given timestep
-        act_fn : str or `activations.ActivationBase` instance (default: None)
-            The activation function for computing A[t]. If not specified, use
-            Tanh by default.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The activation function for computing ``A[t]``. Default is `'Tanh'`.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
+            optimizer with default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3274,6 +3417,7 @@ class RNNCell(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "RNNCell",
             "init": self.init,
@@ -3290,23 +3434,17 @@ class RNNCell(LayerBase):
         """
         Compute the network output for a single timestep.
 
-        Equations:
-            Z[t] = Wax . X[t] + bax + Waa . A[t-1] + baa
-            A[t] = tanh(Z[t])
-
-        We refer to A[t] as the hidden state at timestep t.
-
         Parameters
         ----------
-        Xt : numpy array of shape (n_ex, n_in)
-            Input at timestep t consisting of `n_ex` examples each of
-            dimensionality `n_in`
+        Xt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            Input at timestep `t` consisting of `n_ex` examples each of
+            dimensionality `n_in`.
 
         Returns
         -------
-        At: numpy array of shape (n_ex, n_out)
-            The value of the hidden state at timestep t for each of the `n_ex`
-            examples
+        At: :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+            The value of the hidden state at timestep `t` for each of the
+            `n_ex` examples.
         """
         if not self.is_initialized:
             self.n_in = Xt.shape[1]
@@ -3344,22 +3482,16 @@ class RNNCell(LayerBase):
         """
         Backprop for a single timestep.
 
-        Equations:
-            Z[t] = Wax . X[t] + bax + Waa . A[t-1] + baa
-            A[t] = tanh(Z[t])
-
-        We refer to A[t] as the hidden state at timestep t.
-
         Parameters
         ----------
-        dLdAt : numpy array of shape (n_ex, n_out)
+        dLdAt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
             The gradient of the loss wrt. the layer outputs (ie., hidden
-            states) at timestep t
+            states) at timestep `t`.
 
         Returns
         -------
-        dLdXt : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer inputs at timestep t
+        dLdXt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer inputs at timestep `t`.
         """
         assert self.trainable, "Layer is frozen"
 
@@ -3422,16 +3554,20 @@ class LSTMCell(LayerBase):
         """
         A single step of a long short-term memory (LSTM) RNN.
 
+        Notes
+        -----
         Notation:
-            Z[t]  is the input to each of the gates at timestep t
-            A[t]  is the value of the hidden state at timestep t
-            Cc[t] is the value of the *candidate* cell/memory state at timestep t
-            C[t]  is the value of the *final* cell/memory state at timestep t
-            Gf[t] is the output of the forget gate at timestep t
-            Gu[t] is the output of the update gate at timestep t
-            Go[t] is the output of the output gate at timestep t
 
-        Equations:
+        - ``Z[t]``  is the input to each of the gates at timestep `t`
+        - ``A[t]``  is the value of the hidden state at timestep `t`
+        - ``Cc[t]`` is the value of the *candidate* cell/memory state at timestep `t`
+        - ``C[t]``  is the value of the *final* cell/memory state at timestep `t`
+        - ``Gf[t]`` is the output of the forget gate at timestep `t`
+        - ``Gu[t]`` is the output of the update gate at timestep `t`
+        - ``Go[t]`` is the output of the output gate at timestep `t`
+
+        Equations::
+
             Z[t]  = stack([A[t-1], X[t]])
             Gf[t] = gate_fn(Wf @ Z[t] + bf)
             Gu[t] = gate_fn(Wu @ Z[t] + bu)
@@ -3440,28 +3576,25 @@ class LSTMCell(LayerBase):
             C[t]  = Gf[t] * C[t-1] + Gu[t] * Cc[t]
             A[t]  = Go[t] * act_fn(C[t])
 
-            where '@' indicates dot/matrix product, and '*' indicates
-            elementwise multiplication
-
-        We refer to A[t] as the hidden state at timestep t and C[t] as the
-        memory / cell state
+        where `@` indicates dot/matrix product, and '*' indicates elementwise
+        multiplication.
 
         Parameters
         ----------
         n_out : int
-            The dimension of a single hidden state / output on a given timestep
-        act_fn : str or `activations.ActivationBase` instance (default: 'Tanh')
-            The activation function for computing A[t].
-        gate_fn : str or `activations.Activation` instance (default: 'Sigmoid')
+            The dimension of a single hidden state / output on a given timestep.
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The activation function for computing ``A[t]``. Default is
+            `'Tanh'`.
+        gate_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
             The gate function for computing the update, forget, and output
-            gates.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            gates. Default is `'Sigmoid'`.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
+            optimizer with default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3549,6 +3682,7 @@ class LSTMCell(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "LSTMCell",
             "init": self.init,
@@ -3566,41 +3700,20 @@ class LSTMCell(LayerBase):
         """
         Compute the layer output for a single timestep.
 
-        Notation:
-            Z[t]  is the input to each of the gates at timestep t
-            A[t]  is the value of the hidden state at timestep t
-            Cc[t] is the value of the *candidate* cell/memory state at timestep t
-            C[t]  is the value of the *final* cell/memory state at timestep t
-            Gf[t] is the output of the forget gate at timestep t
-            Gu[t] is the output of the update gate at timestep t
-            Go[t] is the output of the output gate at timestep t
-
-        Equations:
-            Z[t]  = stack([A[t-1], X[t]])
-            Gf[t] = gate_fn(Wf @ Z[t] + bf)
-            Gu[t] = gate_fn(Wu @ Z[t] + bu)
-            Go[t] = gate_fn(Wo @ Z[t] + bo)
-            Cc[t] = act_fn(Wc @ Z[t] + bc)
-            C[t]  = Gf[t] * C[t-1] + Gu[t] * Cc[t]
-            A[t]  = Go[t] * act_fn(C[t])
-
-            where '@' indicates dot/matrix product, and '*' indicates
-            elementwise multiplication
-
         Parameters
         ----------
-        Xt : numpy array of shape (n_ex, n_in)
+        Xt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
             Input at timestep t consisting of `n_ex` examples each of
-            dimensionality `n_in`
+            dimensionality `n_in`.
 
         Returns
         -------
-        At: numpy array of shape (n_ex, n_out)
-            The value of the hidden state at timestep t for each of the `n_ex`
-            examples
-        Ct: numpy array of shape (n_ex, n_out)
-            The value of the cell/memory state at timestep t for each of the
-            `n_ex` examples
+        At: :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+            The value of the hidden state at timestep `t` for each of the `n_ex`
+            examples.
+        Ct: :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+            The value of the cell/memory state at timestep `t` for each of the
+            `n_ex` examples.
         """
         if not self.is_initialized:
             self.n_in = Xt.shape[1]
@@ -3646,14 +3759,14 @@ class LSTMCell(LayerBase):
 
         Parameters
         ----------
-        dLdAt : numpy array of shape (n_ex, n_out)
+        dLdAt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
             The gradient of the loss wrt. the layer outputs (ie., hidden
-            states) at timestep t
+            states) at timestep `t`.
 
         Returns
         -------
-        dLdXt : numpy array of shape (n_ex, n_in)
-            The gradient of the loss wrt. the layer inputs at timestep t
+        dLdXt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+            The gradient of the loss wrt. the layer inputs at timestep `t`.
         """
         assert self.trainable, "Layer is frozen"
 
@@ -3741,16 +3854,18 @@ class RNN(LayerBase):
         Parameters
         ----------
         n_out : int
-            The dimension of a single hidden state / output on a given timestep
-        act_fn : str or `activations.ActivationBase` instance (default: 'Tanh')
-            The activation function for computing A[t].
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            The dimension of a single hidden state / output on a given
+            timestep.
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The activation function for computing ``A[t]``. Default is
+            `'Tanh'`.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
+            optimizer with default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3773,6 +3888,7 @@ class RNN(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "RNN",
             "init": self.init,
@@ -3783,6 +3899,21 @@ class RNN(LayerBase):
         }
 
     def forward(self, X):
+        """
+        Run a forward pass across all timesteps in the input.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_t)
+            Input consisting of `n_ex` examples each of dimensionality `n_in`
+            and extending for `n_t` timesteps.
+
+        Returns
+        -------
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
+            The value of the hidden state for each of the `n_ex` examples
+            across each of the `n_t` timesteps.
+        """
         if not self.is_initialized:
             self.n_in = X.shape[1]
             self._init_params()
@@ -3795,6 +3926,21 @@ class RNN(LayerBase):
         return np.dstack(Y)
 
     def backward(self, dLdA):
+        """
+        Run a backward pass across all timesteps in the input.
+
+        Parameters
+        ----------
+        dLdA : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
+            The gradient of the loss with respect to the layer output for each
+            of the `n_ex` examples across all `n_t` timesteps.
+
+        Returns
+        -------
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_t)
+            The value of the hidden state for each of the `n_ex` examples
+            across each of the `n_t` timesteps.
+        """
         assert self.cell.trainable, "Layer is frozen"
         dLdX = []
         n_ex, n_out, n_t = dLdA.shape
@@ -3849,19 +3995,19 @@ class LSTM(LayerBase):
         Parameters
         ----------
         n_out : int
-            The dimension of a single hidden state / output on a given timestep
-        act_fn : str or `activations.ActivationBase` instance (default: 'Tanh')
-            The activation function for computing A[t].
-        gate_fn : str or `activations.Activation` instance (default: 'Sigmoid')
+            The dimension of a single hidden state / output on a given timestep.
+        act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
+            The activation function for computing ``A[t]``. Default is `'Tanh'`.
+        gate_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
             The gate function for computing the update, forget, and output
-            gates.
-        init : str (default: 'glorot_uniform')
-            The weight initialization strategy. Valid entries are
-            {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
-        optimizer : str or `OptimizerBase` instance (default: None)
+            gates. Default is `'Sigmoid'`.
+        init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
+            The weight initialization strategy. Default is `'glorot_uniform'`.
+        optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the `update` method.  If `None`, use the `SGD` optimizer with
-            default parameters.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3885,6 +4031,7 @@ class LSTM(LayerBase):
 
     @property
     def hyperparameters(self):
+        """Return a dictionary containing the layer hyperparameters."""
         return {
             "layer": "LSTM",
             "init": self.init,
@@ -3901,15 +4048,15 @@ class LSTM(LayerBase):
 
         Parameters
         ----------
-        X : numpy array of shape (n_ex, n_in, n_t)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_t)
             Input consisting of `n_ex` examples each of dimensionality `n_in`
-            and extending for `n_t` timesteps
+            and extending for `n_t` timesteps.
 
         Returns
         -------
-        Y : numpy array of shape (n_ex, n_out, n_t)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
             The value of the hidden state for each of the `n_ex` examples
-            across each of the `n_t` timesteps
+            across each of the `n_t` timesteps.
         """
         if not self.is_initialized:
             self.n_in = X.shape[1]
@@ -3928,15 +4075,15 @@ class LSTM(LayerBase):
 
         Parameters
         ----------
-        dLdA : numpy array of shape (n_ex, n_out, n_t)
+        dLdA : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
             The gradient of the loss with respect to the layer output for each
-            of the `n_ex` examples across all `n_t` timesteps
+            of the `n_ex` examples across all `n_t` timesteps.
 
         Returns
         -------
-        dLdX : numpy array of shape (n_ex, n_in, n_t)
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex`, `n_in`, `n_t`)
             The value of the hidden state for each of the `n_ex` examples
-            across each of the `n_t` timesteps
+            across each of the `n_t` timesteps.
         """
         assert self.cell.trainable, "Layer is frozen"
         dLdX = []

@@ -9,7 +9,7 @@ from math import erf
 def gaussian_cdf(x, mean, var):
     """
     Compute the probability that a random draw from a 1D Gaussian with mean
-    `mean` and variance `var` is less than or equal to x.
+    `mean` and variance `var` is less than or equal to `x`.
     """
     eps = np.finfo(float).eps
     x_scaled = (x - mean) / np.sqrt(var + eps)
@@ -18,15 +18,18 @@ def gaussian_cdf(x, mean, var):
 
 class SchedulerBase(ABC):
     def __init__(self):
+        """Abstract base class for all Scheduler objects."""
         self.hyperparameters = {}
 
     def __call__(self, step=None, cur_loss=None):
         return self.learning_rate(step=step, cur_loss=cur_loss)
 
     def copy(self):
+        """Return a copy of the current object."""
         return deepcopy(self)
 
     def set_params(self, hparam_dict):
+        """Set the scheduler hyperparameters from a dictionary."""
         if hparam_dict is not None:
             for k, v in hparam_dict.items():
                 if k in self.hyperparameters:
@@ -40,12 +43,12 @@ class SchedulerBase(ABC):
 class ConstantScheduler(SchedulerBase):
     def __init__(self, lr=0.01, **kwargs):
         """
-        Returns a fixed learning rate, regardless of current step
+        Returns a fixed learning rate, regardless of the current step.
 
         Parameters
         ----------
-        initial_lr : float (default: 0.01)
-            The learning rate
+        initial_lr : float
+            The learning rate. Default is 0.01
         """
         super().__init__()
         self.lr = lr
@@ -56,7 +59,7 @@ class ConstantScheduler(SchedulerBase):
 
     def learning_rate(self, **kwargs):
         """
-        Returns the learning rate, regardless of current step etc.
+        Return the current learning rate.
 
         Returns
         -------
@@ -71,21 +74,34 @@ class ExponentialScheduler(SchedulerBase):
         self, initial_lr=0.01, stage_length=500, staircase=False, decay=0.1, **kwargs
     ):
         """
+        An exponential learning rate scheduler.
+
+        Notes
+        -----
         The exponential scheduler decays the learning rate by `decay` every
-        `stage_length` steps, starting from `initial_lr`.
+        `stage_length` steps, starting from `initial_lr`::
+
+            learning_rate = initial_lr * decay ** curr_stage
+
+        where::
+
+            curr_stage = step / stage_length          if staircase = False
+            curr_stage = floor(step / stage_length)   if staircase = True
 
         Parameters
         ----------
-        initial_lr : float (default: 0.01)
-            The learning rate at the first step
-        stage_length : int (default: 500)
-            The length of each stage, in steps
-        staircase : bool (default: False)
+        initial_lr : float
+            The learning rate at the first step. Default is 0.01.
+        stage_length : int
+            The length of each stage, in steps. Default is 500.
+        staircase : bool
             If True, only adjusts the learning rate at the stage transitions,
             producing a step-like decay schedule. If False, adjusts the
             learning rate after each step, creating a smooth decay schedule.
-        decay : float (default: 0.1)
-            The amount to decay the learning rate at each new stage
+            Default is False.
+        decay : float
+            The amount to decay the learning rate at each new stage. Default is
+            0.1.
         """
         super().__init__()
         self.decay = decay
@@ -107,25 +123,17 @@ class ExponentialScheduler(SchedulerBase):
 
     def learning_rate(self, step, **kwargs):
         """
-        The exponential scheduler decays the learning rate by `decay` every
-        `stage_length` steps, starting from `initial_lr`.
-
-            learning_rate = initial_lr * decay^curr_stage
-
-        where
-
-            curr_stage = step / stage_length          if staircase=False
-            curr_stage = floor(step / stage_length)   if staircase=True
+        Return the current learning rate as a function of `step`.
 
         Parameters
         ----------
         step : int
-            The current step number
+            The current step number.
 
         Returns
         -------
         lr : float
-            The learning rate for the current step
+            The learning rate for the current step.
         """
         cur_stage = step / self.stage_length
         if self.staircase:
@@ -136,27 +144,34 @@ class ExponentialScheduler(SchedulerBase):
 class NoamScheduler(SchedulerBase):
     def __init__(self, model_dim=512, scale_factor=1, warmup_steps=4000, **kwargs):
         """
+        The Noam learning rate scheduler, originally used in conjunction with
+        the Adam optimizer in [1].
+
+        Notes
+        -----
         The Noam scheduler increases the learning rate linearly for the first
-        warmup_steps steps, and decreases it thereafter proportionally to the
-        inverse square root of the step number.
+        `warmup_steps` steps, and decreases it thereafter proportionally to the
+        inverse square root of the step number::
 
-        lr = scale_factor * [
-            model_dim^{-0.5} * min(
-                step_num^{-0.5}, step_num * warmup_steps^{-1.5}
-            )
-        ]
+            lr = scale_factor * ( (model_dim ** (-0.5)) * adj_step )
+            adj_step = min(step_num ** (-0.5), step_num * warmup_steps ** (-1.5))
 
-        Originally used in conjunction with the Adam optimizer in Vaswani et
-        al. 2017
+        References
+        ----------
+        .. [1] Vaswani et al. (2017) "Attention is all you need". *31st
+           Conference on Neural Information Processing Systems*,
+           https://arxiv.org/pdf/1706.03762.pdf
 
         Parameters
         ----------
-        model_dim : int (default: 512)
-            The number of units in the layer output
-        scale_factor : float (default: 1)
-            A fixed coefficient for rescaling the final learning rate
-        warmup_steps : int (default: 4000)
-            The number of steps in the warmup stage of training.
+        model_dim : int
+            The number of units in the layer output. Default is 512.
+        scale_factor : float
+            A fixed coefficient for rescaling the final learning rate. Default
+            is 1.
+        warmup_steps : int
+            The number of steps in the warmup stage of training. Default is
+            4000.
         """
         super().__init__()
         self.model_dim = model_dim
@@ -183,21 +198,30 @@ class NoamScheduler(SchedulerBase):
 class KingScheduler(SchedulerBase):
     def __init__(self, initial_lr=0.01, patience=1000, decay=0.99, **kwargs):
         """
-        The KingScheduler exponentially decreases the learning rate by decay if
-        the loss has not decreased for `patience` timesteps.
+        The Davis King / DLib learning rate scheduler.
 
-        See http://blog.dlib.net/2018/02/automatic-learning-rate-scheduling-that.html
-        for details.
+        Notes
+        -----
+        The KingScheduler computes the probability that the slope of the OLS
+        fit to the loss history is negative. If the probability that it is
+        negative is less than 51% over the last `patience` steps, the scheduler
+        exponentially decreases the current learning rate by `decay`.
+
+        References
+        ----------
+        .. [1] King, D. (2018). "Automatic learning rate scheduling that really
+           works". http://blog.dlib.net/2018/02/automatic-learning-rate-scheduling-that.html
 
         Parameters
         ----------
-        initial_lr : float (default: 0.01)
-            The learning rate to begin at
-        patience : int (default: 1000)
+        initial_lr : float
+            The learning rate to begin at. Default is 0.01.
+        patience : int
             Amount of time to maintain the current learning rate without a
-            decrease in loss before adjustment
-        decay : float (default: 0.99)
-            The amount to decay the learning rate at each new stage
+            decrease in loss before adjustment. Default is 1000.
+        decay : float
+            The amount to decay the learning rate at each new stage. Default is
+            0.99.
         """
         super().__init__()
         self.decay = decay
@@ -221,21 +245,21 @@ class KingScheduler(SchedulerBase):
 
     def _steps_without_decrease(self, robust=False, check_all=False):
         """
-        Returns the maximum number of timesteps for which P(loss is decreasing)
-        < 0.51.
+        Returns the maximum number of timesteps for which `P(loss is decreasing)
+        < 0.51`.
 
         Parameters
         ----------
-        robust : bool (default: False)
+        robust : bool
             If `robust=True`, first filter out the largest 10% of the loss
             values to remove transient spikes in the loss due to, e.g., a few
-            bad minibatches.
-        check_all : bool (default: False)
-            If check_all is False, returns the maximum number of timesteps for
-            which P(loss is decreasing) < 0.51. If True, only checks whether
-            the number of timesteps for which P(loss is decreasing) < 0.51 is
-            equal to self.patience. The former provides more information but is
-            significantly more computationally expensive.
+            bad minibatches. Default is False.
+        check_all : bool
+            If False, returns the maximum number of timesteps for which P(loss
+            is decreasing) < 0.51. If True, only checks whether the number of
+            timesteps for which P(loss is decreasing) < 0.51 is equal to
+            ``self.patience``. The former provides more information but is
+            significantly more computationally expensive.  Default is False.
 
         Returns
         -------
@@ -270,9 +294,9 @@ class KingScheduler(SchedulerBase):
         Parameters
         ----------
         loss_history : numpy array of shape (N,)
-            The sequence of loss values for the previous N minibatches
+            The sequence of loss values for the previous `N` minibatches.
         i : int
-            Compute P(Slope < 0) beginning at index i in `history`
+            Compute P(Slope < 0) beginning at index i in `history`.
 
         Returns
         ------
@@ -300,10 +324,7 @@ class KingScheduler(SchedulerBase):
 
     def learning_rate(self, step, cur_loss):
         """
-        Compute the probability that the slope of the OLS fit to the loss
-        history is negative. If the probability that it is negative is less
-        than 51% over the last `patience` steps, exponentially decrease the
-        current learning rate by `decay`.
+        Compute the updated learning rate for the current step and loss.
 
         Parameters
         ----------
@@ -315,7 +336,7 @@ class KingScheduler(SchedulerBase):
         Returns
         -------
         lr : float
-            The learning rate for the current step
+            The learning rate for the current step.
         """
         if cur_loss is None:
             raise ValueError("cur_loss must be a float, but got {}".format(cur_loss))
