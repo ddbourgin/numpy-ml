@@ -1,1 +1,1 @@
-To build the documentation locally, [install sphinx](http://www.sphinx-doc.org/en/master/usage/installation.html), cd into the docs directory and run `make html`. Local files will be generated in the `docs/_build/html` directory.
+To build the documentation locally, [install sphinx](http://www.sphinx-doc.org/en/master/usage/installation.html), cd into the docs, directory and run `make html`. Local files will be generated in the `docs/_build/html` directory.
