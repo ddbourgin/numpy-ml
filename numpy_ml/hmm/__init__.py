@@ -1,1 +1,1 @@
-from . import hmm
+from .hmm import *

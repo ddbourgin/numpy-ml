@@ -1,1 +1,1 @@
-from . import gmm
+from .gmm import *

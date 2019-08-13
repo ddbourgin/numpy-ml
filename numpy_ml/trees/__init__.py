@@ -1,4 +1,4 @@
 from . import losses
-from . import dt
-from . import rf
-from . import gbdt
+from .dt import *
+from .rf import *
+from .gbdt import *

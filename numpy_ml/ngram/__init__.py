@@ -1,1 +1,1 @@
-from . import ngram
+from .ngram import *

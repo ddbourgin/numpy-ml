@@ -1,2 +1,2 @@
-from . import lda
-from . import lda_smoothed
+from .lda import *
+from .lda_smoothed import *
