@@ -6,6 +6,4 @@ matplotlib
 seaborn
 pandas
 sklearn
-torch
-tensorflow
 huffman
