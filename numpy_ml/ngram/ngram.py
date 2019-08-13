@@ -45,11 +45,11 @@ class NGramBase(ABC):
         ----------
         corpus_fp : str
             The path to a newline-separated text corpus file.
-        vocab : `preprocessing.nlp.Vocabulary` instance or None
-            If not `None`, only the words in `vocab` will be used to construct
+        vocab : :class:`~numpy_ml.preprocessing.nlp.Vocabulary` instance or None
+            If not None, only the words in `vocab` will be used to construct
             the language model; all out-of-vocabulary words will either be
-            mappend to ``<unk>`` (if ``self.unk = True``) or removed (if ``self.unk =
-            False``). Default is None.
+            mappend to ``<unk>`` (if ``self.unk = True``) or removed (if
+            ``self.unk = False``). Default is None.
         encoding : str or None
             Specifies the text encoding for corpus. Common entries are 'utf-8',
             'utf-8-sig', 'utf-16'. Default is None.
@@ -484,8 +484,8 @@ class GoodTuringNGram(NGramBase):
         ----------
         corpus_fp : str
             The path to a newline-separated text corpus file
-        vocab : `preprocessing.nlp.Vocabulary` instance or None.
-            If not `None`, only the words in `vocab` will be used to construct
+        vocab : :class:`~numpy_ml.preprocessing.nlp.Vocabulary` instance or None.
+            If not None, only the words in `vocab` will be used to construct
             the language model; all out-of-vocabulary words will either be
             mappend to ``<unk>`` (if ``self.unk = True``) or removed (if
             ``self.unk = False``). Default is None.

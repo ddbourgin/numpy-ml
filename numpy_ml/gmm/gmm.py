@@ -22,13 +22,13 @@ class GMM(object):
             The number of examples in the training dataset.
         d : int
             The dimension of each example in the training dataset.
-        pi : numpy array of shape (C,)
+        pi : :py:class:`ndarray <numpy.ndarray>` of shape `(C,)`
             The cluster priors.
-        Q : numpy array of shape (N, C)
-            The variational distribution q(T).
-        mu : numpy array of shape (C, d)
+        Q : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+            The variational distribution `q(T)`.
+        mu : :py:class:`ndarray <numpy.ndarray>` of shape `(C, d)`
             The cluster means.
-        sigma : numpy array of shape (C, d, d)
+        sigma : :py:class:`ndarray <numpy.ndarray>` of shape `(C, d, d)`
             The cluster covariance matrices.
         """
         self.C = C  # number of clusters
@@ -90,7 +90,7 @@ class GMM(object):
 
         Parameters
         ----------
-        X : numpy array of shape (N, d)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, d)`
             A collection of `N` training data points, each with dimension `d`.
         max_iter : int
             The maximum number of EM updates to perform before terminating

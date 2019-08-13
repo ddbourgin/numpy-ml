@@ -3,32 +3,34 @@ from scipy.special import digamma, polygamma, gammaln
 
 
 class LDA(object):
-    """
-    Vanilla (non-smoothed) LDA model trained using variational EM.
-    Generates maximum-likelihood estimates for model paramters
-    `alpha` and `beta`.
-
-    Model Parameters
-    ----------------
-    T : int
-        Number of topics
-    D : int
-        Number of documents
-    N : list of length D
-        Number of words in each document
-    V : int
-        Number of unique word tokens across all documents
-    phi : numpy array of shape (D, N[d], T)
-        Variational approximation to word-topic distribution
-    gamma : numpy array of shape (D, T)
-        Variational approximation to document-topic distribution
-    alpha : numpy array of shape (1, T)
-        Parameter for the Dirichlet prior on the document-topic distribution
-    beta  : numpy array of shape (V, T)
-        Word-topic distribution
-    """
-
     def __init__(self, T=10):
+        """
+        Vanilla (non-smoothed) LDA model trained using variational EM.
+        Generates maximum-likelihood estimates for model paramters
+        `alpha` and `beta`.
+
+        Parameters
+        ----------
+        T : int
+            Number of topics
+
+        Attributes
+        ----------
+        D : int
+            Number of documents
+        N : list of length `D`
+            Number of words in each document
+        V : int
+            Number of unique word tokens across all documents
+        phi : :py:class:`ndarray <numpy.ndarray>` of shape `(D, N[d], T)`
+            Variational approximation to word-topic distribution
+        gamma : :py:class:`ndarray <numpy.ndarray>` of shape `(D, T)`
+            Variational approximation to document-topic distribution
+        alpha : :py:class:`ndarray <numpy.ndarray>` of shape `(1, T)`
+            Parameter for the Dirichlet prior on the document-topic distribution
+        beta  : :py:class:`ndarray <numpy.ndarray>` of shape `(V, T)`
+            Word-topic distribution
+        """
         self.T = T
 
     def _maximize_phi(self):
@@ -148,7 +150,8 @@ class LDA(object):
 
     def VLB(self):
         """
-        Variational lower bound
+        Return the variational lower bound associated with the current model
+        parameters.
         """
         phi = self.phi
         alpha = self.alpha
@@ -185,7 +188,7 @@ class LDA(object):
 
     def initialize_parameters(self):
         """
-        Provide reasonable initializations for model and variational parameters
+        Provide reasonable initializations for model and variational parameters.
         """
         T = self.T
         V = self.V
@@ -203,6 +206,22 @@ class LDA(object):
     def train(self, corpus, verbose=False, max_iter=1000, tol=5):
         """
         Train the LDA model on a corpus of documents (bags of words).
+
+        Parameters
+        ----------
+        corpus : list of length `D`
+            A list of lists, with each sublist containing the tokenized text of
+            a single document.
+        verbose : bool
+            Whether to print the VLB at each training iteration. Default is
+            True.
+        max_iter : int
+            The maximum number of training iterations to perform before
+            breaking. Default is 1000.
+        tol : int
+            Break the training loop if the difference betwen the VLB on the
+            current iteration and the previous iteration is less than `tol`.
+            Default is 5.
         """
         self.D = len(corpus)
         self.V = len(set(np.concatenate(corpus)))

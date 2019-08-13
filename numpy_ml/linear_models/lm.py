@@ -3,35 +3,31 @@ from ..utils.testing import is_symmetric_positive_definite, is_number
 
 
 class LinearRegression:
-    """
-    The simple linear regression model is
-
-        y = bX + e  where e ~ N(0, sigma^2 * I)
-
-    In probabilistic terms this corresponds to
-
-        y - bX ~ N(0, sigma^2 * I)
-        y | X, b ~ N(bX, sigma^2 * I)
-
-    The loss for the model is simply the squared error between the model
-    predictions and the true values:
-
-        Loss = ||y - bX||^2
-
-    The MLE for the model parameters b can be computed in closed form via the
-    normal equation:
-
-        b = (X^T X)^{-1} X^T y
-
-    where (X^T X)^{-1} X^T is known as the pseudoinverse / Moore-Penrose
-    inverse.
-    """
-
     def __init__(self, fit_intercept=True):
+        """
+        An ordinary least squares regression model fit via the normal equation.
+
+        Parameters
+        ----------
+        fit_intercept : bool
+            Whether to fit an additional intercept term in addition to the
+            model coefficients. Default is True.
+        """
         self.beta = None
         self.fit_intercept = fit_intercept
 
     def fit(self, X, y):
+        """
+        Fit the regression coefficients via maximum likelihood.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A dataset consisting of `N` examples, each of dimension `M`.
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
+            The targets for each of the `N` examples in `X`, where each target
+            has dimension `K`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -40,6 +36,20 @@ class LinearRegression:
         self.beta = np.dot(pseudo_inverse, y)
 
     def predict(self, X):
+        """
+        Used the trained model to generate predictions on a new collection of
+        data points.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, M)`
+            A dataset consisting of `Z` new examples, each of dimension `M`.
+
+        Returns
+        -------
+        y_pred : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, K)`
+            The model predictions for the items in `X`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -47,46 +57,35 @@ class LinearRegression:
 
 
 class RidgeRegression:
-    """
-    Ridge regression uses the same simple linear regression model but adds an
-    additional penalty on the L2-norm of the coefficients to the loss function.
-    This is sometimes known as Tikhonov regularization.
-
-    In particular, the ridge model is still simply
-
-        y = bX + e  where e ~ N(0, sigma^2 * I)
-
-    except now the error for the model is calcualted as
-
-        RidgeLoss = ||y - bX||^2 + alpha * ||b||^2
-
-    The MLE for the model parameters b can be computed in closed form via the
-    adjusted normal equation:
-
-        b = (X^T X + alpha I)^{-1} X^T y
-
-    where (X^T X + alpha I)^{-1} X^T is the pseudoinverse / Moore-Penrose
-    inverse adjusted for the L2 penalty on the model coefficients.
-    """
-
     def __init__(self, alpha=1, fit_intercept=True):
         """
         A ridge regression model fit via the normal equation.
 
         Parameters
         ----------
-        alpha : float (default: 1)
+        alpha : float
             L2 regularization coefficient. Higher values correspond to larger
-            penalty on the l2 norm of the model coefficients
-        fit_intercept : bool (default: True)
+            penalty on the L2 norm of the model coefficients. Default is 1.
+        fit_intercept : bool
             Whether to fit an additional intercept term in addition to the
-            model coefficients
+            model coefficients. Default is True.
         """
         self.beta = None
         self.alpha = alpha
         self.fit_intercept = fit_intercept
 
     def fit(self, X, y):
+        """
+        Fit the regression coefficients via maximum likelihood.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A dataset consisting of `N` examples, each of dimension `M`.
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
+            The targets for each of the `N` examples in `X`, where each target
+            has dimension `K`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -96,6 +95,20 @@ class RidgeRegression:
         self.beta = pseudo_inverse @ y
 
     def predict(self, X):
+        """
+        Use the trained model to generate predictions on a new collection of
+        data points.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, M)`
+            A dataset consisting of `Z` new examples, each of dimension `M`.
+
+        Returns
+        -------
+        y_pred : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, K)`
+            The model predictions for the items in `X`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -110,16 +123,18 @@ class LogisticRegression:
 
         Parameters
         ----------
-        penalty : str (default: 'l2')
+        penalty : {'l1', 'l2'}
             The type of regularization penalty to apply on the coefficients
-            `beta`. Valid entries are {'l2', 'l1'}.
-        gamma : float in [0, 1] (default: 0)
+            `beta`. Default is 'l2'.
+        gamma : float in [0, 1]
             The regularization weight. Larger values correspond to larger
             regularization penalties, and a value of 0 indicates no penalty.
-        fit_intercept : bool (default: True)
+            Default is 0.
+        fit_intercept : bool
             Whether to fit an intercept term in addition to the coefficients in
-            b. If True, the estimates for `beta` will have M+1 dimensions,
-            where the first dimension corresponds to the intercept
+            b. If True, the estimates for `beta` will have `M + 1` dimensions,
+            where the first dimension corresponds to the intercept. Default is
+            True.
         """
         err_msg = "penalty must be 'l1' or 'l2', but got: {}".format(penalty)
         assert penalty in ["l2", "l1"], err_msg
@@ -129,6 +144,22 @@ class LogisticRegression:
         self.fit_intercept = fit_intercept
 
     def fit(self, X, y, lr=0.01, tol=1e-7, max_iter=1e7):
+        """
+        Fit the regression coefficients via gradient descent on the negative
+        log likelihood.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A dataset consisting of `N` examples, each of dimension `M`.
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
+            The binary targets for each of the `N` examples in `X`.
+        lr : float
+            The gradient descent learning rate. Default is 1e-7.
+        max_iter : float
+            The maximum number of iterations to run the gradient descent
+            solver. Default is 1e7.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -148,10 +179,12 @@ class LogisticRegression:
         Penalized negative log likelihood of the targets under the current
         model.
 
-            NLL = -1/N * (
-                [sum_{i=0}^N y_i log(y_pred_i) + (1-y_i) log(1-y_pred_i)] -
-                (gamma ||b||) / 2
-            )
+        .. math::
+
+            \\text{NLL} = -\\frac{1}{N} \left[
+                \left(\sum_{i=0}^N y_i \log(\hat{y}_i) + (1-y_i) log(1-\hat{y}_i) \\right) -
+                \\frac{\gamma}{2} ||\mathbf{b}||_2 \\right]
+
         """
         N, M = X.shape
         order = 2 if self.penalty == "l2" else 1
@@ -170,6 +203,20 @@ class LogisticRegression:
         return -(np.dot(y - y_pred, X) + d_penalty) / N
 
     def predict(self, X):
+        """
+        Use the trained model to generate prediction probabilities on a new
+        collection of data points.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, M)`
+            A dataset consisting of `Z` new examples, each of dimension `M`.
+
+        Returns
+        -------
+        y_pred : :py:class:`ndarray <numpy.ndarray>` of shape `(Z,)`
+            The model prediction probabilities for the items in `X`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -177,104 +224,44 @@ class LogisticRegression:
 
 
 class BayesianLinearRegressionUnknownVariance:
-    """
-    Bayesian Linear Regression
-    --------------------------
-    In its general form, Bayesian linear regression extends the simple linear
-    regression model by introducing priors on model parameters b and/or the
-    error variance sigma^2.
-
-    The introduction of a prior allows us to quantify the uncertainty in our
-    parameter estimates for b by replacing the MLE point estimate in simple
-    linear regression with an entire posterior *distribution*, p(b | X, y,
-    sigma), simply by applying Bayes rule:
-
-        p(b | X, y) = [ p(y | X, b) * p(b | sigma) ] / p(y | X)
-
-    We can also quantify the uncertainty in our predictions y* for some new
-    data X* with the posterior predictive distribution:
-
-        p(y* | X*, X, Y) = \int_{b} p(y* | X*, b) p(b | X, y) db
-
-    Depending on the choice of prior it may be impossible to compute an
-    analytic form for the posterior / posterior predictive distribution. In
-    these cases, it is common to use approximations, either via MCMC or
-    variational inference.
-
-    Bayesian Regression w/ unknown variance
-    ---------------------------------------
-    If *both* b and the error variance sigma^2 are unknown, the conjugate prior
-    for the Gaussian likelihood is the Normal-Gamma distribution (univariate
-    likelihood) or the Normal-Inverse-Wishart distribution (multivariate
-    likelihood).
-
-        Univariate:
-            b, sigma^2 ~ NG(b_mean, b_V, alpha, beta)
-
-            sigma^2 ~ InverseGamma(alpha, beta)
-            b | sigma^2 ~ N(b_mean, sigma^2 * b_V)
-
-            where alpha, beta, b_V, and b_mean are parameters of the prior.
-
-        Multivariate:
-            b, Sigma ~ NIW(b_mean, lambda, Psi, rho)
-
-            Sigma ~ N(b_mean, 1/lambda * Sigma)
-            b | Sigma ~ W^{-1}(Psi, rho)
-
-            where b_mean, lambda, Psi, and rho are parameters of the prior.
-
-    Due to the conjugacy of the above priors with the Gaussian likelihood of
-    the linear regression model we can compute the posterior distributions for
-    the model parameters in closed form:
-
-        B = (y - X b_mean)
-        shape = N + alpha
-        scale = (1 / shape) * {alpha * beta + B^T ([X b_V X^T + I])^{-1} B}
-
-        sigma^2 | X, y ~ InverseGamma(shape, scale)
-
-        A     = (b_V^{-1} + X^T X)^{-1}
-        mu_b  = A b_V^{-1} b_mean + A X^T y
-        cov_b = sigma^2 A
-
-        b | X, y, sigma^2 ~ N(mu_b, cov_b)
-
-    This allows us a closed form for the posterior predictive distribution as
-    well:
-
-        y* | X*, X, Y ~ N(X* mu_b, X* cov_b X*^T + I)
-    """
-
     def __init__(self, alpha=1, beta=2, b_mean=0, b_V=None, fit_intercept=True):
         """
-        Bayesian linear regression model with conjugate Normal-Gamma prior on b
-        and sigma^2
+        Bayesian linear regression model with unknown variance and conjugate
+        Normal-Gamma prior on `b` and :math:`\sigma^2`.
 
-            b, sigma^2 ~ NG(b_mean, b_V, alpha, beta)
-            sigma^2 ~ InverseGamma(alpha, beta)
-            b ~ N(b_mean, sigma^2 * b_V)
+        Notes
+        -----
+        Uses a conjugate Normal-Gamma prior on `b` and :math:`\sigma^2`. The
+        joint and marginal posteriors over error variance and model parameters
+        are:
+
+        .. math::
+
+            b, \sigma^2  &\sim  \\text{NG}(b_{mean}, b_{V}, \\alpha, \\beta) \\\\
+            \sigma^2  &\sim  \\text{InverseGamma}(\\alpha, \\beta) \\\\
+            b  &\sim  \mathcal{N}(b_{mean}, \sigma^2 * b_V)
 
         Parameters
         ----------
-        alpha : float (default: 1)
-            The shape parameter for the Inverse-Gamma prior on sigma^2. Must be
-            strictly greater than 0.
-        beta : float (default: 1)
-            The scale parameter for the Inverse-Gamma prior on sigma^2. Must be
-            strictly greater than 0.
-        b_mean : np.array of shape (M,) or float (default: 0)
-            The mean of the Gaussian prior on b. If a float, assume b_mean is
-            np.ones(M) * b_mean.
-        b_V : np.array of shape (N, N) or np.array of shape (N,) or None
+        alpha : float
+            The shape parameter for the Inverse-Gamma prior on
+            :math:`\sigma^2`. Must be strictly greater than 0. Default is 1.
+        beta : float
+            The scale parameter for the Inverse-Gamma prior on
+            :math:`\sigma^2`. Must be strictly greater than 0. Default is 1.
+        b_mean : :py:class:`ndarray <numpy.ndarray>` of shape `(M,)` or float
+            The mean of the Gaussian prior on `b`. If a float, assume `b_mean`
+            is ``np.ones(M) * b_mean``. Default is 0.
+        b_V : :py:class:`ndarray <numpy.ndarray>` of shape `(N, N)` or `(N,)` or None
             A symmetric positive definite matrix that when multiplied
-            element-wise by b_sigma^2 gives the covariance matrix for the
-            Gaussian prior on b. If a list, assume b_V=diag(b_V). If None,
-            assume b_V is the identity matrix.
-        fit_intercept : bool (default: True)
+            element-wise by :math:`b_sigma^2` gives the covariance matrix for
+            the Gaussian prior on `b`. If a list, assume ``b_V =
+            diag(b_V)``. If None, assume `b_V` is the identity matrix.
+            Default is None.
+        fit_intercept : bool
             Whether to fit an intercept term in addition to the coefficients in
-            b. If True, the estimates for b will have M+1 dimensions, where
-            the first dimension corresponds to the intercept
+            b. If True, the estimates for b will have `M + 1` dimensions, where
+            the first dimension corresponds to the intercept. Default is True.
         """
         # this is a placeholder until we know the dimensions of X
         b_V = 1.0 if b_V is None else b_V
@@ -299,6 +286,18 @@ class BayesianLinearRegressionUnknownVariance:
         self.posterior_predictive = {"mu": None, "cov": None}
 
     def fit(self, X, y):
+        """
+        Compute the posterior over model parameters using the data in `X` and
+        `y`.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A dataset consisting of `N` examples, each of dimension `M`.
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
+            The targets for each of the `N` examples in `X`, where each target
+            has dimension `K`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -340,6 +339,19 @@ class BayesianLinearRegressionUnknownVariance:
         }
 
     def predict(self, X):
+        """
+        Return the MAP prediction for the targets associated with `X`.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, M)`
+            A dataset consisting of `Z` new examples, each of dimension `M`.
+
+        Returns
+        -------
+        y_pred : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, K)`
+            The model predictions for the items in `X`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -356,84 +368,41 @@ class BayesianLinearRegressionUnknownVariance:
 
 
 class BayesianLinearRegressionKnownVariance:
-    """
-    Bayesian Linear Regression
-    --------------------------
-    In its general form, Bayesian linear regression extends the simple linear
-    regression model by introducing priors on model parameters b and/or the
-    error variance sigma^2.
-
-    The introduction of a prior allows us to quantify the uncertainty in our
-    parameter estimates for b by replacing the MLE point estimate in simple
-    linear regression with an entire posterior *distribution*, p(b | X, y,
-    sigma), simply by applying Bayes rule:
-
-        p(b | X, y) = [ p(y | X, b) * p(b | sigma) ] / p(y | X)
-
-    We can also quantify the uncertainty in our predictions y* for some new
-    data X* with the posterior predictive distribution:
-
-        p(y* | X*, X, Y) = \int_{b} p(y* | X*, b) p(b | X, y) db
-
-    Depending on the choice of prior it may be impossible to compute an
-    analytic form for the posterior / posterior predictive distribution. In
-    these cases, it is common to use approximations, either via MCMC or
-    variational inference.
-
-    Bayesian linear regression with known variance
-    ----------------------------------------------
-    If we happen to already know the error variance sigma^2, the conjugate
-    prior on b is Gaussian. A common parameterization is:
-
-        b | sigma, b_V ~ N(b_mean, sigma^2 * b_V)
-
-    where b_mean, sigma and b_V are hyperparameters. Ridge regression is a
-    special case of this model where b_mean = 0, sigma = 1 and b_V = I (ie.,
-    the prior on b is a zero-mean, unit covariance Gaussian).
-
-    Due to the conjugacy of the above prior with the Gaussian likelihood in the
-    linear regression model, we can compute the posterior distribution over the
-    model parameters in closed form:
-
-        A     = (b_V^{-1} + X^T X)^{-1}
-        mu_b  = A b_V^{-1} b_mean + A X^T y
-        cov_b = sigma^2 A
-
-        b | X, y ~ N(mu_b, cov_b)
-
-    which allows us a closed form for the posterior predictive distribution as
-    well:
-
-        y* | X*, X, Y ~ N(X* mu_b, X* cov_b X*^T + I)
-    """
-
     def __init__(self, b_mean=0, b_sigma=1, b_V=None, fit_intercept=True):
         """
         Bayesian linear regression model with known error variance and
-        conjugate Gaussian prior on b
+        conjugate Gaussian prior on model parameters.
 
-            b | b_mean, sigma^2, b_V ~ N(b_mean, sigma^2 * b_V)
+        Notes
+        -----
+        Uses a conjugate Gaussian prior on the model coefficients. The
+        posterior over model parameters is
 
-        Ridge regression is a special case of this model where b_mean = 0,
-        sigma = 1 and b_V = I (ie., the prior on b is a zero-mean, unit
-        covariance Gaussian).
+        .. math::
+
+            b \mid b_{mean}, \sigma^2, b_V \sim \mathcal{N}(b_{mean}, \sigma^2 b_V)
+
+        Ridge regression is a special case of this model where :math:`b_{mean}`
+        = 0, :math:`\sigma` = 1 and `b_V` = I (ie., the prior on `b` is a
+        zero-mean, unit covariance Gaussian).
 
         Parameters
         ----------
-        b_mean : np.array of shape (M,) or float (default: 0)
-            The mean of the Gaussian prior on b. If a float, assume b_mean is
-            np.ones(M) * b_mean.
-        b_sigma : float (default: 1)
-            A scaling term for covariance of the Gaussian prior on b
-        b_V : np.array of shape (N,N) or np.array of shape (N,) or None
+        b_mean : :py:class:`ndarray <numpy.ndarray>` of shape `(M,)` or float
+            The mean of the Gaussian prior on `b`. If a float, assume `b_mean` is
+            ``np.ones(M) * b_mean``. Default is 0.
+        b_sigma : float
+            A scaling term for covariance of the Gaussian prior on `b`. Default
+            is 1.
+        b_V : :py:class:`ndarray <numpy.ndarray>` of shape `(N,N)` or `(N,)` or None
             A symmetric positive definite matrix that when multiplied
-            element-wise by b_sigma^2 gives the covariance matrix for the
-            Gaussian prior on b. If a list, assume b_V=diag(b_V). If None,
-            assume b_V is the identity matrix.
-        fit_intercept : bool (default: True)
+            element-wise by `b_sigma^2` gives the covariance matrix for the
+            Gaussian prior on `b`. If a list, assume ``b_V = diag(b_V)``. If None,
+            assume `b_V` is the identity matrix. Default is None.
+        fit_intercept : bool
             Whether to fit an intercept term in addition to the coefficients in
-            b. If True, the estimates for b will have M+1 dimensions, where
-            the first dimension corresponds to the intercept
+            b. If True, the estimates for b will have `M + 1` dimensions, where
+            the first dimension corresponds to the intercept. Default is True.
         """
         # this is a placeholder until we know the dimensions of X
         b_V = 1.0 if b_V is None else b_V
@@ -458,6 +427,18 @@ class BayesianLinearRegressionKnownVariance:
         self.fit_intercept = fit_intercept
 
     def fit(self, X, y):
+        """
+        Compute the posterior over model parameters using the data in `X` and
+        `y`.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A dataset consisting of `N` examples, each of dimension `M`.
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
+            The targets for each of the `N` examples in `X`, where each target
+            has dimension `K`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -485,6 +466,20 @@ class BayesianLinearRegressionKnownVariance:
         self.posterior["b"] = {"dist": "Gaussian", "mu": mu, "cov": cov}
 
     def predict(self, X):
+        """
+        Return the MAP prediction for the targets associated with `X`.
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, M)`
+            A dataset consisting of `Z` new examples, each of dimension `M`.
+
+        Returns
+        -------
+        y_pred : :py:class:`ndarray <numpy.ndarray>` of shape `(Z, K)`
+            The MAP predictions for the targets associated with the items in
+            `X`.
+        """
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]

@@ -5,6 +5,7 @@ import numpy as np
 
 class WrapperBase(ABC):
     def __init__(self, wrapped_layer):
+        """An abstract base class for all Wrapper instances"""
         self._base_layer = wrapped_layer
         if hasattr(wrapped_layer, "_base_layer"):
             self._base_layer = wrapped_layer._base_layer
@@ -106,15 +107,17 @@ class Dropout(WrapperBase):
         """
         A dropout regularization wrapper.
 
-        During training, independently zeroes each element of the layer input
-        with probability p and scales the activation by 1 / (1 - p) (to reflect
-        the fact that on average only (1 - p) * N units are active on any
+        Notes
+        -----
+        During training, a dropout layer zeroes each element of the layer input
+        with probability `p` and scales the activation by `1 / (1 - p)` (to reflect
+        the fact that on average only `(1 - p) * N` units are active on any
         training pass). At test time, does not adjust elements of the input at
         all (ie., simply computes the identity function).
 
         Parameters
         ----------
-        wrapped_layer : `layers.LayerBase` instance
+        wrapped_layer : :doc:`Layer <numpy_ml.neural_nets.layers>` instance
             The layer to apply dropout to.
         p : float in [0, 1)
             The dropout propbability during training

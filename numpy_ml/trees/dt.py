@@ -33,8 +33,8 @@ class DecisionTree:
         Parameters
         ----------
         classifier : bool
-            Whether to treat target values as categorical (``classifier =
-            True``) or continuous (``classifier = False``). Default is True.
+            Whether to treat target values as categorical (classifier =
+            True) or continuous (classifier = False). Default is True.
         max_depth: int or None
             The depth at which to stop growing the tree. If None, grow the tree
             until all leaves are pure. Default is None.
@@ -73,11 +73,11 @@ class DecisionTree:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             The training data of `N` examples, each with `M` features
-        Y : numpy array of shape (N,)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             An array of integer class labels for each example in `X` if
-            ``self.classifier = True``, otherwise the set of target values for
+            self.classifier = True, otherwise the set of target values for
             each example in `X`.
         """
         self.n_classes = max(Y) + 1 if self.classifier else None
@@ -90,14 +90,14 @@ class DecisionTree:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             The training data of `N` examples, each with `M` features
 
         Returns
         -------
-        preds : numpy array of shape (N,)
+        preds : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The integer class labels predicted for each example in `X` if
-            ``self.classifier = True``, otherwise the predicted target values.
+            self.classifier = True, otherwise the predicted target values.
         """
         return np.array([self._traverse(x, self.root) for x in X])
 
@@ -108,12 +108,12 @@ class DecisionTree:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             The training data of `N` examples, each with `M` features
 
         Returns
         -------
-        preds : numpy array of shape (N, n_classes)
+        preds : :py:class:`ndarray <numpy.ndarray>` of shape `(N, n_classes)`
             The class probabilities predicted for each example in `X`.
         """
         assert self.classifier, "`predict_class_probs` undefined for classifier = False"

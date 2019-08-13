@@ -2,31 +2,33 @@ import numpy as np
 
 
 class SmoothedLDA(object):
-    """
-    A smoothed LDA model trained using collapsed Gibbs sampling. Generates
-    posterior mean estimates for model parameters `phi` and `theta`.
-
-    Model Parameters
-    ----------------
-    T : int
-        Number of topics
-    D : int
-        Number of documents
-    N : int
-        Total number of words across all documents
-    V : int
-        Number of unique word tokens across all documents
-    phi : numpy array of shape (N[d], T)
-        The word-topic distribution
-    theta : numpy array of shape (D, T)
-        The document-topic distribution
-    alpha : numpy array of shape (1, T)
-        Parameter for the Dirichlet prior on the document-topic distribution
-    beta  : numpy array of shape (V, T)
-        Parameter for the Dirichlet prior on the topic-word distribution
-    """
-
     def __init__(self, T, **kwargs):
+        """
+        A smoothed LDA model trained using collapsed Gibbs sampling. Generates
+        posterior mean estimates for model parameters `phi` and `theta`.
+
+        Parameters
+        ----------
+        T : int
+            Number of topics
+
+        Attributes
+        ----------
+        D : int
+            Number of documents
+        N : int
+            Total number of words across all documents
+        V : int
+            Number of unique word tokens across all documents
+        phi : :py:class:`ndarray <numpy.ndarray>` of shape `(N[d], T)`
+            The word-topic distribution
+        theta : :py:class:`ndarray <numpy.ndarray>` of shape `(D, T)`
+            The document-topic distribution
+        alpha : :py:class:`ndarray <numpy.ndarray>` of shape `(1, T)`
+            Parameter for the Dirichlet prior on the document-topic distribution
+        beta  : :py:class:`ndarray <numpy.ndarray>` of shape `(V, T)`
+            Parameter for the Dirichlet prior on the topic-word distribution
+        """
         self.T = T
 
         self.alpha = (50.0 / self.T) * np.ones(self.T)
@@ -56,9 +58,29 @@ class SmoothedLDA(object):
 
     def train(self, texts, tokens, n_gibbs=2000):
         """
-        Trains a topic model on the documents in texts. Assumes `texts` is an
-        array of subarrays, where each subarray corresponds to a separate
-        document.
+        Trains a topic model on the documents in texts.
+
+        Parameters
+        ----------
+        texts : array of length `(D,)`
+            The training corpus represented as an array of subarrays, where
+            each subarray corresponds to the tokenized words of a single
+            document.
+        tokens : array of length `(V,)`
+            The set of unique tokens in the documents in `texts`.
+        n_gibbs : int
+            The number of steps to run the collapsed Gibbs sampler during
+            training. Default is 2000.
+
+        Returns
+        -------
+        C_wt : :py:class:`ndarray <numpy.ndarray>` of shape (V, T)
+            The word-topic count matrix
+        C_dt : :py:class:`ndarray <numpy.ndarray>` of shape (D, T)
+            The document-topic count matrix
+        assignments : :py:class:`ndarray <numpy.ndarray>` of shape (N, n_gibbs)
+            The topic assignments for each word in the corpus on each Gibbs
+            step.
         """
         self._init_params(texts, tokens)
         C_wt, C_dt, assignments = self._gibbs_sampler(n_gibbs, texts)
@@ -67,7 +89,7 @@ class SmoothedLDA(object):
 
     def what_did_you_learn(self, top_n=10):
         """
-        Prints the `top_n` most probable words for each topic
+        Print the `top_n` most probable words under each topic
         """
         for tt in range(self.T):
             top_idx = np.argsort(self.phi[:, tt])[::-1][:top_n]
@@ -79,7 +101,21 @@ class SmoothedLDA(object):
     def fit_params(self, C_wt, C_dt):
         """
         Estimate `phi`, the word-topic distribution, and `theta`, the
-        topic-document distribution from the current count matrices
+        topic-document distribution.
+
+        Parameters
+        ----------
+        C_wt : :py:class:`ndarray <numpy.ndarray>` of shape (V, T)
+            The word-topic count matrix
+        C_dt : :py:class:`ndarray <numpy.ndarray>` of shape (D, T)
+            The document-topic count matrix
+
+        Returns
+        -------
+        phi : :py:class:`ndarray <numpy.ndarray>` of shape `(V, T)`
+            The word-topic distribution
+        theta : :py:class:`ndarray <numpy.ndarray>` of shape `(D, T)`
+            The document-topic distribution
         """
         self.phi = np.zeros([self.V, self.T])
         self.theta = np.zeros([self.D, self.T])

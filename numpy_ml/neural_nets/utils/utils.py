@@ -11,7 +11,7 @@ def minibatch(X, batchsize=256, shuffle=True):
 
     Parameters
     ----------
-    X : numpy array of shape (N, ...)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (N, ...)
         The dataset to divide into minibatches. Assumes the first dimension
         represents the number of training examples.
     batchsize : int
@@ -198,7 +198,7 @@ def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
 
     Parameters
     ----------
-    X : numpy array of shape (n_ex, l_in, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
         Input volume. Padding is applied to `l_in`.
     pad : tuple, int, or {'same', 'causal'}
         The padding amount. If 'same', add padding to ensure that the output
@@ -220,7 +220,7 @@ def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
 
     Returns
     -------
-    X_pad : numpy array of shape (n_ex, padded_seq, in_channels)
+    X_pad : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, padded_seq, in_channels)
         The padded output volume
     p : 2-tuple
         The number of 0-padded columns added to the (left, right) of the sequences
@@ -255,7 +255,7 @@ def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
 
     Parameters
     ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
         Input volume. Padding is applied to `in_rows` and `in_cols`.
     pad : tuple, int, or 'same'
         The padding amount. If 'same', add padding to ensure that the output of
@@ -275,7 +275,7 @@ def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
 
     Returns
     -------
-    X_pad : numpy array of shape (n_ex, padded_in_rows, padded_in_cols,
+    X_pad : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, padded_in_rows, padded_in_cols,
     in_channels)
         The padded output volume.
     p : 4-tuple
@@ -310,28 +310,31 @@ def dilate(X, d):
     """
     Dilate the 4D volume `X` by `d`.
 
+    Notes
+    -----
+    For a visual depiction of a dilated convolution, see [1].
+
+    References
+    ----------
+    .. [1] Dumoulin & Visin (2016). "A guide to convolution arithmetic for deep
+       learning." https://arxiv.org/pdf/1603.07285v1.pdf
+
     Parameters
     ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
         Input volume.
     d : int
         The number of 0-rows to insert between each adjacent row + column in `X`.
 
     Returns
     -------
-    Xd : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-        The dilated array.
-            `out_rows` = `in_rows` + `d` * (`in_rows` - 1)
-            `out_cols` = `in_cols` + `d` * (`in_cols` - 1)
+    Xd : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+        The dilated array where
 
-    Notes
-    -----
-    For a visual depiction of a dilated convolution, see [1]_.
+        .. math::
 
-    References
-    ----------
-    .. [1] Dumoulin & Visin (2016). "A guide to convolution arithmetic for deep
-       learning." https://arxiv.org/pdf/1603.07285v1.pdf
+            \\text{out_rows}  &=  \\text{in_rows} + d(\\text{in_rows} - 1) \\\\
+            \\text{out_cols}  &=  \\text{in_cols} + d (\\text{in_cols} - 1)
     """
     n_ex, in_rows, in_cols, n_in = X.shape
     r_ix = np.repeat(np.arange(1, in_rows), d)
@@ -444,7 +447,7 @@ def calc_conv_out_dims(X_shape, W_shape, stride=1, pad=0, dilation=0):
 def _im2col_indices(X_shape, fr, fc, p, s, d=0):
     """
     Helper function that computes indices into X in prep for columnization in
-    `im2col`.
+    :func:`im2col`.
 
     Code extended from Andrej Karpathy's `im2col.py`
     """
@@ -485,11 +488,17 @@ def im2col(X, W_shape, pad, stride, dilation=0):
     Pads and rearrange overlapping windows of the input volume into column
     vectors, returning the concatenated padded vectors in a matrix `X_col`.
 
+    Notes
+    -----
+    A NumPy reimagining of MATLAB's `:func:`im2col`` 'sliding' function.
+
+    Code extended from Andrej Karpathy's ``im2col.py``.
+
     Parameters
     ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
         Input volume (not padded).
-    W_shape: 4-tuple containing (kernel_rows, kernel_cols, in_ch, out_ch)
+    W_shape: 4-tuple containing `(kernel_rows, kernel_cols, in_ch, out_ch)`
         The dimensions of the weights/kernels in the present convolutional
         layer.
     pad : tuple, int, or 'same'
@@ -507,16 +516,13 @@ def im2col(X, W_shape, pad, stride, dilation=0):
 
     Returns
     -------
-    X_col : numpy array of shape (Q, Z)
+    X_col : :py:class:`ndarray <numpy.ndarray>` of shape (Q, Z)
         The reshaped input volume where where:
-            Q = kernel_rows * kernel_cols * n_in
-            Z = n_ex * out_rows * out_cols
 
-    Notes
-    -----
-    A NumPy reimagining of MATLAB's ``im2col`` 'sliding' function.
+        .. math::
 
-    Code extended from Andrej Karpathy's ``im2col.py``.
+            Q  &=  \\text{kernel_rows} \\times \\text{kernel_cols} \\times \\text{n_in} \\\\
+            Z  &=  \\text{n_ex} \\times \\text{out_rows} \\times \\text{out_cols}
     """
     fr, fc, n_in, n_out = W_shape
     s, p, d = stride, pad, dilation
@@ -542,9 +548,15 @@ def col2im(X_col, X_shape, W_shape, pad, stride, dilation=0):
     Take columns of a 2D matrix and rearrange them into the blocks/windows of
     a 4D image volume.
 
+    Notes
+    -----
+    A NumPy reimagining of MATLAB's ``col2im`` 'sliding' function.
+
+    Code extended from Andrej Karpathy's ``im2col.py``.
+
     Parameters
     ----------
-    X_col : numpy array of shape (Q, Z)
+    X_col : :py:class:`ndarray <numpy.ndarray>` of shape (Q, Z)
         The columnized version of `X` (assumed to include padding)
     X_shape : 4-tuple containing (n_ex, in_rows, in_cols, in_ch)
         The original dimensions of `X` (not including padding)
@@ -559,14 +571,8 @@ def col2im(X_col, X_shape, W_shape, pad, stride, dilation=0):
 
     Returns
     -------
-    img : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+    img : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
         The reshaped `X_col` input matrix
-
-    Notes
-    -----
-    A NumPy reimagining of MATLAB's ``col2im`` 'sliding' function.
-
-    Code extended from Andrej Karpathy's ``im2col.py``.
     """
     if not (isinstance(pad, tuple) and len(pad) == 4):
         raise TypeError("pad must be a 4-tuple, but got: {}".format(pad))
@@ -589,39 +595,20 @@ def col2im(X_col, X_shape, W_shape, pad, stride, dilation=0):
     return X_pad[:, :, pr1:pr2, pc1:pc2]
 
 
+#######################################################################
+#                             Convolution                             #
+#######################################################################
+
+
 def conv2D(X, W, stride, pad, dilation=0):
     """
     A faster (but more memory intensive) implementation of the 2D "convolution"
     (technically, cross-correlation) of input `X` with a collection of kernels in
     `W`.
 
-    Parameters
-    ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
-        Input volume (unpadded).
-    W: numpy array of shape (kernel_rows, kernel_cols, in_ch, out_ch)
-        A volume of convolution weights/kernels for a given layer.
-    stride : int
-        The stride of each convolution kernel.
-    pad : tuple, int, or 'same'
-        The padding amount. If 'same', add padding to ensure that the output of
-        a 2D convolution with a kernel of `kernel_shape` and stride `stride`
-        produces an output volume of the same dimensions as the input.  If
-        2-tuple, specifies the number of padding rows and colums to add *on both
-        sides* of the rows/columns in X. If 4-tuple, specifies the number of
-        rows/columns to add to the top, bottom, left, and right of the input
-        volume.
-    dilation : int
-        Number of pixels inserted between kernel elements. Default is 0.
-
-    Returns
-    -------
-    Z : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
-        The covolution of `X` with `W`.
-
     Notes
     -----
-    Relies on the ``im2col`` function to perform the convolution as a single
+    Relies on the `:func:`im2col` function to perform the convolution as a single
     matrix multiplication.
 
     For a helpful diagram, see Pete Warden's 2015 blogpost [1].
@@ -630,6 +617,30 @@ def conv2D(X, W, stride, pad, dilation=0):
     ----------
     .. [1] Warden (2015). "Why GEMM is at the heart of deep learning,"
        https://petewarden.com/2015/04/20/why-gemm-is-at-the-heart-of-deep-learning/
+
+    Parameters
+    ----------
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        Input volume (unpadded).
+    W: :py:class:`ndarray <numpy.ndarray>` of shape (kernel_rows, kernel_cols, in_ch, out_ch)
+        A volume of convolution weights/kernels for a given layer.
+    stride : int
+        The stride of each convolution kernel.
+    pad : tuple, int, or 'same'
+        The padding amount. If 'same', add padding to ensure that the output of
+        a 2D convolution with a kernel of `kernel_shape` and stride `stride`
+        produces an output volume of the same dimensions as the input.  If
+        2-tuple, specifies the number of padding rows and colums to add *on both
+        sides* of the rows/columns in `X`. If 4-tuple, specifies the number of
+        rows/columns to add to the top, bottom, left, and right of the input
+        volume.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
+
+    Returns
+    -------
+    Z : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+        The covolution of `X` with `W`.
     """
     s, d = stride, dilation
     _, p = pad2D(X, pad, W.shape[:2], s, dilation=dilation)
@@ -654,22 +665,29 @@ def conv2D(X, W, stride, pad, dilation=0):
     return Z
 
 
-#######################################################################
-#                             Convolution                             #
-#######################################################################
-
-
 def conv1D(X, W, stride, pad, dilation=0):
     """
     A faster (but more memory intensive) implementation of a 1D "convolution"
     (technically, cross-correlation) of input `X` with a collection of kernels in
     `W`.
 
+    Notes
+    -----
+    Relies on the `:func:`im2col` function to perform the convolution as a single
+    matrix multiplication.
+
+    For a helpful diagram, see Pete Warden's 2015 blogpost [1].
+
+    References
+    ----------
+    .. [1] Warden (2015). "Why GEMM is at the heart of deep learning,"
+       https://petewarden.com/2015/04/20/why-gemm-is-at-the-heart-of-deep-learning/
+
     Parameters
     ----------
-    X : numpy array of shape (n_ex, l_in, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
         Input volume (unpadded)
-    W: numpy array of shape (kernel_width, in_ch, out_ch)
+    W: :py:class:`ndarray <numpy.ndarray>` of shape (kernel_width, in_ch, out_ch)
         A volume of convolution weights/kernels for a given layer
     stride : int
         The stride of each convolution kernel
@@ -684,20 +702,8 @@ def conv1D(X, W, stride, pad, dilation=0):
 
     Returns
     -------
-    Z : numpy array of shape (n_ex, l_out, out_ch)
+    Z : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch)
         The convolution of X with W.
-
-    Notes
-    -----
-    Relies on the ``im2col`` function to perform the convolution as a single
-    matrix multiplication.
-
-    For a helpful diagram, see Pete Warden's 2015 blogpost [1].
-
-    References
-    ----------
-    .. [1] Warden (2015). "Why GEMM is at the heart of deep learning,"
-       https://petewarden.com/2015/04/20/why-gemm-is-at-the-heart-of-deep-learning/
     """
     _, p = pad1D(X, pad, W.shape[0], stride, dilation=dilation)
 
@@ -717,11 +723,24 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
     input volume `X` with a weight kernel `W`, incorporating stride, pad, and
     dilation.
 
+    Notes
+    -----
+    Rather than using the transpose of the convolution matrix, this approach
+    uses a direct convolution with zero padding, which, while conceptually
+    straightforward, is computationally inefficient.
+
+    For further explanation, see [1].
+
+    References
+    ----------
+    .. [1] Dumoulin & Visin (2016). "A guide to convolution arithmetic for deep
+       learning." https://arxiv.org/pdf/1603.07285v1.pdf
+
     Parameters
     ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
         Input volume (not padded)
-    W: numpy array of shape (kernel_rows, kernel_cols, in_ch, out_ch)
+    W: :py:class:`ndarray <numpy.ndarray>` of shape (kernel_rows, kernel_cols, in_ch, out_ch)
         A volume of convolution weights/kernels for a given layer
     stride : int
         The stride of each convolution kernel
@@ -738,22 +757,9 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
 
     Returns
     -------
-    Y : numpy array of shape (n_ex, out_rows, out_cols, n_out)
+    Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, n_out)
         The decovolution of (padded) input volume `X` with `W` using stride `s` and
         dilation `d`.
-
-    Notes
-    -----
-    Rather than using the transpose of the convolution matrix, this approach
-    uses a direct convolution with zero padding, which, while conceptually
-    straightforward, is computationally inefficient.
-
-    For further explanation, see [1].
-
-    References
-    ----------
-    .. [1] Dumoulin & Visin (2016). "A guide to convolution arithmetic for deep
-       learning." https://arxiv.org/pdf/1603.07285v1.pdf
     """
     if stride > 1:
         X = dilate(X, stride - 1)
@@ -793,11 +799,18 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
     A slow but more straightforward implementation of a 2D "convolution"
     (technically, cross-correlation) of input `X` with a collection of kernels `W`.
 
+    Notes
+    -----
+    This implementation uses ``for`` loops and direct indexing to perform the
+    convolution. As a result, it is slower than the vectorized :func:`conv2D`
+    function that relies on the :func:`col2im` and :func:`im2col`
+    transformations.
+
     Parameters
     ----------
-    X : numpy array of shape (`n_ex`, `in_rows`, `in_cols`, `in_ch`)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex`, `in_rows`, `in_cols`, `in_ch`)
         Input volume.
-    W: numpy array of shape (`kernel_rows`, `kernel_cols`, `in_ch`, `out_ch`)
+    W: :py:class:`ndarray <numpy.ndarray>` of shape (`kernel_rows`, `kernel_cols`, `in_ch`, `out_ch`)
         The volume of convolution weights/kernels.
     stride : int
         The stride of each convolution kernel.
@@ -814,14 +827,8 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
 
     Returns
     -------
-    Z : numpy array of shape (n_ex, out_rows, out_cols, out_ch)
+    Z : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
         The covolution of `X` with `W`.
-
-    Notes
-    -----
-    This implementation uses ``for`` loops and direct indexing to perform the
-    convolution. As a result, it is slower than the vectorized `conv2D`
-    function that relies on the `col2im` and `im2col` transformations.
     """
     s, d = stride, dilation
     X_pad, p = pad2D(X, pad, W.shape[:2], stride=s, dilation=d)
@@ -856,9 +863,19 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
 
 def he_uniform(weight_shape):
     """
-    Initializes network weights `W` with draws from ``Uniform(-b, b)`` where::
+    Initializes network weights `W` with using the He uniform initialization
+    strategy.
 
-        b = sqrt(6 / fan_in)
+    Notes
+    -----
+    The He uniform initializations trategy initializes thew eights in `W` using
+    draws from Uniform(-b, b) where
+
+    .. math::
+
+        b = \sqrt{\\frac{6}{\\text{fan_in}}}
+
+    Developed for deep networks with ReLU nonlinearities.
 
     Parameters
     ----------
@@ -867,12 +884,8 @@ def he_uniform(weight_shape):
 
     Returns
     -------
-    W : numpy array of shape `weight_shape`
+    W : :py:class:`ndarray <numpy.ndarray>` of shape `weight_shape`
         The initialized weights.
-
-    Notes
-    -----
-    Developed for deep networks with ReLU nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     b = np.sqrt(6 / fan_in)
@@ -881,10 +894,19 @@ def he_uniform(weight_shape):
 
 def he_normal(weight_shape):
     """
-    Initializes network weights `W` with draws from ``TruncatedNormal(0, b)``
-    where the variance ``b`` is::
+    Initialize network weights `W` using the He normal initialization strategy.
 
-        b = 2 / fan_in
+    Notes
+    -----
+    The He normal initialization strategy initializes the weights in `W` using
+    draws from TruncatedNormal(0, b) where the variance `b` is
+
+    .. math::
+
+        b = \\frac{2}{\\text{fan_in}}
+
+    He normal initialization was originally developed for deep networks with
+    :class:`~numpy_ml.neural_nets.activations.ReLU` nonlinearities.
 
     Parameters
     ----------
@@ -893,12 +915,8 @@ def he_normal(weight_shape):
 
     Returns
     -------
-    W : numpy array of shape `weight_shape`
+    W : :py:class:`ndarray <numpy.ndarray>` of shape `weight_shape`
         The initialized weights.
-
-    Notes
-    -----
-    Developed for deep networks with ReLU nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     std = np.sqrt(2 / fan_in)
@@ -907,9 +925,24 @@ def he_normal(weight_shape):
 
 def glorot_uniform(weight_shape, gain=1.0):
     """
-    Initializes network weights `W` with draws from ``Uniform(-b, b)`` where::
+    Initialize network weights `W` using the Glorot uniform initialization
+    strategy.
 
-        b = gain * sqrt(6 / (fan_in + fan_out))
+    Notes
+    -----
+    The Glorot uniform initialization strategy initializes weights using draws
+    from ``Uniform(-b, b)`` where:
+
+    .. math::
+
+        b = \\text{gain} \sqrt{\\frac{6}{\\text{fan_in} + \\text{fan_out}}}
+
+    The motivation for Glorot uniform initialization is to choose weights to
+    ensure that the variance of the layer outputs are approximately equal to
+    the variance of its inputs.
+
+    This initialization strategy was primarily developed for deep networks with
+    tanh and logistic sigmoid nonlinearities.
 
     Parameters
     ----------
@@ -918,17 +951,8 @@ def glorot_uniform(weight_shape, gain=1.0):
 
     Returns
     -------
-    W : numpy array of shape `weight_shape`
+    W : :py:class:`ndarray <numpy.ndarray>` of shape `weight_shape`
         The initialized weights.
-
-    Notes
-    -----
-    The motivation for Glorot uniform initialization is to choose weights to
-    ensure that the variance of the layer outputs are approximately equal to
-    the variance of its inputs.
-
-    This initialization strategy was primarily developed for deep networks with
-    tanh and logistic sigmoid nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     b = gain * np.sqrt(6 / (fan_in + fan_out))
@@ -937,10 +961,24 @@ def glorot_uniform(weight_shape, gain=1.0):
 
 def glorot_normal(weight_shape, gain=1.0):
     """
-    Initializes network weights `W` with draws from ``TruncatedNormal(0, b)``
-    where the variance ``b`` is::
+    Initialize network weights `W` using the Glorot normal initialization strategy.
 
-        b = gain^2 * 2 / (fan_in + fan_out)
+    Notes
+    -----
+    The Glorot normal initializaiton initializes weights with draws from
+    TruncatedNormal(0, b) where the variance `b` is
+
+    .. math::
+
+        b = \\frac{2 \\text{gain}^2}{\\text{fan_in} + \\text{fan_out}}
+
+    The motivation for Glorot normal initialization is to choose weights to
+    ensure that the variance of the layer outputs are approximately equal to
+    the variance of its inputs.
+
+    This initialization strategy was primarily developed for deep networks with
+    :class:`~numpy_ml.neural_nets.activations.Tanh` and
+    :class:`~numpy_ml.neural_nets.activations.Sigmoid` nonlinearities.
 
     Parameters
     ----------
@@ -949,17 +987,8 @@ def glorot_normal(weight_shape, gain=1.0):
 
     Returns
     -------
-    W : numpy array of shape `weight_shape`
+    W : :py:class:`ndarray <numpy.ndarray>` of shape `weight_shape`
         The initialized weights.
-
-    Notes
-    -----
-    The motivation for Glorot normal initialization is to choose weights to
-    ensure that the variance of the layer outputs are approximately equal to
-    the variance of its inputs.
-
-    This initialization strategy was primarily developed for deep networks with
-    tanh and logistic sigmoid nonlinearities.
     """
     fan_in, fan_out = calc_fan(weight_shape)
     std = gain * np.sqrt(2 / (fan_in + fan_out))
@@ -969,6 +998,12 @@ def glorot_normal(weight_shape, gain=1.0):
 def truncated_normal(mean, std, out_shape):
     """
     Generate draws from a truncated normal distribution via rejection sampling.
+
+    Notes
+    -----
+    The rejection sampling regimen draws samples from a normal distribution
+    with mean `mean` and standard deviation `std`, and resamples any values
+    more than two standard deviations from `mean`.
 
     Parameters
     ----------
@@ -982,15 +1017,9 @@ def truncated_normal(mean, std, out_shape):
 
     Returns
     -------
-    samples : numy array of shape `out_shape`
+    samples : :py:class:`ndarray <numpy.ndarray>` of shape `out_shape`
         Samples from the truncated normal distribution parameterized by `mean`
         and `std`.
-
-    Notes
-    -----
-    The rejection sampling regimen draws samples from a normal distribution
-    with mean `mean` and standard deviation `std`, and resamples any values
-    more than two standard deviations from `mean`.
     """
     samples = np.random.normal(loc=mean, scale=std, size=out_shape)
     reject = np.logical_or(samples >= mean + 2 * std, samples <= mean - 2 * std)

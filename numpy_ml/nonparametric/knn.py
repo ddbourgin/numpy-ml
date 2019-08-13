@@ -10,25 +10,28 @@ class KNN:
         self, k=5, leaf_size=40, classifier=True, metric=None, weights="uniform"
     ):
         """
-        A k-nearest neighbors (kNN) model relying on a ball tree for efficient
+        A `k`-nearest neighbors (kNN) model relying on a ball tree for efficient
         computation.
 
         Parameters
         ----------
-        k : int (default: 5)
-            The number of neighbors to use during prediction
-        leaf_size : int (default: 40)
-            The maximum number of datapoints at each leaf in the ball tree
-        classifier : bool (default: True)
+        k : int
+            The number of neighbors to use during prediction. Default is 5.
+        leaf_size : int
+            The maximum number of datapoints at each leaf in the ball tree.
+            Default is 40.
+        classifier : bool
             Whether to treat the values in Y as class labels (classifier =
-            True) or real-valued targets (classifier = False)
-        metric : function (default: None)
-            The distance metric to use for computing nearest neighbors
-        weights : 'uniform' or 'distance' (default: 'uniform')
+            True) or real-valued targets (classifier = False). Default is True.
+        metric : :doc:`Distance metric <numpy_ml.utils.distance_metrics>` or None
+            The distance metric to use for computing nearest neighbors. If
+            None, use the :func:`~numpy_ml.utils.distance_metrics.euclidean`
+            metric by default. Default is None.
+        weights : {'uniform', 'distance'}
             How to weight the predictions from each neighbors. 'uniform'
             assigns uniform weights to each neighbor, while 'distance' assigns
             weights proportional to the inverse of the distance from the query
-            point
+            point. Default is 'uniform'.
         """
         self._ball_tree = BallTree(leaf_size=leaf_size, metric=metric)
         self.hyperparameters = {
@@ -46,10 +49,10 @@ class KNN:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
-            An array of N examples to generate predictions on
-        y : numpy array of shape (N, ...)
-            Predicted targets for the N' rows in `X`
+        X : numpy array of shape `(N, M)`
+            An array of `N` examples to generate predictions on.
+        y : numpy array of shape `(N, \*)`
+            Predicted targets for the `N'` rows in `X`.
         """
         if X.ndim != 2:
             raise Exception("X must be two-dimensional")
@@ -61,13 +64,13 @@ class KNN:
 
         Parameters
         ----------
-        X : numpy array of shape (N', M')
-            An array of N' examples to generate predictions on
+        X : numpy array of shape `(N', M')`
+            An array of `N'` examples to generate predictions on.
 
         Returns
         -------
-        y : numpy array of shape (N', ...)
-            Predicted targets for the N' rows in `X`
+        y : numpy array of shape `(N',\*)`
+            Predicted targets for the `N'` rows in `X`.
         """
         predictions = []
         H = self.hyperparameters

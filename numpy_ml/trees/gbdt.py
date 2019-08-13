@@ -97,9 +97,9 @@ class GradientBoostedDecisionTree:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (N, M)
             The training data of `N` examples, each with `M` features
-        Y : numpy array of shape (N,)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape (N,)
             An array of integer class labels for each example in `X` if
             ``self.classifier = True``, otherwise the set of target values for
             each example in `X`.
@@ -161,12 +161,12 @@ class GradientBoostedDecisionTree:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             The training data of `N` examples, each with `M` features
 
         Returns
         -------
-        preds : numpy array of shape (N,)
+        preds : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The integer class labels predicted for each example in `X` if
             ``self.classifier = True``, otherwise the predicted target values.
         """

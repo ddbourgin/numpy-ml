@@ -8,14 +8,14 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        A : numpy array of shape (N, N) or None
-            The transition matrix between latent states in the HMM. Index i,j
-            gives the probability of transitioning from latent state i to
-            latent state j. Default is None.
-        B : numpy array of shape (N, V) or None
-            The emission matrix. Entry i,j gives the probability of latent
-            state i emitting an observation of type j. Default is None.
-        pi : numpy array of shape (N,) or None
+        A : :py:class:`ndarray <numpy.ndarray>` of shape `(N, N)` or None
+            The transition matrix between latent states in the HMM. Index `i`,
+            `j` gives the probability of transitioning from latent state `i` to
+            latent state `j`. Default is None.
+        B : :py:class:`ndarray <numpy.ndarray>` of shape `(N, V)` or None
+            The emission matrix. Entry `i`, `j` gives the probability of latent
+            state i emitting an observation of type `j`. Default is None.
+        pi : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)` or None
             The prior probability of each latent state. If None, use a uniform
             prior over states. Default is None.
         eps : float or None
@@ -24,18 +24,18 @@ class MultinomialHMM:
 
         Attributes
         ----------
-        A : numpy array of shape (N, N)
+        A : :py:class:`ndarray <numpy.ndarray>` of shape `(N, N)`
             The transition matrix between latent states in the HMM. Index `i`,
             `j` gives the probability of transitioning from latent state `i` to
             latent state `j`.
-        B : numpy array of shape (N, V)
+        B : :py:class:`ndarray <numpy.ndarray>` of shape `(N, V)`
             The emission matrix. Entry `i`, `j` gives the probability of latent
             state `i` emitting an observation of type `j`.
         N : int
             The number of unique latent states
         V : int
             The number of unique observation types
-        O : numpy array of shape (I, T)
+        O : :py:class:`ndarray <numpy.ndarray>` of shape `(I, T)`
             The collection of observed training sequences.
         I : int
             The number of sequences in `O`.
@@ -84,16 +84,16 @@ class MultinomialHMM:
         ----------
         n_steps : int
             The length of the generated sequence
-        latent_state_types : numpy array of shape (N,)
+        latent_state_types : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             A collection of labels for the latent states
-        obs_types : numpy array of shape (V,)
+        obs_types : :py:class:`ndarray <numpy.ndarray>` of shape `(V,)`
             A collection of labels for the observations
 
         Returns
         -------
-        states : numpy array of shape (n_steps,)
+        states : :py:class:`ndarray <numpy.ndarray>` of shape `(n_steps,)`
             The sampled latent states.
-        emissions : numpy array of shape (n_steps,)
+        emissions : :py:class:`ndarray <numpy.ndarray>` of shape `(n_steps,)`
             The sampled emissions.
         """
         # sample the initial latent state
@@ -151,7 +151,7 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        O : np.array of shape (1, T)
+        O : :py:class:`ndarray <numpy.ndarray>` of shape `(1, T)`
             A single set of observations.
 
         Returns
@@ -184,10 +184,13 @@ class MultinomialHMM:
         probability under the HMM of being in state `i` at time `j` after having
         passed through the *most probable* state sequence :math:`q_1,...,q_{j-1}`:
 
-        .. math:: \mathtt{viterbi[i,j]} = \max_{q_1,...,q_{j-1}} P(o_1,...,o_j,q_1,...,q_{j-1},q_j=i|A,B,\pi)
+        .. math::
+
+            \mathtt{viterbi[i,j]} =
+                \max_{q_1,\ldots,q_{j-1}} P(o_1,\ldots,o_j,q_1,\ldots,q_{j-1},q_j=i \mid A,B,\pi)
 
         Here :math:`q_j = i` indicates that the hidden state at time `j` is of
-        type `i`, and :math:`\max_{q_1,...,q_{j-1}}` represents the maximum over
+        type `i`, and :math:`\max_{q_1,\ldots,q_{j-1}}` represents the maximum over
         all possible latent state sequences for the first `j-1` observations.
 
         The DP step is:
@@ -218,12 +221,12 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        O : np.array of shape (T,)
+        O : np.array of shape `(T,)`
             An observation sequence of length `T`.
 
         Returns
         -------
-        best_path : list of length T
+        best_path : list of length `T`
             The most probable sequence of latent states for observations `O`.
         best_path_prob : float
             The probability of the latent state sequence in `best_path` under
@@ -306,12 +309,12 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        Obs : numpy array of shape (T,)
+        Obs : :py:class:`ndarray <numpy.ndarray>` of shape `(T,)`
             An observation sequence of length `T`.
 
         Returns
         -------
-        forward : numpy array of shape (N, T)
+        forward : :py:class:`ndarray <numpy.ndarray>` of shape `(N, T)`
             The forward trellis.
         """
         eps = self.eps
@@ -367,12 +370,12 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        Obs : numpy array of shape (T,)
+        Obs : :py:class:`ndarray <numpy.ndarray>` of shape `(T,)`
             A single observation sequence of length `T`.
 
         Returns
         -------
-        backward : numpy array of shape (N, T)
+        backward : :py:class:`ndarray <numpy.ndarray>` of shape `(N, T)`
             The backward trellis.
         """
         eps = self.eps
@@ -417,13 +420,13 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        O : np.array of shape (I, T)
+        O : :py:class:`ndarray <numpy.ndarray>` of shape `(I, T)`
             The set of `I` training observations, each of length `T`.
-        latent_state_types : list of length N
+        latent_state_types : list of length `N`
             The collection of valid latent states.
-        observation_types : list of length V
+        observation_types : list of length `V`
             The collection of valid observation states.
-        pi : numpy array of shape (N,)
+        pi : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The prior probability of each latent state. If None, assume each
             latent state is equally likely a priori. Default is None.
         tol : float
@@ -435,11 +438,11 @@ class MultinomialHMM:
 
         Returns
         -------
-        A : numpy array of shape (N, N)
+        A : :py:class:`ndarray <numpy.ndarray>` of shape `(N, N)`
             The estimated transition matrix.
-        B : numpy array of shape (N, V)
+        B : :py:class:`ndarray <numpy.ndarray>` of shape `(N, V)`
             The estimated emission matrix.
-        pi : numpy array of shape (N,)
+        pi : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The estimated prior probabilities of each latent state.
         """
         if O.ndim == 1:
@@ -516,15 +519,15 @@ class MultinomialHMM:
 
         ``gamma[i,j]`` gives the probability of being in state `i` at time `j`
 
-        .. math:: \mathtt{gamma[i,j]{ = P(q_j=i|O,A,B,\pi)
+        .. math:: \mathtt{gamma[i,j]} = P(q_j = i \mid O, A, B, \pi)
 
         Returns
         -------
-        gamma : numpy array of shape (I, N, T)
+        gamma : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N, T)`
             The estimated state-occupancy count matrix.
-        xi : numpy array of shape (I, N, N, T)
+        xi : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N, N, T)`
             The estimated state-state transition count matrix.
-        phi : numpy array of shape (I, N)
+        phi : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N)`
             The estimated prior counts for each latent state.
         """
         eps = self.eps
@@ -566,20 +569,20 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        gamma : numpy array of shape (I, N, T)
+        gamma : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N, T)`
             The estimated state-occupancy count matrix.
-        xi : numpy array of shape (I, N, N, T)
+        xi : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N, N, T)`
             The estimated state-state transition count matrix.
-        phi : numpy array of shape (I, N)
+        phi : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N)`
             The estimated starting count matrix for each latent state.
 
         Returns
         -------
-        A : numpy array of shape (N, N)
+        A : :py:class:`ndarray <numpy.ndarray>` of shape `(N, N)`
             The estimated transition matrix.
-        B : numpy array of shape (N, V)
+        B : :py:class:`ndarray <numpy.ndarray>` of shape `(N, V)`
             The estimated emission matrix.
-        pi : numpy array of shape (N,)
+        pi : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The estimated prior probabilities for each latent state.
         """
         eps = self.eps

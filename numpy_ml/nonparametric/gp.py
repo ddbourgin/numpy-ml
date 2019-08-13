@@ -16,45 +16,26 @@ from ..utils.kernels import KernelInitializer
 
 
 class GPRegression:
-    """
-    A Gaussian process defines a prior distribution over functions mapping
-    X -> ℝ, where X can be any finite (or infinite!)-dimensional set.
-
-    More concretely, let f(xk) be the random variable corresponding to the
-    value of a function f at a point xk ∈ X. We can define a random variable z
-    = [f(x1), ..., f(xN)] for any finite set of points {x1,..., xN} ⊂ X. If f
-    is distributed according to a Gaussian Process, we have that
-
-        z ~ N(mu, K)
-
-    for
-
-        mu = [mean(x1), ..., mean(xN)]
-        K[i, j] = kernel(xi, xj)
-
-    where `mean` is the mean function (it is common to define mean(x) = 0), and
-    `kernel` is a kernel / covariance function that determines the general
-    shape of the GP prior over functions, p(f).
-    """
-
     def __init__(self, kernel="RBFKernel", alpha=1e-10):
         """
         A Gaussian Process (GP) regression model.
 
-            y | X, f  ~ N( [f(x1), ..., f(xn)], alpha * I )
-            f | X     ~ GP(0, K)
+        .. math::
 
-        for data D = {(x1, y1), ..., (xn, yn)} and a covariance matrix K[i, j]
-        = kernel(xi, xj) for all i, j in {1, ..., n}.
+            y \mid X, f  &\sim  \mathcal{N}( [f(x_1), \ldots, f(x_n)], \\alpha I ) \\\\
+            f \mid X     &\sim  \\text{GP}(0, K)
+
+        for data :math:`D = \{(x_1, y_1), \ldots, (x_n, y_n) \}` and a covariance matrix :math:`K_{ij}
+        = \\text{kernel}(x_i, x_j)` for all :math:`i, j \in \{1, \ldots, n \}`.
 
         Parameters
         ----------
-        kernel : str (default: 'RBFKernel')
-            The kernel to use in fitting the GP prior
-        alpha : float (default: 1e-10)
-            An isotropic noise term for the diagonal in the GP covariance, K.
+        kernel : str
+            The kernel to use in fitting the GP prior. Default is 'RBFKernel'.
+        alpha : float
+            An isotropic noise term for the diagonal in the GP covariance, `K`.
             Larger values correspond to the expectation of greater noise in the
-            observed data points.
+            observed data points. Default is 1e-10.
         """
         self.kernel = KernelInitializer(kernel)()
         self.parameters = {"GP_mean": None, "GP_cov": None, "X": None}
@@ -66,11 +47,11 @@ class GPRegression:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
-            A training dataset of N examples, each with dimensionality M
-        y : numpy array of shape (N, O)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A training dataset of `N` examples, each with dimensionality `M`.
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, O)`
             A collection of real-valued training targets for the
-            examples in X, each with dimension O
+            examples in `X`, each with dimension `O`.
         """
         mu = np.zeros(X.shape[0])
         K = self.kernel(X, X)
@@ -82,54 +63,68 @@ class GPRegression:
 
     def predict(self, X, conf_interval=0.95, return_cov=False):
         """
-        Return the MAP estimate for y*, corresponding the mean/mode of the
-        posterior predictive distribution, p(y* | x*, X, y). Under the GP
-        regression model, the posterior predictive distribution is
+        Return the MAP estimate for :math:`y^*`, corresponding the mean/mode of
+        the posterior predictive distribution, :math:`p(y^* \mid x^*, X, y)`.
 
-            y* | x*, X, y ~ N(mu*, cov*)
+        Notes
+        -----
+        Under the GP regression model, the posterior predictive distribution is
+
+        .. math::
+
+            y^* \mid x^*, X, y \sim \mathcal{N}(\mu^*, \\text{cov}^*)
 
         where
 
-            mu*  = K* @ (K + alpha * I)^{-1} @ y
-            cov* = K** - K*' @ (K + alpha * I)^{-1} @ K*
+        .. math::
 
-            K = kernel(X, X)
-            K* = kernel(X, X*)
-            K** = kernel(X*, X*)
+            \mu^*  &=  K^* (K + \\alpha I)^{-1} y \\\\
+            \\text{cov}^*  &=  K^{**} - K^{*'} (K + \\alpha I)^{-1} K^*
+
+        and
+
+        .. math::
+
+            K  &=  \\text{kernel}(X, X) \\\\
+            K^*  &=  \\text{kernel}(X, X^*) \\\\
+            K^{**}  &=  \\text{kernel}(X^*, X^*)
 
         NB. This implementation uses the inefficient but general purpose
-        `np.linalg.inv` routine to invert (K + alpha * I). A more efficient way
-        is to rely on the fact that K (and hence also K + alpha * I) is
-        symmetric positive (semi-)definite and take the inner product of the
-        inverse of its (lower) Cholesky decompositions:
+        `np.linalg.inv` routine to invert :math:`(K + \\alpha I)`. A more
+        efficient way is to rely on the fact that `K` (and hence also :math:`K
+        + \\alpha I`) is symmetric positive (semi-)definite and take the inner
+        product of the inverse of its (lower) Cholesky decompositions:
 
-            Q^{-1} = cholesky(Q)^{-1}.T @ cholesky(Q)^{-1}
+        .. math::
+
+            Q^{-1} = \\text{cholesky}(Q)^{-1 \\top} \\text{cholesky}(Q)^{-1}
 
         For more details on a production-grade implementation, see Algorithm
         2.1 in Rasmussen & Williams (2006).
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape (N, M)
             The collection of datapoints to generate predictions on
-        conf_interval : float in (0, 1) (default: 0.95)
+        conf_interval : float in (0, 1)
             The percentage confidence bound to return for each prediction. If
             the scipy package is not available, this value is always set to
-            0.95.
-        return_cov : bool (default: False)
-            If True, also return the covariance (cov*) of the posterior
-            predictive distribution for the points in `X`
+            0.95. Default is 0.95.
+        return_cov : bool
+            If True, also return the covariance (`cov*`) of the posterior
+            predictive distribution for the points in `X`. Default is False.
 
         Returns
         -------
-        y_pred : numpy array of shape (N, O)
-            The predicted values for each point in X, each with dimensionality O
-        conf : numpy array of shape (N, O)
-            The %conf_interval confidence bound for each y_pred. The %conf
-            confidence interval for the i'th prediction is [y[i] - conf[i],
-            y[i] + conf[i]].
-        cov : numpy array of shape (N, N)
-            The covariance (cov*) of the posterior predictive distribution for
+        y_pred : :py:class:`ndarray <numpy.ndarray>` of shape `(N, O)`
+            The predicted values for each point in `X`, each with
+            dimensionality `O`.
+        conf : :py:class:`ndarray <numpy.ndarray>` of shape `(N, O)`
+            The % conf_interval confidence bound for each `y_pred`. The conf %
+            confidence interval for the `i`'th prediction is ``[y[i] - conf[i],
+            y[i] + conf[i]]``.
+        cov : :py:class:`ndarray <numpy.ndarray>` of shape `(N, N)`
+            The covariance (`cov*`) of the posterior predictive distribution for
             `X`. Only returned if `return_cov` is True.
         """
         if conf_interval != 0.95 and not _SCIPY:
@@ -161,34 +156,41 @@ class GPRegression:
     def marginal_log_likelihood(self, kernel_params=None):
         """
         Compute the log of the marginal likelihood (i.e., the log model
-        evidence), p(y | X, kernel_params).
+        evidence), :math:`p(y \mid X, \\text{kernel_params})`.
 
+        Notes
+        -----
         Under the GP regression model, the marginal likelihood is normally
         distributed:
 
-            y | X, kernel_params ~ N(0, K + alpha * I)
+        .. math::
+
+            y | X, \\theta  \sim  \mathcal{N}(0, K + \\alpha I)
 
         Hence,
 
-        log p(y | X, kernel_params) =
-            -0.5 * log det(K + alpha * I) -
-                0.5 * y.T @ (K + alpha * I)^{-1} @ y + n/2 * log 2*pi
+        .. math::
 
-        where K = kernel(X, X) and n is the number of dimensions in K.
+            \log p(y \mid X, \\theta) =
+                -0.5 \log \det(K + \\alpha I) -
+                    0.5 y^\\top (K + \\alpha I)^{-1} y + \\frac{n}{2} \log 2 \pi
+
+        where :math:`K = \\text{kernel}(X, X)`, :math:`\\theta` is the set of
+        kernel parameters, and `n` is the number of dimensions in `K`.
 
         Parameters
         ----------
-        kernel_params : dict (default: None)
-            Parameters for the kernel function. If `None`, calculate the
+        kernel_params : dict
+            Parameters for the kernel function. If None, calculate the
             marginal likelihood under the kernel parameters defined at model
-            initialization.
+            initialization. Default is None.
 
         Returns
         -------
         marginal_log_likelihood : float
             The log likelihood of the training targets given the kernel
             parameterized by `kernel_params` and the training inputs,
-            marginalized over all functions f
+            marginalized over all functions `f`.
         """
         X = self.parameters["X"]
         y = self.parameters["y"]
@@ -225,18 +227,19 @@ class GPRegression:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             The collection of datapoints to generate predictions on. Only used if
             `dist` = 'posterior_predictive'.
-        n_samples: int (default: 1)
-            The number of samples to generate
-        dist : str in {"posterior_predictive", "prior"} (default: "posterior_predictive")
-            The distribution to draw samples from
+        n_samples: int
+            The number of samples to generate. Default is 1.
+        dist : {"posterior_predictive", "prior"}
+            The distribution to draw samples from. Default is
+            "posterior_predictive".
 
         Returns
         -------
-        samples : numpy array of shape (n_samples, O, N)
-            The generated samples for the points in X
+        samples : :py:class:`ndarray <numpy.ndarray>` of shape `(n_samples, O, N)`
+            The generated samples for the points in `X`.
         """
         mvnorm = np.random.multivariate_normal
 

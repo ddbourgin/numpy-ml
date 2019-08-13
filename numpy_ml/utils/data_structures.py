@@ -212,18 +212,18 @@ class BallTree:
         ----------
         leaf_size : int
             The maximum number of datapoints at each leaf. Default is 40.
-        metric : function or None
-            The distance metric to use for computing nearest neighbors. Default
-            is None.
+        metric : :doc:`Distance metric <numpy_ml.utils.distance_metrics>` or None
+            The distance metric to use for computing nearest neighbors. If
+            None, use the :func:`~numpy_ml.utils.distance_metrics.euclidean`
+            metric. Default is None.
 
         References
         ----------
-        [1] Omohundro, S. M. (1989). "Five balltree construction algorithms". *ICSI
-        Technical Report TR-89-063*.
-
-        [2] Liu, T., Moore, A., & Gray A. (2006). "New algorithms for efficient
-        high-dimensional nonparametric classification". *J. Mach. Learn. Res.,
-        7*, 1135-1158.
+        .. [1] Omohundro, S. M. (1989). "Five balltree construction algorithms". *ICSI
+           Technical Report TR-89-063*.
+        .. [2] Liu, T., Moore, A., & Gray A. (2006). "New algorithms for efficient
+           high-dimensional nonparametric classification". *J. Mach. Learn. Res.,
+           7*, 1135-1158.
         """
         self.root = None
         self.leaf_size = leaf_size
@@ -242,9 +242,9 @@ class BallTree:
 
         Parameters
         ----------
-        X : numpy array of shape (N, M)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             An array of `N` examples each with `M` features.
-        y : numpy array of shape (N, ...) or None
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, \*)` or None
             An array of target values / labels associated with the entries in
             `X`. Default is None.
         """
@@ -295,9 +295,9 @@ class BallTree:
         Parameters
         ----------
         k : int
-            The number of closest points in X to return
-        x : numpy array of shape (1, M)
-            The query vector
+            The number of closest points in `X` to return
+        x : :py:class:`ndarray <numpy.ndarray>` of shape (1, M)
+            The query vector.
 
         Returns
         -------
@@ -349,24 +349,24 @@ class DiscreteSampler:
 
         Notes
         -----
-        Vose's algorithm takes O(n) time to initialize, requires O(n) memory,
+        Vose's algorithm takes `O(n)` time to initialize, requires `O(n)` memory,
         and generates samples in constant time.
 
         References
         ----------
-        [1] Walker, A. J. (1977) "An efficient method for generating discrete
-        random variables with general distributions". *ACM Transactions on
-        Mathematical Software, 3(3)*, 253-256.
+        .. [1] Walker, A. J. (1977) "An efficient method for generating discrete
+           random variables with general distributions". *ACM Transactions on
+           Mathematical Software, 3(3)*, 253-256.
 
-        [2] Vose, M. D. (1991) "A linear algorithm for generating random numbers
-        with a given distribution". *IEEE Trans. Softw. Eng., 9*, 972-974.
+        .. [2] Vose, M. D. (1991) "A linear algorithm for generating random numbers
+           with a given distribution". *IEEE Trans. Softw. Eng., 9*, 972-974.
 
-        [3] Schwarz, K (2011) "Darts, dice, and coins: sampling from a discrete
-        distribution". http://www.keithschwarz.com/darts-dice-coins/
+        .. [3] Schwarz, K (2011) "Darts, dice, and coins: sampling from a discrete
+           distribution". http://www.keithschwarz.com/darts-dice-coins/
 
         Parameters
         ----------
-        probs : numpy array of length (N,)
+        probs : :py:class:`ndarray <numpy.ndarray>` of length `(N,)`
             A list of probabilities of the `N` outcomes in the sample space.
             `probs[i]` returns the probability of outcome `i`.
         log : bool
@@ -430,7 +430,7 @@ class DiscreteSampler:
 
         Returns
         -------
-        sample : numpy array of shape (n_samples,)
+        sample : :py:class:`ndarray <numpy.ndarray>` of shape `(n_samples,)`
             A collection of draws from the distribution defined by `probs`.
             Each sample is an int in the range `[0, N)`.
         """
@@ -448,7 +448,7 @@ class DiscreteSampler:
 
         Returns
         -------
-        sample : numpy array of shape (n_samples,)
+        sample : :py:class:`ndarray <numpy.ndarray>` of shape `(n_samples,)`
             A collection of draws from the distribution defined by `probs`.
             Each sample is an int in the range `[0, N)`.
         """
