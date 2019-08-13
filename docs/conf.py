@@ -17,7 +17,6 @@ import sys
 import inspect
 
 sys.path.insert(0, os.path.abspath(".."))
-import numpy_ml
 
 
 gh_url = "https://github.com/ddbourgin/numpy-ml"
@@ -84,10 +83,10 @@ def linkcode_resolve(domain, info):
     except:
         return None
 
-    file = os.path.relpath(file, start=os.path.dirname(numpy_ml.__file__))
+    file = os.path.relpath(file, start=os.path.abspath(".."))
     source, line_start = inspect.getsourcelines(obj)
     line_end = line_start + len(source) - 1
-    filename = f"numpy_ml/{file}#L{line_start}-L{line_end}"
+    filename = f"{file}#L{line_start}-L{line_end}"
     return f"{gh_url}/blob/master/{filename}"
 
 
