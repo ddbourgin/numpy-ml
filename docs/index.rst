@@ -4,16 +4,25 @@ Welcome to numpy-ml
 tools written exclusively in `NumPy`_ and the Python `standard library`_. 
 
 The purpose of the project is to provide reference implementations of common
-machine learning components for rapid prototyping and experimentation. 
+machine learning components for rapid prototyping and experimentation. With
+that in mind, don't just read the docs -- read the source!
 
 .. _numpy-ml: http://www.github.com/ddbourgin/numpy-ml
 .. _NumPy: http://numpy.scipy.org/
 .. _standard library: https://docs.python.org/3/library/
 
-API Reference
--------------
+.. topic:: This documentation is under development!
+
+    We're working to expand our coverage. During this time there are likely to
+    be typos, bugs, and poorly-worded sections. If you encounter any of the
+    above, please file an `issue`_ or submit a `pull request`_! 
+
+.. _issue: https://github.com/ddbourgin/numpy-ml/issues
+.. _pull request: https://github.com/ddbourgin/numpy-ml/pulls
+
 .. toctree::
    :maxdepth: 3
+   :hidden:
 
    numpy_ml.hmm
 
@@ -23,19 +32,19 @@ API Reference
 
    numpy_ml.ngram
 
-   numpy_ml.trees
-
-   numpy_ml.utils
-
    numpy_ml.rl_models
+
+   numpy_ml.nonparametric
+
+   numpy_ml.trees
 
    numpy_ml.neural_nets
 
    numpy_ml.linear_models
 
-   numpy_ml.nonparametric
-
    numpy_ml.preprocessing
+
+   numpy_ml.utils
 
 ##########
 Disclaimer	

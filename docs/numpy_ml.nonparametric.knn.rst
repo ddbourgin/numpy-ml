@@ -1,7 +1,7 @@
 ``KNN``
 #######
 
-.. automodule:: numpy_ml.nonparametric.knn
+.. autoclass:: numpy_ml.nonparametric.KNN
 	:members:
 	:undoc-members:
 	:inherited-members:

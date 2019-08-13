@@ -1,7 +1,7 @@
 ``KernelRegression``
 #####################
 
-.. automodule:: numpy_ml.nonparametric.kernel_regression
+.. autoclass:: numpy_ml.nonparametric.KernelRegression
 	:members:
 	:undoc-members:
 	:inherited-members:

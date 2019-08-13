@@ -61,7 +61,9 @@ under the smoothed LDA model is:
 .. topic:: References
 
     .. [1]  Blei, Ng, & Jordan (2003). "Latent Dirichlet allocation". *Journal of
-       Machine Learning Research*, 3, 993–1022.
+       Machine Learning Research*, *3*, 993–1022.
+    .. [2]  Griffiths & Steyvers (2004). "Finding scientific topics". *PNAS*,
+       *101(1)*, 5228-5235.
 
 .. toctree::
    :maxdepth: 3

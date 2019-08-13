@@ -1,9 +1,8 @@
 ``MLENGram``
 ------------
 
-.. autoclass:: numpy_ml.ngram.ngram.MLENGram
+.. autoclass:: numpy_ml.ngram.MLENGram
         :members:
 	:undoc-members:
 	:inherited-members:
-	:show-inheritance:	
 

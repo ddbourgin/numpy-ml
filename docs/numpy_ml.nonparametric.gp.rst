@@ -1,7 +1,7 @@
 ``GPRegression``
 #################
 
-.. automodule:: numpy_ml.nonparametric.gp
+.. autoclass:: numpy_ml.nonparametric.GPRegression
 	:members:
 	:undoc-members:
 	:inherited-members:

@@ -1,8 +1,7 @@
 ``RandomForest``
 ################
 
-.. autoclass:: numpy_ml.trees.rf.RandomForest
+.. autoclass:: numpy_ml.trees.RandomForest
 	:members:
 	:undoc-members:
 	:inherited-members:
-	:show-inheritance:	

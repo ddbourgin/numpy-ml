@@ -1,7 +1,7 @@
 ``GMM``
 -------
 
-.. autoclass:: numpy_ml.gmm.gmm.GMM
+.. autoclass:: numpy_ml.gmm.GMM
 	:members:
 	:undoc-members:
 	:inherited-members:

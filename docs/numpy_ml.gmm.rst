@@ -53,7 +53,10 @@ algorithm`_ to learn the GMM parameters.
 
 .. topic:: References
     
-    .. [1]  w.
+    .. [1] Bilmes, J. A. (1998). "A gentle tutorial of the EM algorithm and its
+       application to parameter estimation for Gaussian mixture and hidden
+       Markov models" *International Computer Science Institute, 4(510)*
+       https://www.inf.ed.ac.uk/teaching/courses/pmr/docs/EM.pdf
 
 
 .. toctree::

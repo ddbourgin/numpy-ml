@@ -1,7 +1,7 @@
 ``SmoothedLDA``
 ===============
 
-.. autoclass:: numpy_ml.lda.lda_smoothed.SmoothedLDA
+.. autoclass:: numpy_ml.lda.SmoothedLDA
     :members:
     :undoc-members:
     :inherited-members:
