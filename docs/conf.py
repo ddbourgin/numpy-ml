@@ -56,7 +56,7 @@ extensions = [
     #  "numpydoc",
 ]
 
-autodoc_mock_imports = ["tensorflow", "torch"]
+autodoc_mock_imports = ["tensorflow", "torch", "gym"]
 
 # Try to link to source code on GitHub
 def linkcode_resolve(domain, info):
