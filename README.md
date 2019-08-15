@@ -3,7 +3,7 @@ Ever wish you had an inefficient but somewhat legible collection of machine
 learning algorithms implemented exclusively in numpy? No? 
 
 ## Documentation
-To see all of the available models, take a look at the [project documentation](https://numpy-ml.readthedocs.io/).
+To see all of the available models, take a look at the [project documentation](https://numpy-ml.readthedocs.io/) or see [here](https://github.com/ddbourgin/numpy-ml/blob/master/numpy_ml/README.md).
 
 ## Contributing
 
