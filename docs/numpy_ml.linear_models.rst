@@ -43,9 +43,10 @@ the normal equation:
 where :math:`(\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top` is known
 as the pseudoinverse / Moore-Penrose inverse.
 
-----------------
-Ridge Regression
-----------------
+.. raw:: html
+
+   <h2>Ridge Regression</h2>
+
 Ridge regression uses the same simple linear regression model but adds an
 additional penalty on the `L2`-norm of the coefficients to the loss function.
 This is sometimes known as Tikhonov regularization.
@@ -79,9 +80,10 @@ where :math:`(\mathbf{X}^\top \mathbf{X} + \alpha I)^{-1}
 \mathbf{X}^\top` is the pseudoinverse / Moore-Penrose inverse adjusted for
 the `L2` penalty on the model coefficients.
 
---------------------------
-Bayesian Linear Regression
---------------------------
+.. raw:: html
+
+   <h2>Bayesian Linear Regression</h2>
+
 In its general form, Bayesian linear regression extends the simple linear
 regression model by introducing priors on model parameters b and/or the
 error variance :math:`\sigma^2`.

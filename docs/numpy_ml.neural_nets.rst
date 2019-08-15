@@ -14,13 +14,12 @@ Neural networks
 
    numpy_ml.neural_nets.schedulers
 
+   numpy_ml.neural_nets.wrappers
+
    numpy_ml.neural_nets.modules
 
    numpy_ml.neural_nets.models
 
    numpy_ml.neural_nets.utils
 
-   numpy_ml.neural_nets.wrappers
-
-   numpy_ml.neural_nets.initializers
 
