@@ -46,7 +46,7 @@ class KernelBase(ABC):
 
         Returns
         -------
-        new_kernel : `KernelBase` instance
+        new_kernel : :doc:`Kernel <numpy_ml.utils.kernels>` instance
             A kernel with parameters and hyperparameters adjusted to those
             specified in `summary_dict`.
         """
@@ -100,15 +100,15 @@ class LinearKernel(KernelBase):
 
         Parameters
         ----------
-        X : numpy array of shape (N, C)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
             Collection of `N` input vectors
-        Y : numpy array of shape (M, C) or None
-            Collection of `M` input vectors. If `None`, assume `Y` = `X`.
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(M, C)` or None
+            Collection of `M` input vectors. If None, assume `Y` = `X`.
             Default is None.
 
         Returns
         -------
-        out : numpy array of shape (N, M)
+        out : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             Similarity between `X` and `Y`, where index (`i`, `j`) gives
             :math:`k(x_i, y_j)`.
         """
@@ -161,15 +161,15 @@ class PolynomialKernel(KernelBase):
 
         Parameters
         ----------
-        X : numpy array of shape (N, C)
-            Collection of N input vectors
-        Y : numpy array of shape (M, C) or None
-            Collection of M input vectors. If None, assume Y = X. Default is
-            None.
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+            Collection of `N` input vectors
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(M, C)` or None
+            Collection of `M` input vectors. If None, assume `Y = X`. Default
+            is None.
 
         Returns
         -------
-        out : numpy array of shape (N, M)
+        out : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             Similarity between `X` and `Y` where index (`i`, `j`) gives
             :math:`k(x_i, y_j)` (i.e., the kernel's Gram-matrix).
         """
@@ -191,7 +191,9 @@ class RBFKernel(KernelBase):
 
         .. math::
 
-            k(\mathbf{x}, \mathbf{y}) = \exp \left\{ -0.5   \left\lVert \\frac{\mathbf{x} - \mathbf{y}}{\sigma} \\right\\rVert_2^2 \\right\}
+            k(\mathbf{x}, \mathbf{y}) = \exp \left\{ -0.5
+                \left\lVert \\frac{\mathbf{x} -
+                    \mathbf{y}}{\sigma} \\right\\rVert_2^2 \\right\}
 
         The RBF kernel decreases with distance and ranges between zero (in the
         limit) to one (when **x** = **y**). Notably, the implied feature space
@@ -199,10 +201,10 @@ class RBFKernel(KernelBase):
 
         Parameters
         ----------
-        sigma : float or array of shape (C,) or None
+        sigma : float or array of shape `(C,)` or None
             A scaling parameter for the vectors **x** and **y**, producing an
             isotropic kernel if a float, or an anistropic kernel if an array of
-            length `C`.  If None, defaults to ``sqrt(C / 2)``. Sometimes
+            length `C`.  If None, defaults to :math:`\sqrt(C / 2)`. Sometimes
             referred to as the kernel 'bandwidth'. Default is None.
         """
         super().__init__()
@@ -216,15 +218,15 @@ class RBFKernel(KernelBase):
 
         Parameters
         ----------
-        X : numpy array of shape (N, C)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
             Collection of `N` input vectors, each with dimension `C`.
-        Y : numpy array of shape (M, C)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(M, C)`
             Collection of `M` input vectors. If None, assume `Y` = `X`. Default
             is None.
 
         Returns
         -------
-        out : numpy array of shape (N, M)
+        out : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             Similarity between `X` and `Y` where index (i, j) gives :math:`k(x_i, y_j)`.
         """
         P = self.parameters
@@ -242,7 +244,7 @@ class KernelInitializer(object):
             (c) Parameter dicts (e.g., as produced via the `summary` method in
                 `KernelBase` instances)
 
-        If `param` is `None`, return `LinearKernel`.
+        If `param` is None, return `LinearKernel`.
         """
         self.param = param
 
@@ -322,14 +324,15 @@ def pairwise_l2_distances(X, Y):
 
     Parameters
     ----------
-    X : numpy array of shape (N, C)
-        Collection of N input vectors
-    Y : numpy array of shape (M, C)
-        Collection of M input vectors. If `None`, assume `Y` = `X`. Default is None.
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+        Collection of `N` input vectors
+    Y : :py:class:`ndarray <numpy.ndarray>` of shape `(M, C)`
+        Collection of `M` input vectors. If None, assume `Y` = `X`. Default is
+        None.
 
     Returns
     -------
-    dists : numpy array of shape (N, M)
+    dists : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
         Pairwise distance matrix. Entry (i, j) contains the `L2` distance between
         :math:`x_i` and :math:`y_j`.
     """

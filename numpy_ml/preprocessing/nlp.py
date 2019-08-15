@@ -407,36 +407,33 @@ class Node(object):
 
 
 class HuffmanEncoder(object):
-    """
-    Encode the tokens in a text using variable-length bit strings (a prefix
-    code) computed via a Huffman tree.
-
-    In a Huffman code, tokens that occur more frequently are (generally)
-    represented using fewer bits. Huffman codes produce the minimum expected
-    codeword length among all methods for encoding tokens individually.
-
-    Huffman codes correspond to paths through a binary tree, with 1
-    corresponding to "move right" and 0 corresponding to "move left". In
-    contrast to standard binary trees, the Huffman tree is constructed from the
-    bottom up. Construction begins by initializing a min-heap priority queue
-    consisting of each token in the corpus, with priority corresponding to the
-    token frequency. At each step, the two most infrequent tokens in the corpus
-    are removed and become the children of a parent pseudotoken whose
-    "frequency" is the sum of the frequencies of its children. This new parent
-    pseudotoken is added to the priority queue and the process is repeated
-    recursively until no tokens remain.
-    """
-
     def fit(self, text):
         """
         Build a Huffman tree for the tokens in `text` and compute each token's
         binary encoding.
 
+        Notes
+        -----
+        In a Huffman code, tokens that occur more frequently are (generally)
+        represented using fewer bits. Huffman codes produce the minimum expected
+        codeword length among all methods for encoding tokens individually.
+
+        Huffman codes correspond to paths through a binary tree, with 1
+        corresponding to "move right" and 0 corresponding to "move left". In
+        contrast to standard binary trees, the Huffman tree is constructed from the
+        bottom up. Construction begins by initializing a min-heap priority queue
+        consisting of each token in the corpus, with priority corresponding to the
+        token frequency. At each step, the two most infrequent tokens in the corpus
+        are removed and become the children of a parent pseudotoken whose
+        "frequency" is the sum of the frequencies of its children. This new parent
+        pseudotoken is added to the priority queue and the process is repeated
+        recursively until no tokens remain.
+
         Parameters
         ----------
-        text: list of strs or `Vocabulary` instance
-            The tokenized text or a pretrained Vocabulary object to use for
-            building the Huffman code
+        text: list of strs or :class:`Vocabulary` instance
+            The tokenized text or a pretrained :class:`Vocabulary` object to use for
+            building the Huffman code.
         """
         self._build_tree(text)
         self._generate_codes()
@@ -447,12 +444,12 @@ class HuffmanEncoder(object):
 
         Parameters
         ----------
-        text: list of N strings
+        text: list of `N` strings
             The list of words to encode
 
         Returns
         -------
-        codes : list of N binary strings
+        codes : list of `N` binary strings
             The encoded words in `text`
         """
         if isinstance(text, str):
@@ -464,17 +461,17 @@ class HuffmanEncoder(object):
 
     def inverse_transform(self, codes):
         """
-        Transform an encoded sequence of bit-strings back into words
+        Transform an encoded sequence of bit-strings back into words.
 
         Parameters
         ----------
-        codes : list of N binary strings
-            A list of encoded bit-strings, represented as strings
+        codes : list of `N` binary strings
+            A list of encoded bit-strings, represented as strings.
 
         Returns
         -------
-        text: list of N strings
-            The decoded text
+        text: list of `N` strings
+            The decoded text.
         """
         if isinstance(codes, str):
             codes = [codes]
@@ -574,36 +571,42 @@ class TFIDFEncoder:
         inverse-document-frequency (TF-IDF) representation of the tokens in a
         text corpus.
 
+        Notes
+        -----
         TF-IDF is intended to reflect how important a word is to a document in
         a collection or corpus. For a word token `w` in a document `d`, and a
-        corpus, D = {d1, ..., dN}, we have:
+        corpus, :math:`D = \{d_1, \ldots, d_N\}`, we have:
 
-            TF(w, d) = # of occurences of `w` in document `d`
-            IDF(w, D) = log [ |D| / |{ d in D: t in d }| ]
+        .. math::
+            \\text{TF}(w, d)  &=  \\text{num. occurences of }`w`\\text{ in document }`d` \\\\
+            \\text{IDF}(w, D)  &=  \log \\frac{|D|}{|\{ d \in D: t \in d \}|}
 
         Parameters
         ----------
-        vocab : `Vocabulary` instance or list-like (default: None)
+        vocab : :class:`Vocabulary` object or list-like
             An existing vocabulary to filter the tokens in the corpus against.
-        lowercase : bool (default: True)
-            Whether to convert each string to lowercase before tokenization
-        min_count : int (default: 0)
+            Default is None.
+        lowercase : bool
+            Whether to convert each string to lowercase before tokenization.
+            Default is True.
+        min_count : int
             Minimum number of times a token must occur in order to be included
-            in vocab.
-        smooth_idf : bool (default: True)
+            in vocab. Default is 0.
+        smooth_idf : bool
             Whether to add 1 to the denominator of the IDF calculation to avoid
-            divide-by-zero errors.
-        max_tokens : int (default: None)
+            divide-by-zero errors. Default is True.
+        max_tokens : int
             Only add the `max_tokens` most frequent tokens that occur more
             than `min_count` to the vocabulary.  If None, add all tokens
-            greater that occur more than than `min_count`.
-        input_type : {'files', 'strings'}
+            greater that occur more than than `min_count`. Default is None.
+        input_type : {'filename', 'strings'}
             If 'files', the sequence input to `fit` is expected to be a list
             of filepaths. If 'strings', the input is expected to be a list of
             lists, each sublist containing the raw strings for a single
-            document in the corpus.
-        filter_stopwords : bool (default: True)
-            Whether to remove stopwords before encoding the words in the corpus
+            document in the corpus. Default is 'filename'.
+        filter_stopwords : bool
+            Whether to remove stopwords before encoding the words in the
+            corpus. Default is True.
         """
         # create a function to filter against words in the vocab
         self._filter_vocab = lambda words: words
@@ -652,13 +655,13 @@ class TFIDFEncoder:
         corpus_seq : str or list of strs
             The filepath / list of filepaths / raw string contents of the
             document(s) to be encoded, in accordance with the `input_type`
-            parameter passed to the `__init__` method. Each document is
+            parameter passed to the :meth:`__init__` method. Each document is
             expected to be a newline-separated strings of text, with adjacent
             tokens separated by a whitespace character.
-        encoding : str (default: 'utf-8-sig')
+        encoding : str
             Specifies the text encoding for corpus if `input_type` is `files`.
             Common entries are either 'utf-8' (no header byte), or 'utf-8-sig'
-            (header byte).
+            (header byte). Default is 'utf-8-sig'.
         """
         H = self.hyperparameters
 
@@ -902,13 +905,13 @@ class TFIDFEncoder:
 
         Parameters
         ----------
-        ignore_special_chars : bool (default: True)
+        ignore_special_chars : bool
             Whether to drop columns corresponding to "<eol>", "<bol>", and
-            "<unk>" tokens from the final tfidf encoding.
+            "<unk>" tokens from the final tfidf encoding. Default is True.
 
         Returns
         -------
-        tfidf : numpy array of shape (D, M [- 3])
+        tfidf : numpy array of shape `(D, M [- 3])`
             The encoded corpus, with each row corresponding to a single
             document, and each column corresponding to a token id. The mapping
             between column numbers and tokens is stored in the `idx2token`
@@ -948,17 +951,20 @@ class Vocabulary:
 
         Parameters
         ----------
-        lowercase : bool (default: True)
-            Whether to convert each string to lowercase before tokenization
-        min_count : int (default: None)
+        lowercase : bool
+            Whether to convert each string to lowercase before tokenization.
+            Default is True.
+        min_count : int
             Minimum number of times a token must occur in order to be included
             in vocab. If `None`, include all tokens from `corpus_fp` in vocab.
-        max_tokens : int (default: None)
+            Default is None.
+        max_tokens : int
             Only add the `max_tokens` most frequent tokens that occur more
             than `min_count` to the vocabulary.  If None, add all tokens
-            greater that occur more than than `min_count`.
-        filter_stopwords : bool (default: True)
-            Whether to remove stopwords before encoding the words in the corpus
+            greater that occur more than than `min_count`. Default is None.
+        filter_stopwords : bool
+            Whether to remove stopwords before encoding the words in the
+            corpus. Default is True.
         """
         self.hyperparameters = {
             "id": "Vocabulary",
@@ -1017,14 +1023,15 @@ class Vocabulary:
         ----------
         words : list of strs
             A list of words to filter
-        unk : bool (default: True)
+        unk : bool
             Whether to replace any out of vocabulary words in `words` with the
-            <unk> token (unk = True) or skip them entirely (unk = False)
+            <unk> token (unk = True) or skip them entirely (unk = False).
+            Default is True.
 
         Returns
         -------
         filtered : list of strs
-            The list of words filtered against the vocabulary
+            The list of words filtered against the vocabulary.
         """
         if unk:
             return [w if w in self else "<unk>" for w in words]
@@ -1053,7 +1060,7 @@ class Vocabulary:
     def indices_to_words(self, indices):
         """
         Convert the indices in `indices` to their word values. If an index is
-        not in the vocabulary, return the the <unk> token
+        not in the vocabulary, return the the <unk> token.
 
         Parameters
         ----------
@@ -1070,7 +1077,7 @@ class Vocabulary:
 
     def fit(self, corpus_fps, encoding="utf-8-sig"):
         """
-        Compute the vocabulary across a collection of documents
+        Compute the vocabulary across a collection of documents.
 
         Parameters
         ----------
@@ -1079,9 +1086,10 @@ class Vocabulary:
             Each document is expected to be encoded as newline-separated
             string of text, with adjacent tokens separated by a whitespace
             character.
-        encoding : str (default: 'utf-8-sig')
+        encoding : str
             Specifies the text encoding for corpus. Common entries are either
-            'utf-8' (no header byte), or 'utf-8-sig' (header byte).
+            'utf-8' (no header byte), or 'utf-8-sig' (header byte). Default is
+            'utf-8-sig'.
         """
         if isinstance(corpus_fps, str):
             corpus_fps = [corpus_fps]

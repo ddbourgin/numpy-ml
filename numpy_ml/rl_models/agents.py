@@ -97,7 +97,7 @@ class CrossEntropyAgent(AgentBase):
 
         Parameters
         ----------
-        env : ``gym.wrappers`` or ``gym.envs`` instance
+        env : :meth:`gym.wrappers` or :meth:`gym.envs` instance
             The environment to run the agent on.
         n_samples_per_episode : int
             The number of theta samples to evaluate on each episode. Default is 500.
@@ -153,19 +153,20 @@ class CrossEntropyAgent(AgentBase):
 
         .. math::
 
-            \pi(a | x^{(t)}) = \\text{softmax}( \\text{obs}^{(t)} \cdot \mathbf{W}_i^{(t)} + \mathbf{b}_i^{(t)} )
+            \pi(a | x^{(t)}) = \\text{softmax}(
+                \\text{obs}^{(t)} \cdot \mathbf{W}_i^{(t)} + \mathbf{b}_i^{(t)} )
 
         where :math:`\mathbf{W}` is a learned weight matrix, `obs` is the observation
         at timestep `t`, and **b** is a learned bias vector.
 
         Parameters
         ----------
-        obs : int or array
+        obs : int or :py:class:`ndarray <numpy.ndarray>`
             An observation from the environment.
 
         Returns
         -------
-        action : int, float, or np.ndarray
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             An action sampled from the distribution over actions defined by the
             softmax policy.
         """
@@ -230,9 +231,9 @@ class CrossEntropyAgent(AgentBase):
 
         Parameters
         ----------
-        W : numpy array of shape (obs_dim, n_actions)
+        W : :py:class:`ndarray <numpy.ndarray>` of shape `(obs_dim, n_actions)`
             The weights for the softmax policy.
-        b : numpy array of shape (bias_len, )
+        b : :py:class:`ndarray <numpy.ndarray>` of shape `(bias_len, )`
             The bias for the softmax policy.
         max_steps : int
             The maximum number of steps to run the episode.
@@ -346,7 +347,7 @@ class MonteCarloAgent(AgentBase):
 
         Parameters
         ----------
-        env : ``gym.wrappers`` or ``gym.envs`` instance
+        env : :class:`gym.wrappers` or :class:`gym.envs` instance
             The environment to run the agent on.
         off_policy : bool
             Whether to use a behavior policy separate from the target policy
@@ -438,7 +439,7 @@ class MonteCarloAgent(AgentBase):
         ----------
         s : int, float, or tuple
             The state number for the current observation, as returned by
-            ``self._obs2num[obs]``
+            ``_obs2num[obs]``.
         a : int, float, tuple, or None
             The action number in the current state, as returned by
             ``self._action2num[obs]``. If None, sample an action from the
@@ -448,7 +449,7 @@ class MonteCarloAgent(AgentBase):
 
         Returns
         -------
-        action : int, float, or np.ndarray
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             If `a` is None, this is an action sampled from the distribution
             over actions defined by the epsilon-soft policy. If `a` is not
             None, this is the probability of `a` under the epsilon-soft policy.
@@ -494,7 +495,7 @@ class MonteCarloAgent(AgentBase):
 
         Returns
         -------
-        action : int, float, or np.ndarray
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             If `a` is None, this is an action sampled from the distribution
             over actions defined by the greedy policy. If `a` is not
             None, this is the probability of `a` under the greedy policy.
@@ -517,7 +518,9 @@ class MonteCarloAgent(AgentBase):
 
         .. math::
 
-            Q'(s, a) \leftarrow \\text{avg}(\\text{reward following first visit to } (s, a) \\text{ across all episodes})
+            Q'(s, a) \leftarrow
+                \\text{avg}(\\text{reward following first visit to } (s, a)
+                \\text{ across all episodes})
 
         RL agents seek to learn action values conditional on subsequent optimal
         behavior, but they need to behave non-optimally in order to explore all
@@ -591,12 +594,12 @@ class MonteCarloAgent(AgentBase):
 
         Parameters
         ----------
-        obs : int, float, or np.ndarray as returned by ``env.step(action)``
+        obs : int, float, or :py:class:`ndarray <numpy.ndarray>` as returned by ``env.step(action)``
             An observation from the environment.
 
         Returns
         -------
-        action : int, float, or np.ndarray
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             An action sampled from the distribution over actions defined by the
             epsilon-soft policy.
         """
@@ -770,12 +773,12 @@ class TemporalDifferenceAgent(AgentBase):
             The number of overlapping tilings to use if the ``env`` observation
             space is continuous. Unused if observation space is discrete.
             Default is 8.
-        obs_max : float or np.ndarray
+        obs_max : float or :py:class:`ndarray <numpy.ndarray>`
             The value to treat as the max value of the observation space when
             calculating the grid widths if the observation space is continuous.
             If None, use ``env.observation_space.high``. Unused if observation
             space is discrete. Default is None.
-        obs_min : float or np.ndarray
+        obs_min : float or :py:class:`ndarray <numpy.ndarray>`
             The value to treat as the min value of the observation space when
             calculating grid widths if the observation space is continuous. If
             None, use ``env.observation_space.low``. Unused if observation
@@ -985,17 +988,17 @@ class TemporalDifferenceAgent(AgentBase):
         ----------
         s : int, float, or tuple
             The state number for the current observation, as returned by
-            self._obs2num[obs]
-        a : int, float, or tuple (default : None)
+            ``self._obs2num[obs]``
+        a : int, float, or tuple
             The action number in the current state, as returned by
             self._action2num[obs]. If None, sample an action from the action
             probabilities in state s, otherwise, return the probability of
-            action `a` under the epsilon-soft policy.
+            action `a` under the epsilon-soft policy. Default is None.
 
         Returns
         -------
         If `a` is None:
-        action : int, float, or np.ndarray as returned by `self._num2action`
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>` as returned by `self._num2action`
             If `a` is None, returns an action sampled from the distribution
             over actions defined by the epsilon-soft policy.
 
@@ -1032,17 +1035,17 @@ class TemporalDifferenceAgent(AgentBase):
         ----------
         s : int, float, or tuple
             The state number for the current observation, as returned by
-            self._obs2num[obs]
-        a : int, float, or tuple (default : None)
+            ``self._obs2num[obs]``
+        a : int, float, or tuple
             The action number in the current state, as returned by
-            self._action2num[obs]. If None, sample an action from the action
-            probabilities in state s, otherwise, return the probability of
-            action `a` under the greedy policy.
+            ``self._action2num[obs]``. If None, sample an action from the
+            action probabilities in state `s`, otherwise, return the
+            probability of action `a` under the greedy policy. Default is None.
 
         Returns
         -------
         If `a` is None:
-        action : int, float, or np.ndarray as returned by `self._num2action`
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>` as returned by ``self._num2action``
             If `a` is None, returns an action sampled from the distribution
             over actions defined by the greedy policy.
 
@@ -1145,12 +1148,12 @@ class TemporalDifferenceAgent(AgentBase):
 
         Parameters
         ----------
-        obs : int, float, or np.ndarray as returned by ``env.step(action)``
+        obs : int, float, or :py:class:`ndarray <numpy.ndarray>` as returned by ``env.step(action)``
             An observation from the environment.
 
         Returns
         -------
-        action : int, float, or np.ndarray
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             An action sampled from the distribution over actions defined by the
             epsilon-soft policy.
         """
@@ -1228,10 +1231,10 @@ class DynaAgent(AgentBase):
 
         Parameters
         ----------
-        env : gym.wrappers or gym.envs instance
+        env : :class:`gym.wrappers` or :class:`gym.envs` instance
             The environment to run the agent on
         lr : float
-            Learning rate for the Q function updates. Default is 0.05.
+            Learning rate for the `Q` function updates. Default is 0.05.
         epsilon : float between [0, 1]
             The epsilon value in the epsilon-soft policy. Larger values
             encourage greater exploration during training. Default is 0.1.
@@ -1239,23 +1242,23 @@ class DynaAgent(AgentBase):
             The number of overlapping tilings to use if the env observation
             space is continuous. Unused if observation space is discrete.
             Default is 8.
-        obs_max : float or np.ndarray or None
+        obs_max : float or :py:class:`ndarray <numpy.ndarray>` or None
             The value to treat as the max value of the observation space when
             calculating the grid widths if the observation space is continuous.
-            If `None`, use ``env.observation_space.high``. Unused if observation
+            If None, use :meth:`env.observation_space.high`. Unused if observation
             space is discrete. Default is None.
-        obs_min : float or np.ndarray or None
+        obs_min : float or :py:class:`ndarray <numpy.ndarray>` or None
             The value to treat as the min value of the observation space when
             calculating grid widths if the observation space is continuous. If
-            None, use ``env.observation_space.low``. Unused if observation
+            None, use :meth:`env.observation_space.low`. Unused if observation
             space is discrete. Default is None.
         grid_dims : list
             The number of rows and columns in each tiling grid if the env
             observation space is continuous. Unused if observation space is
             discrete. Default is `[8, 8]`.
-        q_plus : bool (default: False)
+        q_plus : bool
             Whether to add incentives for visiting states that the agent hasn't
-            encountered recently
+            encountered recently. Default is False.
         explore_weight : float
             Amount to incentivize exploring states that the agent hasn't
             recently visited. Only used if `q_plus` is True. Default is 0.05.
@@ -1341,12 +1344,12 @@ class DynaAgent(AgentBase):
 
         Parameters
         ----------
-        obs : int, float, or np.ndarray as returned by ``env.step(action)``
+        obs : int, float, or :py:class:`ndarray <numpy.ndarray>` as returned by ``env.step(action)``
             An observation from the environment.
 
         Returns
         -------
-        action : int, float, or np.ndarray
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             An action sampled from the distribution over actions defined by the
             epsilon-soft policy.
         """
@@ -1380,16 +1383,16 @@ class DynaAgent(AgentBase):
         s : int, float, or tuple
             The state number for the current observation, as returned by
             self._obs2num[obs]
-        a : int, float, or tuple (default : None)
+        a : int, float, or tuple
             The action number in the current state, as returned by
             self._action2num[obs]. If None, sample an action from the action
             probabilities in state s, otherwise, return the probability of
-            action `a` under the epsilon-soft policy.
+            action `a` under the epsilon-soft policy. Default is None.
 
         Returns
         -------
         If `a` is None:
-        action : int, float, or np.ndarray as returned by `self._num2action`
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>` as returned by :meth:`_num2action`
             If `a` is None, returns an action sampled from the distribution
             over actions defined by the epsilon-soft policy.
 
@@ -1427,16 +1430,16 @@ class DynaAgent(AgentBase):
         s : int, float, or tuple
             The state number for the current observation, as returned by
             self._obs2num[obs]
-        a : int, float, or tuple (default : None)
+        a : int, float, or tuple
             The action number in the current state, as returned by
             self._action2num[obs]. If None, sample an action from the action
             probabilities in state s, otherwise, return the probability of
-            action `a` under the greedy policy.
+            action `a` under the greedy policy. Default is None.
 
         Returns
         -------
         If `a` is None:
-        action : int, float, or np.ndarray as returned by `self._num2action`
+        action : int, float, or :py:class:`ndarray <numpy.ndarray>` as returned by :meth:`_num2action`
             If `a` is None, returns an action sampled from the distribution
             over actions defined by the greedy policy.
 
@@ -1608,7 +1611,7 @@ class DynaAgent(AgentBase):
 
     def run_episode(self, max_steps, render=False):
         """
-        Run the agent on a single episode without performing Q-function
+        Run the agent on a single episode without performing `Q`-function
         backups.
 
         Parameters
@@ -1635,9 +1638,9 @@ class DynaAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run an episode
+            The maximum number of steps to run an episode.
         render : bool
-            Whether to render the episode during training
+            Whether to render the episode during training.
 
         Returns
         -------
@@ -1658,19 +1661,19 @@ class DynaAgent(AgentBase):
         Parameters
         ----------
         max_steps : int
-            The maximum number of steps to run the episode
+            The maximum number of steps to run the episode.
         render : bool
-            Whether to render the episode during training
+            Whether to render the episode during training.
         update : bool
-            Whether to perform the Q function backups after each step. Default
-            is True.
+            Whether to perform the `Q` function backups after each step.
+            Default is True.
 
         Returns
         -------
         reward : float
-            The total reward on the episode
+            The total reward on the episode.
         steps : float
-            The number of steps taken on the episode
+            The number of steps taken on the episode.
         """
         self.flush_history()
 

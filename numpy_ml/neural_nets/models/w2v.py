@@ -69,8 +69,8 @@ class Word2Vec(object):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the `update` method.  If None, use the
-            :class:`numpy_ml.neural_nets.optimizers.SGD` optimizer with default
-            parameters. Default is None.
+            :class:`~numpy_ml.neural_nets.optimizers.SGD` optimizer with
+            default parameters. Default is None.
 
         Attributes
         ----------

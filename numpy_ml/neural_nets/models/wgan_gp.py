@@ -209,7 +209,7 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (batchsize, \*)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(batchsize, \*)`
             Input data
         module : {'C' or 'G'}
             Whether to perform the forward pass for the critic ('C') or for the
@@ -222,7 +222,7 @@ class WGAN_GP(object):
 
         Returns
         -------
-        out : :py:class:`ndarray <numpy.ndarray>` of shape (batchsize, \*)
+        out : :py:class:`ndarray <numpy.ndarray>` of shape `(batchsize, \*)`
             The output of the final layer of the module.
         Xs : dict
             A dictionary with layer ids as keys and values corresponding to the
@@ -249,7 +249,7 @@ class WGAN_GP(object):
 
         Parameters
         ----------
-        grad : :py:class:`ndarray <numpy.ndarray>` of shape (batchsize, <module_out_dim>) or list of arrays
+        grad : :py:class:`ndarray <numpy.ndarray>` of shape `(batchsize, \*)` or list of arrays
             Gradient of the loss with respect to module output(s).
         module : {'C' or 'G'}
             Whether to perform the backward pass for the critic ('C') or for the

@@ -1,10 +1,5 @@
 import numpy as np
 
-"""
-In DSP, windowing functions are useful to counteract the assumption made by the
-FFT that the data is infinite and to reduce spectral leakage.
-"""
-
 
 def blackman_harris(window_len, symmetric=False):
     """
@@ -18,7 +13,9 @@ def blackman_harris(window_len, symmetric=False):
     frequency response.
 
     .. math::
-        \\text{bh}(n) = a_0 - a_1 \cos\left(\\frac{2 \pi n}{N}\\right) + a_2 \cos\left(\\frac{4 \pi n }{N}\\right) - a_3 \cos\left(\\frac{6 \pi n}{N}\\right)
+        \\text{bh}(n) = a_0 - a_1 \cos\left(\\frac{2 \pi n}{N}\\right) +
+            a_2 \cos\left(\\frac{4 \pi n }{N}\\right) -
+                a_3 \cos\left(\\frac{6 \pi n}{N}\\right)
 
     where `N` = `window_len` - 1, :math:`a_0` = 0.35875, :math:`a_1` = 0.48829,
     :math:`a_2` = 0.14128, and :math:`a_3` = 0.01168.
@@ -35,7 +32,7 @@ def blackman_harris(window_len, symmetric=False):
 
     Returns
     -------
-    window : numpy array of shape (window_len,)
+    window : :py:class:`ndarray <numpy.ndarray>` of shape `(window_len,)`
         The window
     """
     return generalized_cosine(
@@ -55,7 +52,8 @@ def hamming(window_len, symmetric=False):
 
     .. math::
 
-        \\text{hamming}(n) = 0.54 - 0.46 \cos\left(\\frac{2 \pi n}{\\text{window_len} - 1}\\right)
+        \\text{hamming}(n) = 0.54 -
+            0.46 \cos\left(\\frac{2 \pi n}{\\text{window_len} - 1}\\right)
 
     Parameters
     ----------
@@ -69,7 +67,7 @@ def hamming(window_len, symmetric=False):
 
     Returns
     -------
-    window : numpy array of shape (window_len,)
+    window : :py:class:`ndarray <numpy.ndarray>` of shape `(window_len,)`
         The window
     """
     return generalized_cosine(window_len, [0.54, 1 - 0.54], symmetric)
@@ -101,7 +99,7 @@ def hann(window_len, symmetric=False):
 
     Returns
     -------
-    window : numpy array of shape (window_len,)
+    window : :py:class:`ndarray <numpy.ndarray>` of shape `(window_len,)`
         The window
     """
     return generalized_cosine(window_len, [0.5, 0.5], symmetric)
@@ -135,7 +133,7 @@ def generalized_cosine(window_len, coefs, symmetric=False):
 
     Returns
     -------
-    window : numpy array of shape (window_len,)
+    window : :py:class:`ndarray <numpy.ndarray>` of shape `(window_len,)`
         The window
     """
     window_len += 1 if not symmetric else 0

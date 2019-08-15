@@ -15,18 +15,17 @@ def batch_resample(X, new_dim, mode="bilinear"):
 
     Parameters
     ----------
-    X : numpy array of shape (n_ex, in_rows, in_cols, in_channels)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_channels)`
         An input image volume
-    new_dim : 2-tuple of (out_rows, out_cols)
+    new_dim : 2-tuple of `(out_rows, out_cols)`
         The dimension to resample each image to
-    mode : str
-        The resampling strategy to employ. Valid entries are {'bilinear',
-        'neighbor'}
+    mode : {'bilinear', 'neighbor'}
+        The resampling strategy to employ. Default is 'bilinear'.
 
     Returns
     -------
-    resampled : numpy array of shape (n_ex, out_rows, out_cols, in_channels)
-        The resampled image volume
+    resampled : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, in_channels)`
+        The resampled image volume.
     """
     if mode == "bilinear":
         interpolate = bilinear_interpolate
@@ -53,22 +52,26 @@ def batch_resample(X, new_dim, mode="bilinear"):
 
 def nn_interpolate_2D(X, x, y):
     """
-    Estimates of the pixel values at the coordinates (x, y) in X using a
-    nearest neighbor interpolation strategy. Assumes the current entries
-    in X reflect equally-spaced samples from a 2D integer grid.
+    Estimates of the pixel values at the coordinates (x, y) in `X` using a
+    nearest neighbor interpolation strategy.
+
+    Notes
+    -----
+    Assumes the current entries in `X` reflect equally-spaced samples from a 2D
+    integer grid.
 
     Parameters
     ----------
-    X : numpy array of shape (in_rows, in_cols, in_channels)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(in_rows, in_cols, in_channels)`
         An input image sampled along a grid of `in_rows` by `in_cols`.
-    x : list of length k
+    x : list of length `k`
         A list of x-coordinates for the samples we wish to generate
-    y : list of length k
+    y : list of length `k`
         A list of y-coordinates for the samples we wish to generate
 
     Returns
     -------
-    samples : numpy array of shape (k, in_channels)
+    samples : :py:class:`ndarray <numpy.ndarray>` of shape `(k, in_channels)`
         The samples for each (x,y) coordinate computed via nearest neighbor
         interpolation
     """
@@ -80,19 +83,19 @@ def nn_interpolate_2D(X, x, y):
 
 def nn_interpolate_1D(X, t):
     """
-    Estimates of the signal values at X[t] using a nearest neighbor
+    Estimates of the signal values at `X[t]` using a nearest neighbor
     interpolation strategy.
 
     Parameters
     ----------
-    X : numpy array of shape (in_length, in_channels)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(in_length, in_channels)`
         An input image sampled along an integer `in_length`
-    t : list of length k
+    t : list of length `k`
         A list of coordinates for the samples we wish to generate
 
     Returns
     -------
-    samples : numpy array of shape (k, in_channels)
+    samples : :py:class:`ndarray <numpy.ndarray>` of shape `(k, in_channels)`
         The samples for each (x,y) coordinate computed via nearest neighbor
         interpolation
     """
@@ -102,24 +105,28 @@ def nn_interpolate_1D(X, t):
 
 def bilinear_interpolate(X, x, y):
     """
-    Estimates of the pixel values at the coordinates (x, y) in X via bilinear
-    interpolation. Assumes the current entries in X reflect equally-spaced
+    Estimates of the pixel values at the coordinates (x, y) in `X` via bilinear
+    interpolation.
+
+    Notes
+    -----
+    Assumes the current entries in X reflect equally-spaced
     samples from a 2D integer grid.
 
     Modified from https://bit.ly/2NMb1Dr
 
     Parameters
     ----------
-    X : numpy array of shape (in_rows, in_cols, in_channels)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(in_rows, in_cols, in_channels)`
         An input image sampled along a grid of `in_rows` by `in_cols`.
-    x : list of length k
+    x : list of length `k`
         A list of x-coordinates for the samples we wish to generate
-    y : list of length k
+    y : list of length `k`
         A list of y-coordinates for the samples we wish to generate
 
     Returns
     -------
-    samples : list of length (k, in_channels)
+    samples : list of length `(k, in_channels)`
         The samples for each (x,y) coordinate computed via bilinear
         interpolation
     """
@@ -153,37 +160,44 @@ def bilinear_interpolate(X, x, y):
 
 def DCT(frame, orthonormal=True):
     """
-    A naive O(N^2) implementation of the 1D discrete cosine transform-II
-    (DCT-II). For a signal x consisting of N samples, the k'th DCT coefficient,
-    c[k], is
+    A naive :math:`O(N^2)` implementation of the 1D discrete cosine transform-II
+    (DCT-II).
 
-        c[k] = 2 * sum_{n=0}^{N-1} x[n] cos [pi * k * (2 * n + 1) / (2 * N)]
+    Notes
+    -----
+    For a signal :math:`\mathbf{x} = [x_1, \ldots, x_N]` consisting of `N`
+    samples, the `k` th DCT coefficient, :math:`c_k`, is
 
-    where k ranges from 0, ..., N-1.
+    .. math::
 
-    The DCT is highly similar to the DFT  -- whereas in a DFT the basis
+        c_k = 2 \sum_{n=0}^{N-1} x_n \cos(\pi k (2 n + 1) / (2 N))
+
+    where `k` ranges from :math:`0, \ldots, N-1`.
+
+    The DCT is highly similar to the DFT -- whereas in a DFT the basis
     functions are sinusoids, in a DCT they are restricted solely to cosines. A
     signal's DCT representation tends to have more of its energy concentrated
     in a smaller number of coefficients when compared to the DFT, and is thus
-    commonly used for signal compression. **
+    commonly used for signal compression. [1]
 
-    ** Smoother signals can be accurately approximated using fewer DFT / DCT
-    coefficients, resulting in a higher compression ratio. The DCT naturally
-    yields a continuous extension at the signal boundaries due its use of even
-    basis functions (cosine). This in turn produces a smoother extension in
-    comparison to DFT or DCT approximations, resulting in a higher compression.
+    .. [1] Smoother signals can be accurately approximated using fewer DFT / DCT
+       coefficients, resulting in a higher compression ratio. The DCT naturally
+       yields a continuous extension at the signal boundaries due its use of
+       even basis functions (cosine). This in turn produces a smoother
+       extension in comparison to DFT or DCT approximations, resulting in a
+       higher compression.
 
     Parameters
     ----------
-    frame : numpy array of shape (N,)
+    frame : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         A signal frame consisting of N samples
-    orthonormal : bool (default: True)
-        Scale to ensure the coefficient vector is orthonormal
+    orthonormal : bool
+        Scale to ensure the coefficient vector is orthonormal. Default is True.
 
     Returns
     -------
-    dct : numpy array of shape (N,)
-        The discrete cosine transform of the samples in `frame`
+    dct : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
+        The discrete cosine transform of the samples in `frame`.
     """
     N = len(frame)
     out = np.zeros_like(frame)
@@ -209,19 +223,24 @@ def __DCT2(frame):
 
 def DFT(frame, positive_only=True):
     """
-    A naive O(N^2) implementation of the 1D discrete Fourier transform (DFT).
+    A naive :math:`O(N^2)` implementation of the 1D discrete Fourier transform (DFT).
 
+    Notes
+    -----
     The Fourier transform decomposes a signal into a linear combination of
     sinusoids (ie., basis elements in the space of continuous periodic
-    functions).  For a sequence `x` of N evenly spaced samples, the k'th
-    DFT coefficient is given by:
+    functions).  For a sequence :math:`\mathbf{x} = [x_1, \ldots, x_N]` of N
+    evenly spaced samples, the `k` th DFT coefficient is given by:
 
-        c[k] = sum_{n=0}^{N-1} x[n] * exp(-2 * pi * i * k * n / N)
+    .. math::
 
-    where i is the imaginary unit, k is an index ranging from 0, ..., N-1,
-    and X_k is the complex coefficient representing the phase (imaginary part)
-    and amplitude (real part) of the k'th sinusoid in the DFT spectrum. The
-    frequency of the k'th sinusoid is (k * 2 * pi / N) radians per sample.
+        c_k = \sum_{n=0}^{N-1} x_n \exp(-2 \pi i k n / N)
+
+    where `i` is the imaginary unit, `k` is an index ranging from `0, ..., N-1`,
+    and :math:`X_k` is the complex coefficient representing the phase
+    (imaginary part) and amplitude (real part) of the `k` th sinusoid in the
+    DFT spectrum. The frequency of the `k` th sinusoid is :math:`(k 2 \pi / N)`
+    radians per sample.
 
     When applied to a real-valued input, the negative frequency terms are the
     complex conjugates of the positive-frequency terms and the overall spectrum
@@ -230,15 +249,15 @@ def DFT(frame, positive_only=True):
 
     Parameters
     ----------
-    frame : numpy array of shape (N,)
+    frame : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         A signal frame consisting of N samples
-    positive_only : bool (default: True)
+    positive_only : bool
         Whether to only return the coefficients for the positive frequency
-        terms
+        terms. Default is True.
 
     Returns
     -------
-    spectrum : numpy array of shape (N,) or (N // 2 + 1,) if `real_only`
+    spectrum : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)` or `(N // 2 + 1,)` if `real_only`
         The coefficients of the frequency spectrum for `frame`, including
         imaginary components.
     """
@@ -256,21 +275,21 @@ def DFT(frame, positive_only=True):
 
 def dft_bins(N, fs=44000, positive_only=True):
     """
-    Calc the frequency bin centers for a DFT with N coefficients.
+    Calc the frequency bin centers for a DFT with `N` coefficients.
 
     Parameters
     ----------
     N : int
         The number of frequency bins in the DFT
-    fs : int (default: 44000)
-        The sample rate/frequency of the signal (in Hz)
-    positive_only : bool (default: True)
+    fs : int
+        The sample rate/frequency of the signal (in Hz). Default is 44000.
+    positive_only : bool
         Whether to only return the bins for the positive frequency
-        terms
+        terms. Default is True.
 
     Returns
     -------
-    bins : numpy array of shape (N,) or (N // 2 + 1,) if `positive_only`
+    bins : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)` or `(N // 2 + 1,)` if `positive_only`
         The frequency bin centers associated with each coefficient in the
         DFT spectrum
     """
@@ -289,12 +308,12 @@ def magnitude_spectrum(frames):
 
     Parameters
     ----------
-    frames : numpy array of shape (M, N)
+    frames : :py:class:`ndarray <numpy.ndarray>` of shape `(M, N)`
         A sequence of `M` frames each consisting of `N` samples
 
     Returns
     -------
-    magnitude_spec : numpy array of shape (M, N // 2 + 1)
+    magnitude_spec : :py:class:`ndarray <numpy.ndarray>` of shape `(M, N // 2 + 1)`
         The magnitude spectrum for each frame in `frames`. Only includes the
         coefficients for the positive spectrum frequencies.
     """
@@ -312,14 +331,14 @@ def power_spectrum(frames, scale=False):
 
     Parameters
     ----------
-    frames : numpy array of shape (M, N)
+    frames : :py:class:`ndarray <numpy.ndarray>` of shape `(M, N)`
         A sequence of `M` frames each consisting of `N` samples
-    scale : bool (default: False)
-        Whether the scale by the number of DFT bins
+    scale : bool
+        Whether the scale by the number of DFT bins. Default is False.
 
     Returns
     -------
-    power_spec : numpy array of shape (M, N // 2 + 1)
+    power_spec : :py:class:`ndarray <numpy.ndarray>` of shape `(M, N // 2 + 1)`
         The power spectrum for each frame in `frames`. Only includes the
         coefficients for the positive spectrum frequencies.
     """
@@ -337,15 +356,20 @@ def to_frames(x, frame_width, stride, writeable=False):
     Convert a 1D signal x into overlapping windows of width `frame_width` using
     a hop length of `stride`.
 
-    NB 1: if (len(x) - frame_width) % stride != 0 then some number of the samples
-    in x will be dropped. Specifically,
+    Notes
+    -----
+    If ``(len(x) - frame_width) % stride != 0`` then some number of the samples
+    in x will be dropped. Specifically::
+
         n_dropped_frames = len(x) - frame_width - stride * (n_frames - 1)
-    where
+
+    where::
+
         n_frames = (len(x) - frame_width) // stride + 1
 
-    NB 2: This method uses low-level stride manipulation to avoid creating an
-    additional copy of `x`. The downside is that if `writeable`=True, modifying
-    the `frame` output can result in unexpected behavior:
+    This method uses low-level stride manipulation to avoid creating an
+    additional copy of `x`. The downside is that if ``writeable`=True``,
+    modifying the `frame` output can result in unexpected behavior:
 
         >>> out = to_frames(np.arange(6), 5, 1)
         >>> out
@@ -358,20 +382,20 @@ def to_frames(x, frame_width, stride, writeable=False):
 
     Parameters
     ----------
-    x : numpy array of shape (N,)
+    x : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         A 1D signal consisting of N samples
     frame_width : int
         The width of a single frame window in samples
     stride : int
         The hop size / number of samples advanced between consecutive frames
-    writeable : bool (default: False)
+    writeable : bool
         If set to False, the returned array will be readonly. Otherwise it will
         be writable if `x` was. It is advisable to set this to False whenever
-        possible to avoid unexpected behavior (see NB 2 above).
+        possible to avoid unexpected behavior (see NB 2 above). Default is False.
 
     Returns
     -------
-    frame: numpy array of shape (n_frames, frame_width)
+    frame: :py:class:`ndarray <numpy.ndarray>` of shape `(n_frames, frame_width)`
         The collection of overlapping frames stacked into a matrix
     """
     assert x.ndim == 1
@@ -393,20 +417,29 @@ def autocorrelate1D(x):
     """
     Autocorrelate a 1D signal `x` with itself.
 
-        auto[k] = sum_n x[n + k] * x[n]
+    Notes
+    -----
+    The `k` th term in the 1 dimensional autocorrelation is
 
-    NB. This is a naive O(N^2) implementation.  For a faster O(N log N)
-    approach using the FFT, see:
-    https://en.wikipedia.org/wiki/Autocorrelation#Efficient%computation
+    .. math::
+
+        a_k = \sum_n x_{n + k} x_n
+
+    NB. This is a naive :math:`O(N^2)` implementation.  For a faster :math:`O(N
+    \log N)` approach using the FFT, see [1].
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Autocorrelation#Efficient%computation
 
     Parameters
     ----------
-    x : numpy array of shape (N,)
+    x : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         A 1D signal consisting of N samples
 
     Returns
     -------
-    auto : numpy array of shape (N,)
+    auto : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         The autocorrelation of `x` with itself
     """
     N = len(x)
@@ -427,23 +460,27 @@ def preemphasis(x, alpha):
     Increase the amplitude of high frequency bands + decrease the amplitude of
     lower bands.
 
+    Notes
+    -----
     Preemphasis filtering is (was?) a common transform in speech processing,
     where higher frequencies tend to be more useful during signal
     disambiguation.
 
-        preemphasis( x[t] ) = x[t] - alpha * x[t-1]
+    .. math::
+
+        \\text{preemphasis}( x_t ) = x_t - \\alpha x_{t-1}
 
     Parameters
     ----------
-    x : numpy array of shape (N,)
-        A 1D signal consisting of N samples
+    x : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
+        A 1D signal consisting of `N` samples
     alpha : float in [0, 1)
         The preemphasis coefficient. A value of 0 corresponds to no
         filtering
 
     Returns
     -------
-    out : numpy array of shape (N,)
+    out : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         The filtered signal
     """
     return np.concatenate([x[:1], x[1:] - alpha * x[:-1]])
@@ -453,24 +490,28 @@ def cepstral_lifter(mfccs, D):
     """
     A simple sinusoidal filter applied in the Mel-frequency domain.
 
+    Notes
+    -----
     Cepstral lifting helps to smooth the spectral envelope and dampen the
     magnitude of the higher MFCC coefficients while keeping the other
     coefficients unchanged. The filter function is:
 
-        lifter( x[n] ) = x[n] * [1 + D / 2 * sin (pi * n / D)]
+    .. math::
+
+        \\text{lifter}( x_n ) = x_n \left(1 + \\frac{D \sin(\pi n / D)}{2}\\right)
 
     Parameters
     ----------
-    mfccs : numpy array of shape (G, C)
+    mfccs : :py:class:`ndarray <numpy.ndarray>` of shape `(G, C)`
         Matrix of Mel cepstral coefficients. Rows correspond to frames, columns
         to cepstral coefficients
-    D : int in [0, +infty]
+    D : int in :math:`[0, +\infty]`
         The filter coefficient. 0 corresponds to no filtering, larger values
         correspond to greater amounts of smoothing
 
     Returns
     -------
-    out : numpy array of shape (G, C)
+    out : :py:class:`ndarray <numpy.ndarray>` of shape `(G, C)`
         The lifter'd MFCC coefficients
     """
     if D == 0:
@@ -493,42 +534,45 @@ def mel_spectrogram(
     """
     Apply the Mel-filterbank to the power spectrum for a signal `x`.
 
-    Specifically, the Mel spectrogram is the projection of the power spectrum
-    of the framed and windowed signal onto the basis set provided by the Mel
-    filterbank.
+    Notes
+    -----
+    The Mel spectrogram is the projection of the power spectrum of the framed
+    and windowed signal onto the basis set provided by the Mel filterbank.
 
     Parameters
     ----------
-    x : numpy array of shape (N,)
+    x : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         A 1D signal consisting of N samples
-    window_duration : float (default: 0.025)
-        The duration of each frame / window (in seconds)
-    stride_duration : float (default: 0.01)
-        The duration of the hop between consecutive windows (in seconds)
-    mean_normalize : bool (default : True)
+    window_duration : float
+        The duration of each frame / window (in seconds). Default is 0.025.
+    stride_duration : float
+        The duration of the hop between consecutive windows (in seconds).
+        Default is 0.01.
+    mean_normalize : bool
         Whether to subtract the coefficient means from the final filter values
-        to improve the signal-to-noise ratio
-    window : {'hamming', 'hann', 'blackman_harris'} (default: 'hamming')
-        The windowing function to apply to the signal before FFT
-    n_filters : int (default: 20)
-        The number of mel filters to include in the filterbank
-    center : bool (default : False)
-        Whether to the kth frame of the signal should *begin* at index x[k *
-        stride_len] (center = False) or be *centered* at x[k * stride_len]
-        (center = True)
-    alpha : float in [0, 1) (default: 0.95)
+        to improve the signal-to-noise ratio. Default is True.
+    window : {'hamming', 'hann', 'blackman_harris'}
+        The windowing function to apply to the signal before FFT. Default is
+        'hamming'.
+    n_filters : int
+        The number of mel filters to include in the filterbank. Default is 20.
+    center : bool
+        Whether to the `k` th frame of the signal should *begin* at index ``x[k *
+        stride_len]`` (center = False) or be *centered* at ``x[k * stride_len]``
+        (center = True). Default is False.
+    alpha : float in [0, 1)
         The coefficient for the preemphasis filter. A value of 0 corresponds to
-        no filtering
-    fs : int (default : 44000)
-        The sample rate/frequency for the signal
+        no filtering. Default is 0.95.
+    fs : int
+        The sample rate/frequency for the signal. Default is 44000.
 
     Returns
     -------
-    filter_energies : numpy array of shape (G, n_filters)
+    filter_energies : :py:class:`ndarray <numpy.ndarray>` of shape `(G, n_filters)`
         The (possibly mean_normalized) power for each filter in the Mel
         filterbank (i.e., the Mel spectrogram). Rows correspond to frames,
         columns to filters
-    energy_per_frame : numpy array of shape (G,)
+    energy_per_frame : :py:class:`ndarray <numpy.ndarray>` of shape `(G,)`
         The total energy in each frame of the signal
     """
     eps = np.finfo(float).eps
@@ -583,6 +627,8 @@ def mfcc(
     """
     Compute the Mel-frequency cepstral coefficients (MFCC) for a signal.
 
+    Notes
+    -----
     Computing MFCC features proceeds in the following stages:
 
         1. Convert the signal into overlapping frames and apply a window fn
@@ -599,40 +645,42 @@ def mfcc(
 
     Parameters
     ----------
-    x : numpy array of shape (N,)
+    x : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
         A 1D signal consisting of N samples
-    fs : int (default : 44000)
-        The sample rate/frequency for the signal
-    n_mfccs : int (default : 13)
+    fs : int
+        The sample rate/frequency for the signal. Default is 44000.
+    n_mfccs : int
         The number of cepstral coefficients to return (including the intercept
-        coefficient)
+        coefficient). Default is 13.
     alpha : float in [0, 1)
         The preemphasis coefficient. A value of 0 corresponds to no
-        filtering
-    center : bool (default : True)
-        Whether to the kth frame of the signal should *begin* at index x[k *
-        stride_len] (center = False) or be *centered* at x[k * stride_len]
-        (center = True)
-    n_filters : int (default: 20)
-        The number of filters to include in the Mel filterbank
-    normalize : bool (default: True)
-        Whether to mean-normalize the MFCC values
-    lifter_coef : int in [0, +infty]
+        filtering. Default is 0.95.
+    center : bool
+        Whether to the kth frame of the signal should *begin* at index ``x[k *
+        stride_len]`` (center = False) or be *centered* at ``x[k * stride_len]``
+        (center = True). Default is True.
+    n_filters : int
+        The number of filters to include in the Mel filterbank. Default is 20.
+    normalize : bool
+        Whether to mean-normalize the MFCC values. Default is True.
+    lifter_coef : int in :math:[0, + \infty]`
         The cepstral filter coefficient. 0 corresponds to no filtering, larger
-        values correspond to greater amounts of smoothing
-    window : {'hamming', 'hann', 'blackman_harris'} (default : 'hann')
-        The windowing function to apply to the signal before taking the DFT
+        values correspond to greater amounts of smoothing. Default is 22.
+    window : {'hamming', 'hann', 'blackman_harris'}
+        The windowing function to apply to the signal before taking the DFT.
+        Default is 'hann'.
     stride_duration : float
-        The duration of the hop between consecutive windows (in seconds)
+        The duration of the hop between consecutive windows (in seconds).
+        Default is 0.01.
     window_duration : float
-        The duration of each frame / window (in seconds)
-    replace_intercept : bool (default: True)
+        The duration of each frame / window (in seconds). Default is 0.025.
+    replace_intercept : bool
         Replace the first MFCC coefficient (the intercept term) with the
-        log of the total frame energy instead.
+        log of the total frame energy instead. Default is True.
 
     Returns
     -------
-    mfccs : numpy array of shape (G, C)
+    mfccs : :py:class:`ndarray <numpy.ndarray>` of shape `(G, C)`
         Matrix of Mel-frequency cepstral coefficients. Rows correspond to
         frames, columns to cepstral coefficients
     """
@@ -674,16 +722,17 @@ def mel2hz(mel, formula="htk"):
 
     Parameters
     ----------
-    mel : numpy array of shape (N, ...)
+    mel : :py:class:`ndarray <numpy.ndarray>` of shape `(N, \*)`
         An array of mel frequencies to convert
     formula : {"htk", "slaney"}
         The Mel formula to use. "htk" uses the formula used by the Hidden
         Markov Model Toolkit, and described in O'Shaughnessy (1987). "slaney"
-        uses the formula used in the MATLAB auditory toolbox (Slaney, 1998)
+        uses the formula used in the MATLAB auditory toolbox (Slaney, 1998).
+        Default is 'htk'
 
     Returns
     -------
-    hz : numpy array of shape (N, ...)
+    hz : :py:class:`ndarray <numpy.ndarray>` of shape `(N, \*)`
         The frequencies of the items in `mel`, in Hz
     """
     fstr = "formula must be either 'htk' or 'slaney' but got '{}'"
@@ -699,17 +748,18 @@ def hz2mel(hz, formula="htk"):
 
     Parameters
     ----------
-    hz : numpy array of shape (N, ...)
+    hz : :py:class:`ndarray <numpy.ndarray>` of shape `(N, \*)`
         The frequencies of the items in `mel`, in Hz
     formula : {"htk", "slaney"}
         The Mel formula to use. "htk" uses the formula used by the Hidden
         Markov Model Toolkit, and described in O'Shaughnessy (1987). "slaney"
-        uses the formula used in the MATLAB auditory toolbox (Slaney, 1998)
+        uses the formula used in the MATLAB auditory toolbox (Slaney, 1998).
+        Default is 'htk'.
 
     Returns
     -------
-    mel : numpy array of shape (N, ...)
-        An array of mel frequencies to convert
+    mel : :py:class:`ndarray <numpy.ndarray>` of shape `(N, \*)`
+        An array of mel frequencies to convert.
     """
     fstr = "formula must be either 'htk' or 'slaney' but got '{}'"
     assert formula in ["htk", "slaney"], fstr.format(formula)
@@ -726,6 +776,8 @@ def mel_filterbank(
     Compute the filters in a Mel filterbank and return the corresponding
     transformation matrix
 
+    Notes
+    -----
     The Mel scale is a perceptual scale designed to simulate the way the human
     ear works. Pitches judged by listeners to be equal in perceptual /
     psychological distance have equal distance on the Mel scale.  Practically,
@@ -736,27 +788,33 @@ def mel_filterbank(
     center and a linear decay on both sides until it reaches the center
     frequency of the next adjacent filter.
 
-    NB. This implementation is based on code in the (superb) LibRosa package:
-    https://librosa.github.io
+    This implementation is based on code in the (superb) LibROSA package [1].
+
+    References
+    ----------
+    .. [1] McFee et al. (2015). "librosa: Audio and music signal analysis in
+       Python", *Proceedings of the 14th Python in Science Conference*
+       https://librosa.github.io
 
     Parameters
     ----------
     N : int
         The number of DFT bins
-    n_filters : int (default: 20)
-        The number of mel filters to include in the filterbank
-    min_freq : int (default: 0)
-        Minimum filter frequency (in Hz)
-    max_freq : int (default: 0)
-        Maximum filter frequency (in Hz)
-    fs : int (default : 44000)
-        The sample rate/frequency for the signal
-    normalize : bool (default: True)
+    n_filters : int
+        The number of mel filters to include in the filterbank. Default is 20.
+    min_freq : int
+        Minimum filter frequency (in Hz). Default is 0.
+    max_freq : int
+        Maximum filter frequency (in Hz). Default is 0.
+    fs : int
+        The sample rate/frequency for the signal. Default is 44000.
+    normalize : bool
         If True, scale the Mel filter weights by their area in Mel space.
+        Default is True.
 
     Returns
     -------
-    fbank : numpy array of shape (n_filters, N // 2 + 1)
+    fbank : :py:class:`ndarray <numpy.ndarray>` of shape `(n_filters, N // 2 + 1)`
         The mel-filterbank transformation matrix. Rows correspond to filters,
         columns to DFT bins.
     """

@@ -25,6 +25,7 @@ from ..utils import (
 
 class LayerBase(ABC):
     def __init__(self, optimizer=None):
+        """An abstract base class inherited by all nerual network layers"""
         self.X = []
         self.act_fn = None
         self.trainable = True
@@ -163,7 +164,7 @@ class DotProductAttention(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None. Unused.
         """
         super().__init__(optimizer)
@@ -243,15 +244,15 @@ class DotProductAttention(LayerBase):
 
         Parameters
         ----------
-        Q : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k)
+        Q : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_k)`
             A set of `n_ex` query vectors packed into a single matrix.
             Optional middle dimensions can be used to specify, e.g., the number
             of parallel attention heads.
-        K : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k)
+        K : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_k)`
             A set of `n_ex` key vectors packed into a single matrix. Optional
             middle dimensions can be used to specify, e.g., the number of
             parallel attention heads.
-        V : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v)
+        V : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_v)`
             A set of `n_ex` value vectors packed into a single matrix. Optional
             middle dimensions can be used to specify, e.g., the number of
             parallel attention heads.
@@ -263,7 +264,7 @@ class DotProductAttention(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_v)`
             The attention-weighted output values
         """
         Y, weights = self._fwd(Q, K, V)
@@ -288,8 +289,8 @@ class DotProductAttention(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v)
-            The gradient of the loss wrt. the layer output Y
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_v)`
+            The gradient of the loss wrt. the layer output `Y`
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
             during the backward pass in the final parameter update. Default is
@@ -297,11 +298,11 @@ class DotProductAttention(LayerBase):
 
         Returns
         -------
-        dQ : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k) or list of arrays
+        dQ : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_k)` or list of arrays
             The gradient of the loss wrt. the layer query matrix/matrices `Q`.
-        dK : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_k) or list of arrays
+        dK : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_k)` or list of arrays
             The gradient of the loss wrt. the layer key matrix/matrices `K`.
-        dV : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*, d_v) or list of arrays
+        dV : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*, d_v)` or list of arrays
             The gradient of the loss wrt. the layer value matrix/matrices `V`.
         """
         assert self.trainable, "Layer is frozen"
@@ -351,7 +352,7 @@ class RBM(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -414,7 +415,7 @@ class RBM(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples. Each feature in X should ideally be
             binary-valued, although it is possible to also train on real-valued
@@ -443,11 +444,12 @@ class RBM(LayerBase):
 
         References
         ----------
-        .. [1] Hinton, G. (2010). "A practical guide to training restricted Boltzmann machines". *UTML TR 2010-003*
+        .. [1] Hinton, G. (2010). "A practical guide to training restricted
+           Boltzmann machines". *UTML TR 2010-003*
 
         Parameters
         ----------
-        V : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        V : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Visible input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples. Each feature in V should ideally be
             binary-valued, although it is possible to also train on real-valued
@@ -548,7 +550,7 @@ class RBM(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples. Each feature in `X` should ideally be
             binary-valued, although it is possible to also train on real-valued
@@ -564,7 +566,7 @@ class RBM(LayerBase):
 
         Returns
         -------
-        V : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_ch)
+        V : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_ch)`
             The reconstruction (or feature probabilities if `return_prob` is
             true) of the visual input `X` after running the Gibbs sampler for
             `n_steps`.
@@ -602,7 +604,7 @@ class Add(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -640,7 +642,7 @@ class Add(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*)`
             The sum over the `n_ex` examples.
         """
         out = X[0].copy()
@@ -657,7 +659,7 @@ class Add(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -698,7 +700,7 @@ class Multiply(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -736,7 +738,7 @@ class Multiply(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*)`
             The product over the `n_ex` examples.
         """
         out = X[0].copy()
@@ -753,7 +755,7 @@ class Multiply(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, \*)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, \*)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -794,8 +796,9 @@ class Flatten(LayerBase):
             Default is 'first'.
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
-            optimizer with default parameters. Default is None.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -836,7 +839,7 @@ class Flatten(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (\*`out_dims`)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(\*out_dims)`
             Flattened output. If `keep_dim` is `'first'`, `X` is reshaped to
             ``(X.shape[0], -1)``, otherwise ``(-1, X.shape[0])``.
         """
@@ -853,7 +856,7 @@ class Flatten(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (*out_dims)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(\*out_dims)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -862,7 +865,7 @@ class Flatten(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (\*`in_dims`) or list of arrays
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(\*in_dims)` or list of arrays
             The gradient of the loss wrt. the layer input(s) `X`.
         """
         if not isinstance(dLdy, list):
@@ -927,8 +930,9 @@ class BatchNorm2D(LayerBase):
             to avoid divide-by-zero errors. Default is 1e-5.
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
-            optimizer with default parameters. Default is None.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -1009,7 +1013,7 @@ class BatchNorm2D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             Input volume containing the `in_rows` x `in_cols`-dimensional
             features for a minibatch of `n_ex` examples.
         retain_derived : bool
@@ -1019,7 +1023,7 @@ class BatchNorm2D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
@@ -1057,7 +1061,7 @@ class BatchNorm2D(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -1066,7 +1070,7 @@ class BatchNorm2D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -1161,7 +1165,7 @@ class BatchNorm1D(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -1227,7 +1231,7 @@ class BatchNorm1D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples.
         retain_derived : bool
@@ -1237,7 +1241,7 @@ class BatchNorm1D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer output for each of the `n_ex` examples
         """
         if not self.is_initialized:
@@ -1275,7 +1279,7 @@ class BatchNorm1D(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -1284,7 +1288,7 @@ class BatchNorm1D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -1352,7 +1356,7 @@ class LayerNorm2D(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -1406,8 +1410,8 @@ class LayerNorm2D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
-            Input volume containing the `in_rows` x `in_cols`-dimensional
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
+            Input volume containing the `in_rows` by `in_cols`-dimensional
             features for a minibatch of `n_ex` examples.
         retain_derived : bool
             Whether to retain the variables calculated during the forward pass
@@ -1417,7 +1421,7 @@ class LayerNorm2D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
@@ -1443,7 +1447,7 @@ class LayerNorm2D(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -1452,7 +1456,7 @@ class LayerNorm2D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -1527,7 +1531,7 @@ class LayerNorm1D(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -1571,7 +1575,7 @@ class LayerNorm1D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples.
         retain_derived : bool
@@ -1582,7 +1586,7 @@ class LayerNorm1D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
@@ -1607,7 +1611,7 @@ class LayerNorm1D(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -1616,7 +1620,7 @@ class LayerNorm1D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -1694,7 +1698,7 @@ class Embedding(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -1760,7 +1764,7 @@ class Embedding(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in) or list of length `n_ex`
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)` or list of length `n_ex`
             Layer input, representing a minibatch of `n_ex` examples. If
             ``self.pool`` is None, each example must consist of exactly `n_in`
             integer token IDs. Otherwise, `X` can be a ragged array, with each
@@ -1773,7 +1777,7 @@ class Embedding(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_out)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in, n_out)`
             Embeddings for each coordinate of each of the `n_ex` examples
         """
         # if X is a ragged array
@@ -1813,7 +1817,7 @@ class Embedding(LayerBase):
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_out) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in, n_out)` or list of arrays
             The gradient(s) of the loss wrt. the layer output(s)
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -1869,13 +1873,14 @@ class FullyConnected(LayerBase):
             The dimensionality of the layer output
         act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
             The element-wise output nonlinearity used in computing `Y`. If None,
-            use the identity function :math:`f(X) = X`. Default is NOne.
+            use the identity function :math:`f(X) = X`. Default is None.
         init : {'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'}
             The weight initialization strategy. Default is `'glorot_uniform'`.
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
-            optimizer with default parameters. Default is None.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
+            default parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -1918,7 +1923,7 @@ class FullyConnected(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples.
         retain_derived : bool
@@ -1929,7 +1934,7 @@ class FullyConnected(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
@@ -1959,7 +1964,7 @@ class FullyConnected(LayerBase):
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)` or list of arrays
             The gradient(s) of the loss wrt. the layer output(s).
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -1968,7 +1973,7 @@ class FullyConnected(LayerBase):
 
         Returns
         -------
-        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in) or list of arrays
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)` or list of arrays
             The gradient of the loss wrt. the layer input(s) `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -2043,7 +2048,7 @@ class Softmax(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None. Unused for this layer.
         """
         super().__init__(optimizer)
@@ -2077,7 +2082,7 @@ class Softmax(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples.
         retain_derived : bool
@@ -2088,7 +2093,7 @@ class Softmax(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
@@ -2114,7 +2119,7 @@ class Softmax(LayerBase):
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)` or list of arrays
             The gradient(s) of the loss wrt. the layer output(s).
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -2123,7 +2128,7 @@ class Softmax(LayerBase):
 
         Returns
         -------
-        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -2200,8 +2205,9 @@ class SparseEvolution(LayerBase):
             The weight initialization strategy. Default is `'glorot_uniform'`.
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
-            optimizer with default parameters. Default is None.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with default
+            parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -2253,7 +2259,7 @@ class SparseEvolution(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Layer input, representing the `n_in`-dimensional features for a
             minibatch of `n_ex` examples.
         retain_derived : bool
@@ -2264,7 +2270,7 @@ class SparseEvolution(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             Layer output for each of the `n_ex` examples.
         """
         if not self.is_initialized:
@@ -2295,7 +2301,7 @@ class SparseEvolution(LayerBase):
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)` or list of arrays
             The gradient(s) of the loss wrt. the layer output(s).
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -2304,7 +2310,7 @@ class SparseEvolution(LayerBase):
 
         Returns
         -------
-        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -2447,7 +2453,7 @@ class Conv1D(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -2499,7 +2505,7 @@ class Conv1D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_in, in_ch)`
             The input volume consisting of `n_ex` examples, each of length
             `l_in` and with `in_ch` input channels
         retain_derived : bool
@@ -2510,7 +2516,7 @@ class Conv1D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_out, out_ch)`
             The layer output.
         """
         if not self.is_initialized:
@@ -2541,13 +2547,14 @@ class Conv1D(LayerBase):
 
         Notes
         -----
-        Relies on :meth:`~numpy_ml.neural_nets.utils.utils.im2col` and :meth:`~numpy_ml.neural_nets.utils.utils.col2im` to vectorize the gradient calculation.
-        See the private method :meth:`_backward_naive` for a more straightforward
-        implementation.
+        Relies on :meth:`~numpy_ml.neural_nets.utils.im2col` and
+        :meth:`~numpy_ml.neural_nets.utils.col2im` to vectorize the
+        gradient calculation.  See the private method :meth:`_backward_naive`
+        for a more straightforward implementation.
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_out, out_ch)` or list of arrays
             The gradient(s) of the loss with respect to the layer output(s).
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -2556,7 +2563,7 @@ class Conv1D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_in, in_ch)`
             The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
@@ -2618,7 +2625,7 @@ class Conv1D(LayerBase):
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_out, out_ch)` or list of arrays
             The gradient(s) of the loss with respect to the layer output(s).
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -2627,7 +2634,7 @@ class Conv1D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_in, in_ch)`
             The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
@@ -2723,7 +2730,7 @@ class Conv2D(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -2776,9 +2783,9 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The input volume consisting of `n_ex` examples, each with dimension
-            (`in_rows` x `in_cols` x `in_ch`).
+            (`in_rows`, `in_cols`, `in_ch`).
         retain_derived : bool
             Whether to retain the variables calculated during the forward pass
             for use later during backprop. If False, this suggests the layer
@@ -2787,7 +2794,7 @@ class Conv2D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
             The layer output.
         """
         if not self.is_initialized:
@@ -2818,8 +2825,8 @@ class Conv2D(LayerBase):
 
         Notes
         -----
-        Relies on :meth:`~numpy_ml.neural_nets.utils.utils.im2col` and
-        :meth:`~numpy_ml.neural_nets.utils.utils.col2im` to vectorize the
+        Relies on :meth:`~numpy_ml.neural_nets.utils.im2col` and
+        :meth:`~numpy_ml.neural_nets.utils.col2im` to vectorize the
         gradient calculation.
 
         See the private method :meth:`_backward_naive` for a more straightforward
@@ -2827,8 +2834,8 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows,
-        out_cols, out_ch`) or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows,
+        out_cols, out_ch)` or list of arrays
             The gradient(s) of the loss with respect to the layer output(s).
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -2837,7 +2844,7 @@ class Conv2D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
@@ -2890,12 +2897,12 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
             The gradient of the loss with respect to the layer output.
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss with respect to the layer input volume.
         """
         assert self.trainable, "Layer is frozen"
@@ -2965,7 +2972,7 @@ class Pool2D(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -3006,9 +3013,9 @@ class Pool2D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The input volume consisting of `n_ex` examples, each with dimension
-            (`in_rows` x `in_cols` x `in_ch`)
+            (`in_rows`,`in_cols`, `in_ch`)
         retain_derived : bool
             Whether to retain the variables calculated during the forward pass
             for use later during backprop. If False, this suggests the layer
@@ -3017,7 +3024,7 @@ class Pool2D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows, out_cols, out_ch`)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
             The layer output.
         """
         if not self.is_initialized:
@@ -3061,7 +3068,7 @@ class Pool2D(LayerBase):
 
         Parameters
         ----------
-        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
+        dLdY : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss wrt. the layer output `Y`.
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
@@ -3070,7 +3077,7 @@ class Pool2D(LayerBase):
 
         Returns
         -------
-        dX : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
+        dX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The gradient of the loss wrt. the layer input `X`.
         """
         assert self.trainable, "Layer is frozen"
@@ -3146,7 +3153,7 @@ class Deconv2D(LayerBase):
             The dimension of a single 2D filter/kernel in the current layer
         act_fn : str, :doc:`Activation <numpy_ml.neural_nets.activations>` object, or None
             The activation function for computing ``Y[t]``. If None, use
-            :class:`~numpy_ml.neural_nets.activations.activations.Affine`
+            :class:`~numpy_ml.neural_nets.activations.Affine`
             activations by default. Default is None.
         pad : int, tuple, or 'same'
             The number of rows/columns to zero-pad the input with. Default is 0.
@@ -3158,7 +3165,7 @@ class Deconv2D(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -3209,7 +3216,7 @@ class Deconv2D(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, in_rows, in_cols, in_ch`)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
             The input volume consisting of `n_ex` examples, each with dimension
             (`in_rows`, `in_cols`, `in_ch`).
         retain_derived : bool
@@ -3220,7 +3227,7 @@ class Deconv2D(LayerBase):
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex, out_rows, out_cols, out_ch`)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
             The layer output.
         """
         if not self.is_initialized:
@@ -3251,8 +3258,8 @@ class Deconv2D(LayerBase):
 
         Notes
         -----
-        Relies on :meth:`~numpy_ml.neural_nets.utils.utils.im2col` and
-        :meth:`~numpy_ml.neural_nets.utils.utils.col2im` to vectorize the
+        Relies on :meth:`~numpy_ml.neural_nets.utils.im2col` and
+        :meth:`~numpy_ml.neural_nets.utils.col2im` to vectorize the
         gradient calculations.
 
         Parameters
@@ -3351,7 +3358,10 @@ class RNNCell(LayerBase):
         At timestep `t`, the vanilla RNN cell computes
 
         .. math::
-            \mathbf{Z}^{(t)}  &=  \mathbf{W}_{ax} \mathbf{X}^{(t)} + \mathbf{b}_{ax} + \mathbf{W}_{aa} \mathbf{A}^{(t-1)} + \mathbf{b}_{aa} \\\\
+
+            \mathbf{Z}^{(t)}  &=
+                \mathbf{W}_{ax} \mathbf{X}^{(t)} + \mathbf{b}_{ax} +
+                    \mathbf{W}_{aa} \mathbf{A}^{(t-1)} + \mathbf{b}_{aa} \\\\
             \mathbf{A}^{(t)}  &=  f(\mathbf{Z}^{(t)})
 
         where
@@ -3374,8 +3384,9 @@ class RNNCell(LayerBase):
             The weight initialization strategy. Default is `'glorot_uniform'`.
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
-            optimizer with default parameters. Default is None.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with default
+            parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3436,13 +3447,13 @@ class RNNCell(LayerBase):
 
         Parameters
         ----------
-        Xt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        Xt : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Input at timestep `t` consisting of `n_ex` examples each of
             dimensionality `n_in`.
 
         Returns
         -------
-        At: :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        At: :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             The value of the hidden state at timestep `t` for each of the
             `n_ex` examples.
         """
@@ -3484,13 +3495,13 @@ class RNNCell(LayerBase):
 
         Parameters
         ----------
-        dLdAt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        dLdAt : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             The gradient of the loss wrt. the layer outputs (ie., hidden
             states) at timestep `t`.
 
         Returns
         -------
-        dLdXt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dLdXt : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer inputs at timestep `t`.
         """
         assert self.trainable, "Layer is frozen"
@@ -3593,8 +3604,9 @@ class LSTMCell(LayerBase):
             The weight initialization strategy. Default is `'glorot_uniform'`.
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
-            within the :meth:`update` method.  If None, use the :class:`SGD <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
-            optimizer with default parameters. Default is None.
+            within the :meth:`update` method.  If None, use the :class:`SGD
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with default
+            parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3702,16 +3714,16 @@ class LSTMCell(LayerBase):
 
         Parameters
         ----------
-        Xt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        Xt : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             Input at timestep t consisting of `n_ex` examples each of
             dimensionality `n_in`.
 
         Returns
         -------
-        At: :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        At: :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             The value of the hidden state at timestep `t` for each of the `n_ex`
             examples.
-        Ct: :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        Ct: :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             The value of the cell/memory state at timestep `t` for each of the
             `n_ex` examples.
         """
@@ -3759,13 +3771,13 @@ class LSTMCell(LayerBase):
 
         Parameters
         ----------
-        dLdAt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out)
+        dLdAt : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out)`
             The gradient of the loss wrt. the layer outputs (ie., hidden
             states) at timestep `t`.
 
         Returns
         -------
-        dLdXt : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in)
+        dLdXt : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)`
             The gradient of the loss wrt. the layer inputs at timestep `t`.
         """
         assert self.trainable, "Layer is frozen"
@@ -3864,8 +3876,8 @@ class RNN(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>`
-            optimizer with default parameters. Default is None.
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with default
+            parameters. Default is None.
         """
         super().__init__(optimizer)
 
@@ -3904,13 +3916,13 @@ class RNN(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_t)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in, n_t)`
             Input consisting of `n_ex` examples each of dimensionality `n_in`
             and extending for `n_t` timesteps.
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out, n_t)`
             The value of the hidden state for each of the `n_ex` examples
             across each of the `n_t` timesteps.
         """
@@ -3931,13 +3943,13 @@ class RNN(LayerBase):
 
         Parameters
         ----------
-        dLdA : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
+        dLdA : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out, n_t)`
             The gradient of the loss with respect to the layer output for each
             of the `n_ex` examples across all `n_t` timesteps.
 
         Returns
         -------
-        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_t)
+        dLdX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in, n_t)`
             The value of the hidden state for each of the `n_ex` examples
             across each of the `n_t` timesteps.
         """
@@ -4006,7 +4018,7 @@ class LSTM(LayerBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         """
         super().__init__(optimizer)
@@ -4048,13 +4060,13 @@ class LSTM(LayerBase):
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_in, n_t)
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in, n_t)`
             Input consisting of `n_ex` examples each of dimensionality `n_in`
             and extending for `n_t` timesteps.
 
         Returns
         -------
-        Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out, n_t)`
             The value of the hidden state for each of the `n_ex` examples
             across each of the `n_t` timesteps.
         """
@@ -4075,7 +4087,7 @@ class LSTM(LayerBase):
 
         Parameters
         ----------
-        dLdA : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, n_out, n_t)
+        dLdA : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_out, n_t)`
             The gradient of the loss with respect to the layer output for each
             of the `n_ex` examples across all `n_t` timesteps.
 

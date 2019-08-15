@@ -11,7 +11,7 @@ def minibatch(X, batchsize=256, shuffle=True):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (N, ...)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, \*)`
         The dataset to divide into minibatches. Assumes the first dimension
         represents the number of training examples.
     batchsize : int
@@ -56,10 +56,10 @@ def calc_pad_dims_2D(X_shape, out_dim, kernel_shape, stride, dilation=0):
 
     Parameters
     ----------
-    X_shape : tuple of (n_ex, in_rows, in_cols, in_ch)
+    X_shape : tuple of `(n_ex, in_rows, in_cols, in_ch)`
         Dimensions of the input volume. Padding is applied to `in_rows` and
         `in_cols`.
-    out_dim : tuple of (out_rows, out_cols)
+    out_dim : tuple of `(out_rows, out_cols)`
         The desired dimension of an output example after applying the
         convolution.
     kernel_shape : 2-tuple
@@ -128,7 +128,7 @@ def calc_pad_dims_1D(X_shape, l_out, kernel_width, stride, dilation=0, causal=Fa
 
     Parameters
     ----------
-    X_shape : tuple of (n_ex, l_in, in_ch)
+    X_shape : tuple of `(n_ex, l_in, in_ch)`
         Dimensions of the input volume. Padding is applied on either side of
         `l_in`.
     l_out : int
@@ -198,7 +198,7 @@ def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_in, in_ch)`
         Input volume. Padding is applied to `l_in`.
     pad : tuple, int, or {'same', 'causal'}
         The padding amount. If 'same', add padding to ensure that the output
@@ -220,7 +220,7 @@ def pad1D(X, pad, kernel_width=None, stride=None, dilation=0):
 
     Returns
     -------
-    X_pad : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, padded_seq, in_channels)
+    X_pad : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, padded_seq, in_channels)`
         The padded output volume
     p : 2-tuple
         The number of 0-padded columns added to the (left, right) of the sequences
@@ -255,7 +255,7 @@ def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
         Input volume. Padding is applied to `in_rows` and `in_cols`.
     pad : tuple, int, or 'same'
         The padding amount. If 'same', add padding to ensure that the output of
@@ -271,12 +271,12 @@ def pad2D(X, pad, kernel_shape=None, stride=None, dilation=0):
         The stride for the convolution kernel. Only relevant if p='same'.
         Default is None.
     dilation : int
-        The dilation of the convolution kernel. Only relevant if p='same'. Default is 0.
+        The dilation of the convolution kernel. Only relevant if p='same'.
+        Default is 0.
 
     Returns
     -------
-    X_pad : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, padded_in_rows, padded_in_cols,
-    in_channels)
+    X_pad : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, padded_in_rows, padded_in_cols, in_channels)`
         The padded output volume.
     p : 4-tuple
         The number of 0-padded rows added to the (top, bottom, left, right) of
@@ -321,14 +321,14 @@ def dilate(X, d):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
         Input volume.
     d : int
         The number of 0-rows to insert between each adjacent row + column in `X`.
 
     Returns
     -------
-    Xd : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+    Xd : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
         The dilated array where
 
         .. math::
@@ -490,7 +490,7 @@ def im2col(X, W_shape, pad, stride, dilation=0):
 
     Notes
     -----
-    A NumPy reimagining of MATLAB's `:func:`im2col`` 'sliding' function.
+    A NumPy reimagining of MATLAB's ``im2col`` 'sliding' function.
 
     Code extended from Andrej Karpathy's ``im2col.py``.
 
@@ -556,13 +556,13 @@ def col2im(X_col, X_shape, W_shape, pad, stride, dilation=0):
 
     Parameters
     ----------
-    X_col : :py:class:`ndarray <numpy.ndarray>` of shape (Q, Z)
+    X_col : :py:class:`ndarray <numpy.ndarray>` of shape `(Q, Z)`
         The columnized version of `X` (assumed to include padding)
-    X_shape : 4-tuple containing (n_ex, in_rows, in_cols, in_ch)
+    X_shape : 4-tuple containing `(n_ex, in_rows, in_cols, in_ch)`
         The original dimensions of `X` (not including padding)
-    W_shape: 4-tuple containing (kernel_rows, kernel_cols, in_ch, out_ch)
+    W_shape: 4-tuple containing `(kernel_rows, kernel_cols, in_ch, out_ch)`
         The dimensions of the weights in the present convolutional layer
-    pad : 4-tuple of (left, right, up, down)
+    pad : 4-tuple of `(left, right, up, down)`
         Number of zero-padding rows/cols to add to `X`
     stride : int
         The stride of each convolution kernel
@@ -571,7 +571,7 @@ def col2im(X_col, X_shape, W_shape, pad, stride, dilation=0):
 
     Returns
     -------
-    img : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+    img : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
         The reshaped `X_col` input matrix
     """
     if not (isinstance(pad, tuple) and len(pad) == 4):
@@ -608,7 +608,7 @@ def conv2D(X, W, stride, pad, dilation=0):
 
     Notes
     -----
-    Relies on the `:func:`im2col` function to perform the convolution as a single
+    Relies on the :func:`im2col` function to perform the convolution as a single
     matrix multiplication.
 
     For a helpful diagram, see Pete Warden's 2015 blogpost [1].
@@ -620,9 +620,9 @@ def conv2D(X, W, stride, pad, dilation=0):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
         Input volume (unpadded).
-    W: :py:class:`ndarray <numpy.ndarray>` of shape (kernel_rows, kernel_cols, in_ch, out_ch)
+    W: :py:class:`ndarray <numpy.ndarray>` of shape `(kernel_rows, kernel_cols, in_ch, out_ch)`
         A volume of convolution weights/kernels for a given layer.
     stride : int
         The stride of each convolution kernel.
@@ -639,7 +639,7 @@ def conv2D(X, W, stride, pad, dilation=0):
 
     Returns
     -------
-    Z : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+    Z : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
         The covolution of `X` with `W`.
     """
     s, d = stride, dilation
@@ -673,7 +673,7 @@ def conv1D(X, W, stride, pad, dilation=0):
 
     Notes
     -----
-    Relies on the `:func:`im2col` function to perform the convolution as a single
+    Relies on the :func:`im2col` function to perform the convolution as a single
     matrix multiplication.
 
     For a helpful diagram, see Pete Warden's 2015 blogpost [1].
@@ -685,9 +685,9 @@ def conv1D(X, W, stride, pad, dilation=0):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_in, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_in, in_ch)`
         Input volume (unpadded)
-    W: :py:class:`ndarray <numpy.ndarray>` of shape (kernel_width, in_ch, out_ch)
+    W: :py:class:`ndarray <numpy.ndarray>` of shape `(kernel_width, in_ch, out_ch)`
         A volume of convolution weights/kernels for a given layer
     stride : int
         The stride of each convolution kernel
@@ -697,12 +697,12 @@ def conv1D(X, W, stride, pad, dilation=0):
         produces an output volume of the same dimensions as the input.  If
         2-tuple, specifies the number of padding colums to add *on both sides*
         of the columns in X.
-    dilation : int (default: 0)
-        Number of pixels inserted between kernel elements.
+    dilation : int
+        Number of pixels inserted between kernel elements. Default is 0.
 
     Returns
     -------
-    Z : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, l_out, out_ch)
+    Z : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, l_out, out_ch)`
         The convolution of X with W.
     """
     _, p = pad1D(X, pad, W.shape[0], stride, dilation=dilation)
@@ -738,9 +738,9 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, in_rows, in_cols, in_ch)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
         Input volume (not padded)
-    W: :py:class:`ndarray <numpy.ndarray>` of shape (kernel_rows, kernel_cols, in_ch, out_ch)
+    W: :py:class:`ndarray <numpy.ndarray>` of shape `(kernel_rows, kernel_cols, in_ch, out_ch)`
         A volume of convolution weights/kernels for a given layer
     stride : int
         The stride of each convolution kernel
@@ -757,7 +757,7 @@ def deconv2D_naive(X, W, stride, pad, dilation=0):
 
     Returns
     -------
-    Y : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, n_out)
+    Y : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, n_out)`
         The decovolution of (padded) input volume `X` with `W` using stride `s` and
         dilation `d`.
     """
@@ -808,9 +808,9 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
 
     Parameters
     ----------
-    X : :py:class:`ndarray <numpy.ndarray>` of shape (`n_ex`, `in_rows`, `in_cols`, `in_ch`)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_ch)`
         Input volume.
-    W: :py:class:`ndarray <numpy.ndarray>` of shape (`kernel_rows`, `kernel_cols`, `in_ch`, `out_ch`)
+    W: :py:class:`ndarray <numpy.ndarray>` of shape `(kernel_rows, kernel_cols, in_ch, out_ch)`
         The volume of convolution weights/kernels.
     stride : int
         The stride of each convolution kernel.
@@ -827,7 +827,7 @@ def conv2D_naive(X, W, stride, pad, dilation=0):
 
     Returns
     -------
-    Z : :py:class:`ndarray <numpy.ndarray>` of shape (n_ex, out_rows, out_cols, out_ch)
+    Z : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)`
         The covolution of `X` with `W`.
     """
     s, d = stride, dilation

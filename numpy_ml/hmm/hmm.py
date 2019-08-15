@@ -128,7 +128,7 @@ class MultinomialHMM:
         probability under the HMM of being in latent state `i` after seeing the
         first `j` observations:
 
-        .. math:: \mathtt{forward[i,j]} = P(o_1,o_2,...,o_j,q_j=i|A,B,\pi)
+        .. math:: \mathtt{forward[i,j]} = P(o_1,\ldots,o_j,q_j=i \mid A,B,\pi)
 
         Here :math:`q_j = i` indicates that the hidden state at time `j` is of
         type `i`.
@@ -141,8 +141,8 @@ class MultinomialHMM:
             \cdot \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
 
                                    &=  \sum_{s'=1}^N
-                                   P(o_1,o_2,...,o_{j-1},q_{j-1}=s'|A,B,\pi) \cdot
-                                   P(q_j=i|q_{j-1}=s') \cdot P(o_j|q_j=i)
+                                   P(o_1,\ldots,o_{j-1},q_{j-1}=s' \mid A,B,\pi)
+                                   P(q_j=i|q_{j-1}=s') P(o_j \mid q_j=i)
 
         In words, ``forward[i,j]`` is the weighted sum of the values computed on
         the previous timestep. The weight on each previous state value is the
@@ -182,7 +182,7 @@ class MultinomialHMM:
         HMM decoding is done efficiently via DP using the Viterbi algorithm,
         which produces a 2D trellis, ``viterbi``, where entry `i`, `j` represents the
         probability under the HMM of being in state `i` at time `j` after having
-        passed through the *most probable* state sequence :math:`q_1,...,q_{j-1}`:
+        passed through the *most probable* state sequence :math:`q_1,\ldots,q_{j-1}`:
 
         .. math::
 
@@ -201,8 +201,8 @@ class MultinomialHMM:
             \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
 
                                    &=  \max_{s'=1}^N
-                                   P(o_1,...,o_j,q_1,...,q_{j-1},q_j=i|A,B,\pi) \cdot
-                                   P(q_j=i|q_{j-1}=s') \cdot P(o_j|q_j=i)
+                                   P(o_1,\ldots,o_j,q_1,\ldots,q_{j-1},q_j=i \mid A,B,\pi)
+                                   P(q_j=i \mid q_{j-1}=s') P(o_j \mid q_j=i)
 
         In words, ``viterbi[i,j]`` is the weighted sum of the values computed
         on the previous timestep. The weight on each value is the product of
@@ -221,7 +221,7 @@ class MultinomialHMM:
 
         Parameters
         ----------
-        O : np.array of shape `(T,)`
+        O : :py:class:`ndarray <numpy.ndarray>` of shape `(T,)`
             An observation sequence of length `T`.
 
         Returns
@@ -291,7 +291,7 @@ class MultinomialHMM:
         under the HMM of being in latent state `i` after seeing the first `j`
         observations:
 
-        .. math:: \mathtt{forward[i,j]} = P(o_1,o_2,...,o_j,q_j=i|A,B,\pi)
+        .. math:: \mathtt{forward[i,j]} = P(o_1,\ldots,o_j,q_j=i|A,B,\pi)
 
         Here :math:`q_j = i` indicates that the hidden state at time `j` is of
         type `i`.
@@ -299,7 +299,7 @@ class MultinomialHMM:
         The DP step is::
 
             forward[i,j] = sum_{s'=1}^N forward[s',j-1] * A[s',i] * B[i,o_j]
-                         = sum_{s'=1}^N P(o_1,o_2,...,o_{j-1},q_{j-1}=s'|A,B,pi) *
+                         = sum_{s'=1}^N P(o_1,\ldots,o_{j-1},q_{j-1}=s'|A,B,pi) *
                            P(q_j=i|q_{j-1}=s') * P(o_j|q_j=i)
 
         In words, ``forward[i,j]`` is the weighted sum of the values computed

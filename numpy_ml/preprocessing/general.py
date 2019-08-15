@@ -19,23 +19,23 @@ def minibatch(X, batchsize=256, shuffle=True):
 
     Parameters
     ----------
-    X : numpy array of shape (N, ...)
+    X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, \*)`
         The dataset to divide into minibatches. Assumes the first dimension
         represents the number of training examples.
-    batchsize : int (default: 256)
-        The desired size of each minibatch. Note, however, that if X.shape[0] %
-        batchsize > 0 then the final batch will contain fewer than batchsize
-        entries.
-    shuffle : bool (default: True)
+    batchsize : int
+        The desired size of each minibatch. Note, however, that if ``X.shape[0] %
+        batchsize > 0`` then the final batch will contain fewer than batchsize
+        entries. Default is 256.
+    shuffle : bool
         Whether to shuffle the entries in the dataset before dividing into
-        minibatches
+        minibatches. Default is True.
 
     Returns
     -------
     mb_generator : generator
-        A generator which yields the indices into X for each batch
+        A generator which yields the indices into `X` for each batch.
     n_batches: int
-        The number of batches
+        The number of batches.
     """
     N = X.shape[0]
     ix = np.arange(N)
@@ -59,8 +59,8 @@ class OneHotEncoder:
 
         Parameters
         ----------
-        categories : list of length C
-            List of the unique category labels for the items to encode
+        categories : list of length `C`
+            List of the unique category labels for the items to encode.
         """
         self._is_fit = False
         self.hyperparameters = {}
@@ -75,8 +75,8 @@ class OneHotEncoder:
 
         Parameters
         ----------
-        categories : list of length C
-            List of the unique category labels for the items to encode
+        categories : list of length `C`
+            List of the unique category labels for the items to encode.
         """
         self.parameters["categories"] = categories
         self.cat2idx = {c: i for i, c in enumerate(categories)}
@@ -89,16 +89,18 @@ class OneHotEncoder:
 
         Parameters
         ----------
-        labels : list of length N
-            A list of category labels
-        categories : list of length C (default: None)
-            List of the unique category labels for the items to encode
+        labels : list of length `N`
+            A list of category labels.
+        categories : list of length `C`
+            List of the unique category labels for the items to encode. Default
+            is None.
 
         Returns
         -------
-        Y : numpy array of shape (N, C)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
             The one-hot encoded labels. Each row corresponds to an example,
-            with a single 1 in the column corresponding to the respective label
+            with a single 1 in the column corresponding to the respective
+            label.
         """
         if not self._is_fit:
             categories = set(labels) if categories is None else categories
@@ -120,15 +122,15 @@ class OneHotEncoder:
 
         Parameters
         ----------
-        Y : numpy array of shape (N, C)
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
             One-hot encoded labels. Each row corresponds to an example, with a
             single 1 in the column associated with the label for that example
 
         Returns
         -------
-        labels : list of length N
+        labels : list of length `N`
             The list of category labels corresponding to the nonzero columns in
-            Y
+            `Y`
         """
         C = len(self.cat2idx)
         assert Y.ndim == 2, "Y must be 2D, but has shape {}".format(Y.shape)
@@ -141,6 +143,8 @@ class Standardizer:
         """
         Feature-wise standardization for vector inputs.
 
+        Notes
+        -----
         Due to the sensitivity of empirical mean and standard deviation
         calculations to extreme values, `Standardizer` cannot guarantee
         balanced feature scales in the presence of outliers. In particular,
@@ -149,15 +153,16 @@ class Standardizer:
         very different.
 
         Similar to sklearn, `Standardizer` uses a biased estimator for the
-        standard deviation: numpy.std(x, ddof=0).
+        standard deviation: ``numpy.std(x, ddof=0)``.
 
         Parameters
         ----------
-        with_mean : bool (default: True)
-            Whether to scale samples to have 0 mean during transformation
-        with_std : bool (default: True)
+        with_mean : bool
+            Whether to scale samples to have 0 mean during transformation.
+            Default is True.
+        with_std : bool
             Whether to scale samples to have unit variance during
-            transformation
+            transformation. Default is True.
         """
         self.with_mean = with_mean
         self.with_std = with_std
@@ -182,12 +187,12 @@ class Standardizer:
     def fit(self, X):
         """
         Store the feature-wise mean and standard deviation across the samples
-        in X for future scaling.
+        in `X` for future scaling.
 
         Parameters
         ----------
-        X : numpy array of shape (N, C)
-            An array of N samples, each with dimensionality C
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+            An array of N samples, each with dimensionality `C`
         """
         if not isinstance(X, np.ndarray):
             X = np.array(X)
@@ -214,6 +219,8 @@ class Standardizer:
 
         For a sample `x`, the standardized score is calculated as:
 
+        .. math::
+
             z = (x - u) / s
 
         where `u` is the mean of the training samples or zero if `with_mean` is
@@ -222,13 +229,13 @@ class Standardizer:
 
         Parameters
         ----------
-        X : numpy array of shape (N, C)
-            An array of N samples, each with dimensionality C
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+            An array of N samples, each with dimensionality `C`.
 
         Returns
         -------
-        Z : numpy array of shape (N, C)
-            The feature-wise standardized version of X
+        Z : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+            The feature-wise standardized version of `X`.
         """
         if not self._is_fit:
             raise Exception("Must call `fit` before using the `transform` method")
@@ -241,7 +248,9 @@ class Standardizer:
 
         For a standardized sample `z`, the unstandardized score is calculated as:
 
-            x = z * s + u
+        .. math::
+
+            x = z s + u
 
         where `u` is the mean of the training samples or zero if `with_mean` is
         False, and `s` is the standard deviation of the training samples or 1
@@ -249,13 +258,13 @@ class Standardizer:
 
         Parameters
         ----------
-        Z : numpy array of shape (N, C)
-            An array of N standardized samples, each with dimensionality C
+        Z : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+            An array of `N` standardized samples, each with dimensionality `C`.
 
         Returns
         -------
-        X : numpy array of shape (N, C)
-            The unstandardixed samples from Z
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, C)`
+            The unstandardixed samples from `Z`.
         """
         assert self._is_fit, "Must fit `Standardizer` before calling inverse_transform"
         P = self.parameters
@@ -267,18 +276,23 @@ class FeatureHasher:
     def __init__(self, n_dim=256, sparse=True):
         """
         Convert a collection of features to a fixed-dimensional matrix using
-        the hashing trick. Uses the md5 hash by default.
+        the hashing trick.
+
+        Notes
+        -----
+        Uses the md5 hash.
 
         Parameters
         ----------
-        n_dim : int (default: 256)
+        n_dim : int
             The dimensionality of each example in the output feature matrix.
             Small numbers of features are likely to cause hash collisions, but
             large numbers will cause larger overall parameter dimensions for
-            any (linear) learning agent.
-        sparse : bool (default: True)
+            any (linear) learning agent. Default is 256.
+        sparse : bool
             Whether the resulting feature matrix should be a sparse
-            `scipy.csr_matrix` or dense `np.ndarray`.
+            :py:class:`csr_matrix <scipy.sparse.csr_matrix>` or dense
+            :py:class:`ndarray <numpy.ndarray>`. Default is True.
         """
         self.n_dim = n_dim
         self.hash = hashlib.md5
@@ -289,6 +303,8 @@ class FeatureHasher:
         Encode a collection of multi-featured examples into a
         `n_dim`-dimensional feature matrix via feature hashing.
 
+        Notes
+        -----
         Feature hashing works by applying a hash function to the features of an
         example and using the hash values as column indices in the resulting
         feature matrix. The entries at each hashed feature column correspond to
@@ -300,7 +316,7 @@ class FeatureHasher:
                 {"nocturnal": 1, "quadruped": 1},
             ]
 
-        and a hypothetical hash function H mapping strings to [0, 127], we have:
+        and a hypothetical hash function `H` mapping strings to [0, 127], we have:
 
             >>> feature_mat = zeros(2, 128)
             >>> ex1_cols = [H("furry"), H("quadruped"), H("domesticated")]
@@ -314,13 +330,13 @@ class FeatureHasher:
         Parameters
         ----------
         examples : dict or list of dicts
-            A collection of N examples, each represented as a dict where keys
+            A collection of `N` examples, each represented as a dict where keys
             correspond to the feature name and values correspond to the feature
             value.
 
         Returns
         -------
-        table : `np.ndarray` or `scipy.sparse.csr_matrix` of shape (N, n_dim)
+        table : :py:class:`ndarray <numpy.ndarray>` or :py:class:`csr_matrix <scipy.sparse.csr_matrix>` of shape `(N, n_dim)`
             The encoded feature matrix
         """
         if isinstance(examples, dict):
