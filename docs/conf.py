@@ -56,6 +56,7 @@ extensions = [
     #  "numpydoc",
 ]
 
+# to avoid memory errors in the read-the-docs build process
 autodoc_mock_imports = ["tensorflow", "torch", "gym"]
 
 # Try to link to source code on GitHub
@@ -150,6 +151,7 @@ html_theme = "alabaster"
 # documentation.
 #
 # html_theme_options = {}
+html_css_files = ["css/custom.css"]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -180,7 +182,7 @@ html_theme_options = {
     "description": "Machine learning, in NumPy",
     "github_button": True,
     "show_powered_by": False,
-    "fixed_sidebar": True,
+    "fixed_sidebar": False,
     "analytics_id": "UA-65839510-3",
     #  'logo': 'logo.png',
 }

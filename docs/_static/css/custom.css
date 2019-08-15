@@ -1,0 +1,13 @@
+body {
+    font-size: 16px !important;
+}
+
+table.field-list, table.footnote {
+    background-color: #f9f9f9 !important;
+}
+
+table.field-list th, table.field-list td {
+    padding: 0.8em !important;
+    border: 1px solid #888 !important;
+}
+
