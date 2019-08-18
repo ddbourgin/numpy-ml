@@ -13,6 +13,7 @@ from .distance_metrics import euclidean
 
 class PQNode(object):
     def __init__(self, key, val, priority, entry_id, **kwargs):
+        """A generic node object for holding entries in :class:`PriorityQueue`"""
         self.key = key
         self.val = val
         self.entry_id = entry_id
@@ -23,6 +24,7 @@ class PQNode(object):
         return fstr.format(self.key, self.val, self.priority, self.entry_id)
 
     def to_dict(self):
+        """Return a dictionary representation of the node's contents"""
         d = self.__dict__
         d["id"] = "PQNode"
         return d
@@ -61,8 +63,8 @@ class PriorityQueue:
         -----
         A priority queue is a data structure useful for storing the top
         `capacity` largest or smallest elements in a collection of values. As a
-        result of using a binary heap, ``PriorityQueue`` offers O(log n)
-        ``push`` and ``pop`` operations.
+        result of using a binary heap, ``PriorityQueue`` offers `O(log N)`
+        :meth:`push` and :meth:`pop` operations.
 
         Parameters
         ----------
@@ -129,11 +131,11 @@ class PriorityQueue:
 
         Notes
         -----
-        In contrast to ``self.peek``, this operation is O(log n).
+        In contrast to :meth:`peek`, this operation is `O(log N)`.
 
         Returns
         -------
-        item : `PQNode` instance or None
+        item : :class:`PQNode` instance or None
             Item with the largest/smallest priority, depending on
             ``self.heap_order``.
         """
@@ -150,11 +152,11 @@ class PriorityQueue:
 
         Notes
         -----
-        In contrast to ``self.pop``, this operation is O(1).
+        In contrast to :meth:`pop`, this operation is O(1).
 
         Returns
         -------
-        item : `PQNode` instance or None
+        item : :class:`PQNode` instance or None
             Item with the largest/smallest priority, depending on
             ``self.heap_order``.
         """
@@ -296,14 +298,14 @@ class BallTree:
         ----------
         k : int
             The number of closest points in `X` to return
-        x : :py:class:`ndarray <numpy.ndarray>` of shape (1, M)
+        x : :py:class:`ndarray <numpy.ndarray>` of shape `(1, M)`
             The query vector.
 
         Returns
         -------
-        nearest : list of ``PQNode``s of length `k`
+        nearest : list of :class:`PQNode` s of length `k`
             List of the `k` points in `X` to closest to the query vector. The
-            ``key`` attribute of each ``PQNode`` contains the point itself, the
+            ``key`` attribute of each :class:`PQNode` contains the point itself, the
             ``val`` attribute contains its target, and the ``distance``
             attribute contains its distance to the query vector.
         """

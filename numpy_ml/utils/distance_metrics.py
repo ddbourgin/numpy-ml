@@ -15,7 +15,7 @@ def euclidean(x, y):
 
     Parameters
     ----------
-    x,y : :py:class:`ndarray <numpy.ndarray>`s of shape (N,)
+    x,y : :py:class:`ndarray <numpy.ndarray>` s of shape `(N,)`
         The two vectors to compute the distance between
 
     Returns
@@ -40,7 +40,7 @@ def manhattan(x, y):
 
     Parameters
     ----------
-    x,y : :py:class:`ndarray <numpy.ndarray>`s of shape (N,)
+    x,y : :py:class:`ndarray <numpy.ndarray>` s of shape `(N,)`
         The two vectors to compute the distance between
 
     Returns
@@ -65,7 +65,7 @@ def chebyshev(x, y):
 
     Parameters
     ----------
-    x,y : :py:class:`ndarray <numpy.ndarray>`s of shape (N,)
+    x,y : :py:class:`ndarray <numpy.ndarray>` s of shape `(N,)`
         The two vectors to compute the distance between
 
     Returns
@@ -90,7 +90,7 @@ def minkowski(x, y, p):
 
     Parameters
     ----------
-    x,y : :py:class:`ndarray <numpy.ndarray>`s of shape (N,)
+    x,y : :py:class:`ndarray <numpy.ndarray>` s of shape `(N,)`
         The two vectors to compute the distance between
     p : float > 1
         The parameter of the distance function. When `p = 1`, this is the `L1`
@@ -120,7 +120,7 @@ def hamming(x, y):
 
     Parameters
     ----------
-    x,y : :py:class:`ndarray <numpy.ndarray>`s of shape (N,)
+    x,y : :py:class:`ndarray <numpy.ndarray>` s of shape `(N,)`
         The two vectors to compute the distance between. Both vectors should be
         integer-valued.
 

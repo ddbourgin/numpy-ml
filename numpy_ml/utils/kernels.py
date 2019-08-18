@@ -40,7 +40,7 @@ class KernelBase(ABC):
         ----------
         summary_dict : dict
             A dictionary with keys 'parameters' and 'hyperparameters',
-            structured as would be returned by the ``self.summary`` method. If
+            structured as would be returned by the :meth:`summary` method. If
             a particular (hyper)parameter is not included in this dict, the
             current value will be used.
 
@@ -244,7 +244,7 @@ class KernelInitializer(object):
         A class for initializing learning rate schedulers. Valid inputs are:
             (a) __str__ representations of `KernelBase` instances
             (b) `KernelBase` instances
-            (c) Parameter dicts (e.g., as produced via the `summary` method in
+            (c) Parameter dicts (e.g., as produced via the :meth:`summary` method in
                 `KernelBase` instances)
 
         If `param` is None, return `LinearKernel`.
