@@ -1,8 +1,4 @@
-# numpy-ml
-Ever wish you had an inefficient but somewhat legible collection of machine
-learning algorithms implemented exclusively in numpy? No? 
-
-## Models
+# Models
 This repo includes code for the following models:
 
 1. **Gaussian mixture model**
@@ -139,14 +135,3 @@ This repo includes code for the following models:
     - Priority queue
     - Ball tree 
     - Discrete sampler
-
-## Contributing
-
-Am I missing your favorite model? Is there something that could be cleaner /
-less confusing? Did I mess something up? Submit a PR! The only requirement is
-that your models are written with just the [Python standard
-library](https://docs.python.org/3/library/) and [numpy](https://www.numpy.org/). The
-[SciPy library](https://scipy.github.io/devdocs/) is also permitted under special
-circumstances ;)
-
-See full contributing guidelines [here](./CONTRIBUTING.md). 
