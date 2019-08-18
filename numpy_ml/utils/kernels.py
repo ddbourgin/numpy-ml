@@ -142,9 +142,11 @@ class PolynomialKernel(KernelBase):
         d : int
             Degree of the polynomial kernel. Default is 3.
         gamma : float or None
-            A scaling parameter for the dot product between `x` and `y`. If None,
-            defaults to 1 / `C`. Sometimes referred to as the kernel bandwidth.
-            Default is None.
+            A scaling parameter for the dot product between `x` and `y`,
+            determining the amount of smoothing/resonlution of the kernel.
+            Larger values result in greater smoothing. If None, defaults to 1 /
+            `C`.  Sometimes referred to as the kernel bandwidth.  Default is
+            None.
         c0 : float
             Parameter trading off the influence of higher-order versus lower-order
             terms in the polynomial. If `c0` = 0, the kernel is said to be
@@ -204,7 +206,8 @@ class RBFKernel(KernelBase):
         sigma : float or array of shape `(C,)` or None
             A scaling parameter for the vectors **x** and **y**, producing an
             isotropic kernel if a float, or an anistropic kernel if an array of
-            length `C`.  If None, defaults to :math:`\sqrt(C / 2)`. Sometimes
+            length `C`.  Larger values result in higher resolution / greater
+            smoothing. If None, defaults to :math:`\sqrt(C / 2)`. Sometimes
             referred to as the kernel 'bandwidth'. Default is None.
         """
         super().__init__()

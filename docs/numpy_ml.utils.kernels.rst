@@ -1,7 +1,8 @@
 Kernels 
 =======
 
-A collection of common kernel / similarity functions.
+A collection of common kernel / similarity functions. All kernels are
+continuous, bounded, and symmetric real functions which integrate to 1. 
 
 ``LinearKernel``
 ----------------

@@ -46,7 +46,7 @@ class KernelRegression:
         X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             An array of N examples to generate predictions on
         y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, ...)`
-            Predicted targets for the N' rows in `X`
+            Predicted targets for the `N` rows in `X`
         """
         self.parameters = {"X": X, "y": y}
 

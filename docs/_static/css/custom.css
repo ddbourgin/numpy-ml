@@ -2,12 +2,24 @@ body {
     font-size: 16px !important;
 }
 
-table.field-list, table.footnote {
+table.field-list,
+table.footnote {
     background-color: #f9f9f9 !important;
 }
 
-table.field-list th, table.field-list td {
+table.field-list th,
+table.field-list td {
     padding: 0.8em !important;
     border: 1px solid #888 !important;
 }
 
+/* recolor the code snippets in sidebar */
+@media screen and (max-width: 875px) {
+    div.sphinxsidebar h3,
+    div.sphinxsidebar h4,
+    div.sphinxsidebar p,
+    div.sphinxsidebar h3,
+    div.sphinxsidebar .pre {
+        color: #fff !important;
+    }
+}

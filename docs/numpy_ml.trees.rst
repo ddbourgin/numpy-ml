@@ -5,12 +5,22 @@ Tree-based models
    <h2>Decision Trees</h2>
 
 Decision trees are popular nonparametric models that iteratively split a
-training dataset into smaller, more homogenous subsets.  At test time, the tree
-determines which of the training subsets a new test example falls within and uses
-the items in this subset to compute the model's prediction.
+training dataset into smaller, more homogenous subsets. Each node in the tree
+is associated with a decision rule which it uses to divide up the data it
+inherits from its parent node amongst each of its children. Each leaf node is
+associated with at least one data point from the original training set.
 
-Decision trees greedily look for splits that minimize an inhomogeneity metric,
-:math:`\mathcal{L}`.  One popular split metric is the **information entropy**:
+At test time, new examples travel from the tree root to one of the leaves,
+their path through the tree determined by the decision rules at each of the
+nodes it visits. When a test example arrives at a leaf node, the targets for
+the training examples at that leaf node are used to compute the model's
+prediction.
+
+Training decision trees corresponds to learning the set of decision rules to
+partition the training data. This learning process proceeds greedily by
+selecting the decision rule at each node that results in the greatest reduction
+in an inhomogeneity or "impurity" metric, :math:`\mathcal{L}`. One popular
+metric is the **information entropy**:
 
 .. math::
     
@@ -24,14 +34,14 @@ impurity**:
     
     \sum_{i \neq j} P_n(\omega_i) P_n(\omega_j) = 1 - \sum_{j} P_n(\omega_j)^2
 
-Each node in the decision tree corresponds to a partitioning of the dataset
-inherited from its parent. The partition rule is chosen locally in order to
-reduce the overall impurity as much as possible. In a binary tree, the
-reduction in impurity after a particular split is
+For a binary tree (where each node has only two children), the reduction in
+impurity after a particular split is
 
 .. math::
     
-    \Delta \mathcal{L} = \mathcal{L}(\text{Parent}) - P_{left} \mathcal{L}(\text{Left child}) - (1 - P_{left})\mathcal{L}(\text{Right child})
+    \Delta \mathcal{L} = \mathcal{L}(\text{Parent}) - 
+        P_{left} \mathcal{L}(\text{Left child}) - 
+            (1 - P_{left})\mathcal{L}(\text{Right child})
 
 where :math:`\mathcal{L}(x)` is the impurity of the dataset at node `x`,
 and :math:`P_{left}`/:math:`P_{right}` are the proportion of examples at the
@@ -42,12 +52,38 @@ by the proposed split.
 
    <h2>Bootstrap Aggregating</h2>
 
+Bootstrap aggregating (bagging) methods are an `ensembling approach`_ that
+proceeds by creating `n` bootstrapped samples of a training dataset by sampling
+from it with replacement. A separate learner is fit on each of the `n`
+bootstrapped datasets, with the final bootstrap aggregated model prediction
+corresponding to the average (or majority vote, for classifiers) across each
+of the `n` learners' predictions for a given datapoint.
+
+The random forest model [1]_ [2]_ is a canonical example of bootstrap
+aggregating. For this approach, each of the `n` learners is a different
+decision tree. In addition to training each decision tree on a different
+bootstrapped dataset, random forests employ a `random subspace`_ approach [3]_:
+each decision tree is trained on a subsample (without replacement) of the full
+collection of dataset features. 
+
+.. _`ensembling approach`: https://en.wikipedia.org/wiki/Ensemble_learning
+.. _`random subspace`: https://en.wikipedia.org/wiki/Random_subspace_method
+
+**References**
+
+.. [1] Ho, T. K. (1995). "Random decision forests". *Proceedings of the Third
+   International Conference on Document Analysis and Recognition, 1,* 278-282.
+.. [2] Breiman, L. (2001). "Random forests". *Machine Learning. 45(1),* 5-32.
+.. [3] Ho, T. K. (1998). "The random subspace method for constructing decision
+   forests". *IEEE Transactions on Pattern Analysis and Machine Intelligence.
+   20(8),* 832-844.
+
 .. raw:: html
 
    <h2>Gradient Boosting</h2>
 
-Gradient boosting is a popular ensembling technique in machine learning. It
-proceeds by iteratively fitting a sequence of `m` weak learners such that:
+Gradient boosting [4]_ [5]_ [6]_ is another popular `ensembling technique`_
+that proceeds by iteratively fitting a sequence of `m` weak learners such that:
 
 .. math::
 
@@ -57,21 +93,40 @@ where `b` is a fixed initial estimate for the targets, :math:`\eta` is
 a learning rate parameter, and :math:`w_{i}` and :math:`g_{i}`
 denote the weights and predictions for `i` th learner.
 
-At each iteration we fit a new weak learner to predict the negative gradient of
-the loss with respect to the previous prediction, :math:`f_{i-1}(X)`.  We then
-use the element-wise product of the predictions of this weak learner,
-:math:`g_i`, with a weight, :math:`w_i`, to adjust the predictions of our model
-from the previous iteration, :math:`f_{i-1}(X)`:
+At each training iteration a new weak learner is fit to predict the negative
+gradient of the loss with respect to the previous prediction,
+:math:`\nabla_{f_{i-1}} \mathcal{L}(y, \ f_{i-1}(X))`.  We then use the
+element-wise product of the predictions of this weak learner, :math:`g_i`, with
+a weight, :math:`w_i`, computed via, e.g., `line-search`_ on the objective
+:math:`w_i = \arg \min_{w} \sum_{j=1}^n \mathcal{L}(y_j, f_{i-1}(x_j) + w g_i)`
+, to adjust the predictions of the model from the previous iteration,
+:math:`f_{i-1}(X)`:
 
 .. math::
 
     f_i(X) := f_{i-1}(X) + w_i g_i
+
+The current module implements gradient boosting using decision trees as the
+weak learners.
+
+.. _`ensembling technique`: https://en.wikipedia.org/wiki/Ensemble_learning
+.. _`line-search`: https://en.wikipedia.org/wiki/Line_search
+
+**References**
+
+.. [4]  Breiman, L. (1997). "Arcing the edge". *Technical Report 486.
+   Statistics Department, UC Berkeley*. 
+.. [5] Friedman, J. H. (1999). "Greedy function approximation: A gradient
+   boosting machine". *IMS 1999 Reitz Lecture*.
+.. [6]  Mason, L., Baxter, J., Bartlett, P. L., Frean, M. (1999). "Boosting
+   algorithms as gradient descent" *Advances in Neural Information Processing
+   Systems, 12*, 512–518.
 
 .. toctree::
    :maxdepth: 3
 
    numpy_ml.trees.dt
 
-   numpy_ml.trees.gbdt
-
    numpy_ml.trees.rf
+
+   numpy_ml.trees.gbdt

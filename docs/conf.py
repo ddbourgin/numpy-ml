@@ -182,7 +182,7 @@ html_theme_options = {
     "description": "Machine learning, in NumPy",
     "github_button": True,
     "show_powered_by": False,
-    "fixed_sidebar": False,
+    "fixed_sidebar": True,
     "analytics_id": "UA-65839510-3",
     #  'logo': 'logo.png',
 }
