@@ -33,28 +33,17 @@ class Sigmoid(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the logistic sigmoid, :math:`\sigma`, on the elements of input `z`.
-
-        Notes
-        ----
-        The logistic sigmoid, :math:`\sigma`, is
+        Evaluate the logistic sigmoid, :math:`\sigma`, on the elements of input `z`.
 
         .. math::
 
             \sigma(x_i) = \\frac{1}{1 + e^{-x_i}}
-
-        where :math:`x_i` is the `i` th dimension of input example **x**.
         """
         return 1 / (1 + np.exp(-z))
 
     def grad(self, x):
         """
-        Compute the gradient of the logistic sigmoid on the elements of input
-        `x`.
-
-        Notes
-        -----
-        The first derivative of the logistic sigmoid :math:`\sigma` is
+        Evaluate the first derivative of the logistic sigmoid on the elements of `x`.
 
         .. math::
 
@@ -65,11 +54,7 @@ class Sigmoid(ActivationBase):
 
     def grad2(self, x):
         """
-        Compute the second derivative of the logistic sigmoid on the elements of `x`.
-
-        Notes
-        -----
-        The second derivative of the logistic sigmoid :math:`\sigma` is
+        Evaluate the second derivative of the logistic sigmoid on the elements of `x`.
 
         .. math::
 
@@ -97,11 +82,11 @@ class ReLU(ActivationBase):
     For example, you may find that as much as 40% of your network can be "dead"
     (i.e. neurons that never activate across the entire training dataset) if
     the learning rate is set too high. With a proper setting of the learning
-    rate this is less frequently an issue." [1]_
+    rate this is less frequently an issue." [*]_
 
     References
     ----------
-    .. [1] Karpathy, A. "CS231n: Convolutional neural networks for visual recognition".
+    .. [*] Karpathy, A. "CS231n: Convolutional neural networks for visual recognition".
     """
 
     def __init__(self):
@@ -112,53 +97,35 @@ class ReLU(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the ReLU function on the elements of input `z`.
-
-        Notes
-        -----
-        The ReLU function is
+        Evaulate the ReLU function on the elements of input `z`.
 
         .. math::
 
             \\text{ReLU}(z_i)
                 &=  z_i \\ \\ \\ \\ &&\\text{if }z_i > 0 \\\\
                 &=  0 \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`z_i` is the `i` th dimension of an example in **z**.
         """
         return np.clip(z, 0, np.inf)
 
     def grad(self, x):
         """
-        Compute the first derivative of the ReLU function on the elements of input `x`.
-
-        Notes
-        -----
-        The first derivative of the ReLU function is
+        Evaulate the first derivative of the ReLU function on the elements of input `x`.
 
         .. math::
 
             \\frac{\partial \\text{ReLU}}{\partial x_i}
                 &=  1 \\ \\ \\ \\ &&\\text{if }x_i > 0 \\\\
                 &=  0   \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return (x > 0).astype(int)
 
     def grad2(self, x):
         """
-        Compute the second derivative of the ReLU function on the elements of input `x`.
-
-        Notes
-        -----
-        The second derivative of the ReLU function is
+        Evaulate the second derivative of the ReLU function on the elements of input `x`.
 
         .. math::
 
             \\frac{\partial^2 \\text{ReLU}}{\partial x_i^2}  =  0
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.zeros_like(x)
 
@@ -169,8 +136,8 @@ class LeakyReLU(ActivationBase):
 
     Notes
     -----
-    Leaky ReLUs are designed to address the vanishing gradient problem in ReLUs
-    by allowing a small non-zero gradient when `x` is negative.
+    Leaky ReLUs [*]_ are designed to address the vanishing gradient problem in
+    ReLUs by allowing a small non-zero gradient when `x` is negative.
 
     Parameters
     ----------
@@ -179,7 +146,9 @@ class LeakyReLU(ActivationBase):
 
     References
     ----------
-    .. [1] Mass, L. M., Hannun, A. Y, & Ng, A. Y. (2013). "Rectifier nonlinearities improve neural network acoustic models". *ICML, 30*.
+    .. [*] Mass, L. M., Hannun, A. Y, & Ng, A. Y. (2013). "Rectifier
+       nonlinearities improve neural network acoustic models". *Proceedings of
+       the 30th International Conference of Machine Learning, 30*.
     """
 
     def __init__(self, alpha=0.3):
@@ -191,19 +160,13 @@ class LeakyReLU(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the leaky ReLU function on the elements of input `z`.
-
-        Notes
-        -----
-        The leaky ReLU function is
+        Evaluate the leaky ReLU function on the elements of input `z`.
 
         .. math::
 
             \\text{LeakyReLU}(z_i)
                 &=  z_i \\ \\ \\ \\ &&\\text{if } z_i > 0 \\\\
                 &=  \\alpha z_i \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`z_i` is the `i` th dimension of an example in input **z**.
         """
         _z = z.copy()
         _z[z < 0] = _z[z < 0] * self.alpha
@@ -211,20 +174,14 @@ class LeakyReLU(ActivationBase):
 
     def grad(self, x):
         """
-        Compute the first derivative of the leaky ReLU function on the elements
+        Evaluate the first derivative of the leaky ReLU function on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the leaky ReLU function is
 
         .. math::
 
             \\frac{\partial \\text{LeakyReLU}}{\partial x_i}
                 &=  1 \\ \\ \\ \\ &&\\text{if }x_i > 0 \\\\
                 &=  \\alpha \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         out = np.ones_like(x)
         out[x < 0] *= self.alpha
@@ -232,17 +189,11 @@ class LeakyReLU(ActivationBase):
 
     def grad2(self, x):
         """
-        Compute the second derivative of the leaky ReLU function on the elements of input `x`.
-
-        Notes
-        -----
-        The second derivative of the leaky ReLU function is
+        Evaluate the second derivative of the leaky ReLU function on the elements of input `x`.
 
         .. math::
 
             \\frac{\partial^2 \\text{LeakyReLU}}{\partial x_i^2}  =  0
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.zeros_like(x)
 
@@ -265,35 +216,24 @@ class Tanh(ActivationBase):
 
     def grad(self, x):
         """
-        Compute the first derivative of the tanh function on the elements
+        Evaluate the first derivative of the tanh function on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the tanh function is
 
         .. math::
 
             \\frac{\partial \\tanh}{\partial x_i}  =  1 - \\tanh(x)^2
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return 1 - np.tanh(x) ** 2
 
     def grad2(self, x):
         """
-        Compute the second derivative of the tanh function on the elements
+        Evaluate the second derivative of the tanh function on the elements
         of input `x`.
-
-        Notes
-        -----
-        The second derivative of the tanh function is
 
         .. math::
 
-            \\frac{\partial^2 \\tanh}{\partial x_i^2} = -2 \\tanh(x) \left(\\frac{\partial \\tanh}{\partial x_i}\\right)
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
+            \\frac{\partial^2 \\tanh}{\partial x_i^2} =
+                -2 \\tanh(x) \left(\\frac{\partial \\tanh}{\partial x_i}\\right)
         """
         tanh_x = np.tanh(x)
         return -2 * tanh_x * (1 - tanh_x ** 2)
@@ -320,51 +260,33 @@ class Affine(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the Affine activation on the elements of input `z`.
-
-        Notes
-        -----
-        The Affine activation is
+        Evaluate the Affine activation on the elements of input `z`.
 
         .. math::
 
             \\text{Affine}(z_i)  =  \\text{slope} \\times z_i + \\text{intercept}
-
-        where :math:`z_i` is the `i` th dimension of an example in input **z**.
         """
         return self.slope * z + self.intercept
 
     def grad(self, x):
         """
-        Compute the first derivative of the Affine activation on the elements
+        Evaluate the first derivative of the Affine activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the Affine activation is
 
         .. math::
 
             \\frac{\partial \\text{Affine}}{\partial x_i}  =  \\text{slope}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return self.slope * np.ones_like(x)
 
     def grad2(self, x):
         """
-        Compute the second derivative of the Affine activation on the elements
+        Evaluate the second derivative of the Affine activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The second derivative of the Affine activation is
 
         .. math::
 
             \\frac{\partial^2 \\text{Affine}}{\partial x_i^2}  =  0
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.zeros_like(x)
 
@@ -401,7 +323,7 @@ class ELU(ActivationBase):
         :class:`LeakyReLU`, however, the boundedness of the negative activation
         allows for greater robustness in the face of large negative values,
         allowing the function to avoid conveying the *degree* of "absence"
-        (negative activation) in the input. [1]
+        (negative activation) in the input. [*]_
 
         Parameters
         ----------
@@ -410,7 +332,10 @@ class ELU(ActivationBase):
 
         References
         ----------
-        .. [1] Clevert, D. A., Unterthiner, T., Hochreiter, S. (2016). "Fast and accurate deep network learning by exponential linear units (ELUs)". *ICLR*
+        .. [*] Clevert, D. A., Unterthiner, T., Hochreiter, S. (2016). "Fast
+           and accurate deep network learning by exponential linear units
+           (ELUs)". *4th International Conference on Learning
+           Representations*.
         """
 
         self.alpha = alpha
@@ -421,59 +346,41 @@ class ELU(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the ELU activation on the elements of input `z`.
-
-        Notes
-        -----
-        The exponential linear unit activation function is
+        Evaluate the ELU activation on the elements of input `z`.
 
         .. math::
 
             \\text{ELU}(z_i)
                 &=  z_i \\ \\ \\ \\ &&\\text{if }z_i > 0 \\\\
                 &=  \\alpha (e^{z_i} - 1) \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`z_i` is the `i` th dimension of an example in input **z**.
         """
         # z if z > 0  else alpha * (e^z - 1)
         return np.where(z > 0, z, self.alpha * (np.exp(z) - 1))
 
     def grad(self, x):
         """
-        Compute the first derivative of the ELU activation on the elements
+        Evaluate the first derivative of the ELU activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the ELU activation is
 
         .. math::
 
             \\frac{\partial \\text{ELU}}{\partial x_i}
                 &=  1 \\ \\ \\ \\ &&\\text{if } x_i > 0 \\\\
                 &=  \\alpha e^{x_i} \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         # 1 if x > 0 else alpha * e^(z)
         return np.where(x > 0, np.ones_like(x), self.alpha * np.exp(x))
 
     def grad2(self, x):
         """
-        Compute the second derivative of the ELU activation on the elements
+        Evaluate the second derivative of the ELU activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The second derivative of the ELU activation is
 
         .. math::
 
             \\frac{\partial^2 \\text{ELU}}{\partial x_i^2}
                 &=  0 \\ \\ \\ \\ &&\\text{if } x_i > 0 \\\\
                 &=  \\alpha e^{x_i} \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         # 0 if x > 0 else alpha * e^(z)
         return np.where(x >= 0, np.zeros_like(x), self.alpha * np.exp(x))
@@ -490,40 +397,28 @@ class Exponential(ActivationBase):
         return "Exponential"
 
     def fn(self, z):
-        """Compute the activation function :math:`\\text{Exponential}(z_i) = e^{z_i}`."""
+        """Evaluate the activation function :math:`\\text{Exponential}(z_i) = e^{z_i}`."""
         return np.exp(z)
 
     def grad(self, x):
         """
-        Compute the first derivative of the exponential activation on the elements
+        Evaluate the first derivative of the exponential activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the exponential activation is
 
         .. math::
 
             \\frac{\partial \\text{Exponential}}{\partial x_i}  =  e^{x_i}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.exp(x)
 
     def grad2(self, x):
         """
-        Compute the second derivative of the exponential activation on the elements
+        Evaluate the second derivative of the exponential activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The second derivative of the exponential activation is
 
         .. math::
 
             \\frac{\partial^2 \\text{Exponential}}{\partial x_i^2}  =  e^{x_i}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.exp(x)
 
@@ -543,13 +438,15 @@ class SELU(ActivationBase):
     between consecutive layers. As such the authors propose weights be
     initialized using Lecun-Normal initialization: :math:`w_{ij} \sim
     \mathcal{N}(0, 1 / \\text{fan_in})`, and to use the dropout variant
-    :math:`\\alpha`-dropout during regularization. [1]
+    :math:`\\alpha`-dropout during regularization. [*]_
 
     See the reference for more information (especially the appendix ;-) ).
 
     References
     ----------
-    .. [1] Klambauer, G., Unterthiner, T., & Hochreiter, S. (2017). "Self-normalizing neural networks." *Advances in Neural Information Processing Systems, 30.*
+    .. [*] Klambauer, G., Unterthiner, T., & Hochreiter, S. (2017).
+       "Self-normalizing neural networks." *Advances in Neural Information
+       Processing Systems, 30.*
     """
 
     def __init__(self):
@@ -563,11 +460,7 @@ class SELU(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the SELU activation on the elements of input `z`.
-
-        Notes
-        -----
-        The SELU function is
+        Evaluate the SELU activation on the elements of input `z`.
 
         .. math::
 
@@ -580,27 +473,19 @@ class SELU(ActivationBase):
             \\text{SELU}(z_i)
                 &= \\text{scale} \\times z_i \\ \\ \\ \\ &&\\text{if }z_i > 0 \\\\
                 &= \\text{scale} \\times \\alpha (e^{z_i} - 1) \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`z_i` is the `i` th dimension of an example in input **z**.
         """
         return self.scale * self.elu.fn(z)
 
     def grad(self, x):
         """
-        Compute the first derivative of the SELU activation on the elements
+        Evaluate the first derivative of the SELU activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the SELU activation is
 
         .. math::
 
             \\frac{\partial \\text{SELU}}{\partial x_i}
                 &=  \\text{scale} \\ \\ \\ \\ &&\\text{if } x_i > 0 \\\\
                 &=  \\text{scale} \\times \\alpha e^{x_i} \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.where(
             x >= 0, np.ones_like(x) * self.scale, np.exp(x) * self.alpha * self.scale
@@ -608,20 +493,14 @@ class SELU(ActivationBase):
 
     def grad2(self, x):
         """
-        Compute the second derivative of the SELU activation on the elements
+        Evaluate the second derivative of the SELU activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The second derivative of the SELU activation is
 
         .. math::
 
             \\frac{\partial^2 \\text{SELU}}{\partial x_i^2}
                 &=  0 \\ \\ \\ \\ &&\\text{if } x_i > 0 \\\\
                 &=  \\text{scale} \\times \\alpha e^{x_i} \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.where(x > 0, np.zeros_like(x), np.exp(x) * self.alpha * self.scale)
 
@@ -643,11 +522,7 @@ class HardSigmoid(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the hard sigmoid activation on the elements of input `z`.
-
-        Notes
-        -----
-        The hard sigmoid activation function is
+        Evaluate the hard sigmoid activation on the elements of input `z`.
 
         .. math::
 
@@ -655,44 +530,30 @@ class HardSigmoid(ActivationBase):
                 &= 0 \\ \\ \\ \\ &&\\text{if }z_i < -2.5 \\\\
                 &= 0.2 z_i + 0.5 \\ \\ \\ \\ &&\\text{if }-2.5 \leq z_i \leq 2.5 \\\\
                 &= 1 \\ \\ \\ \\ &&\\text{if }z_i > 2.5
-
-        where :math:`z_i` is the `i` th dimension of an example in input **z**.
         """
         return np.clip((0.2 * z) + 0.5, 0.0, 1.0)
 
     def grad(self, x):
         """
-        Compute the first derivative of the hard sigmoid activation on the elements
+        Evaluate the first derivative of the hard sigmoid activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the hard sigmoid is
 
         .. math::
 
             \\frac{\partial \\text{HardSigmoid}}{\partial x_i}
                 &=  0.2 \\ \\ \\ \\ &&\\text{if } -2.5 \leq x_i \leq 2.5\\\\
                 &=  0 \\ \\ \\ \\ &&\\text{otherwise}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.where((x >= -2.5) & (x <= 2.5), 0.2, 0)
 
     def grad2(self, x):
         """
-        Compute the second derivative of the hard sigmoid activation on the elements
+        Evaluate the second derivative of the hard sigmoid activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The second derivative of the hard sigmoid is
 
         .. math::
 
             \\frac{\partial^2 \\text{HardSigmoid}}{\partial x_i^2} =  0
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         return np.zeros_like(x)
 
@@ -704,7 +565,7 @@ class SoftPlus(ActivationBase):
 
         Notes
         -----
-        In contrast to :class:`ReLU` , the softplus activation is differentiable
+        In contrast to :class:`ReLU`, the softplus activation is differentiable
         everywhere (including 0). It is, however, less computationally efficient to
         compute.
 
@@ -717,52 +578,34 @@ class SoftPlus(ActivationBase):
 
     def fn(self, z):
         """
-        Compute the softplus activation on the elements of input `z`.
-
-        Notes
-        -----
-        The softplus activation function is
+        Evaluate the softplus activation on the elements of input `z`.
 
         .. math::
 
             \\text{SoftPlus}(z_i) = \log(1 + e^{z_i})
-
-        where :math:`z_i` is the `i` th dimension of an example in input **z**.
         """
         return np.log(np.exp(z) + 1)
 
     def grad(self, x):
         """
-        Compute the first derivative of the softplus activation on the elements
+        Evaluate the first derivative of the softplus activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The first derivative of the softplus is
 
         .. math::
 
             \\frac{\partial \\text{SoftPlus}}{\partial x_i} = \\frac{e^{x_i}}{1 + e^{x_i}}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         exp_x = np.exp(x)
         return exp_x / (exp_x + 1)
 
     def grad2(self, x):
         """
-        Compute the second derivative of the softplus activation on the elements
+        Evaluate the second derivative of the softplus activation on the elements
         of input `x`.
-
-        Notes
-        -----
-        The second derivative of the softplus is
 
         .. math::
 
             \\frac{\partial^2 \\text{SoftPlus}}{\partial x_i^2} = \\frac{e^{x_i}}{(1 + e^{x_i})^2}
-
-        where :math:`x_i` is the `i` th dimension of an example in **x**.
         """
         exp_x = np.exp(x)
         return exp_x / ((exp_x + 1) ** 2)

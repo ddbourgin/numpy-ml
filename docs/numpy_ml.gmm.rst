@@ -60,6 +60,10 @@ algorithm`_ to learn the GMM parameters.
 
 .. _expectation-maximization (EM) algorithm : https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm
 
+**Models**
+
+- :class:`~numpy_ml.gmm.GMM`
+
 **References**
     
 .. [1] Bilmes, J. A. (1998). "A gentle tutorial of the EM algorithm and its
@@ -70,5 +74,6 @@ algorithm`_ to learn the GMM parameters.
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
    numpy_ml.gmm.gmm

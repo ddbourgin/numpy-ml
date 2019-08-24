@@ -43,6 +43,10 @@ the normal equation:
 where :math:`(\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top` is known
 as the pseudoinverse / Moore-Penrose inverse.
 
+**Models**
+
+- :class:`~numpy_ml.linear_models.LinearRegression`
+
 .. raw:: html
 
    <h2>Ridge Regression</h2>
@@ -79,6 +83,10 @@ the adjusted normal equation:
 where :math:`(\mathbf{X}^\top \mathbf{X} + \alpha I)^{-1}
 \mathbf{X}^\top` is the pseudoinverse / Moore-Penrose inverse adjusted for
 the `L2` penalty on the model coefficients.
+
+**Models**
+
+- :class:`~numpy_ml.linear_models.RidgeRegression`
 
 .. raw:: html
 
@@ -153,6 +161,11 @@ well:
 where :math:`X^*` is the matrix of new data we wish to predict, and :math:`y^*`
 are the predicted targets for those data.
 
+**Models**
+
+- :class:`~numpy_ml.linear_models.BayesianLinearRegressionKnownVariance`
+
+
 .. raw:: html
 
    <h4>Unknown variance</h4>
@@ -217,8 +230,13 @@ We can also compute a closed-form solution for the posterior predictive distribu
 .. math::
 
     y^* \mid X^*, X, Y \sim \mathcal{N}(X^* \mu_b, \ X^* \text{cov}_b X^{* \top} + I)
+    
+**Models**
+
+- :class:`~numpy_ml.linear_models.BayesianLinearRegressionUnknownVariance`
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
    numpy_ml.linear_models.lm

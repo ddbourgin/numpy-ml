@@ -72,6 +72,11 @@ maximization`_ or Markov chain Monte Carlo (e.g., `collapsed Gibbs sampling`_).
 .. _`variational expectation maximization`: https://en.wikipedia.org/wiki/Variational_Bayesian_methods
 .. _`collapsed Gibbs sampling`: https://en.wikipedia.org/wiki/Gibbs_sampling#Collapsed_Gibbs_sampler
 
+**Models**
+
+- :class:`~numpy_ml.lda.LDA`
+- :class:`~numpy_ml.lda.SmoothedLDA`
+
 **References**
 
 .. [1]  Blei, D., Ng, A., & Jordan, M. (2003). "Latent Dirichlet allocation". *Journal of
@@ -81,6 +86,7 @@ maximization`_ or Markov chain Monte Carlo (e.g., `collapsed Gibbs sampling`_).
 
 .. toctree::
    :maxdepth: 3
+   :hidden:
 
    numpy_ml.lda.lda
    numpy_ml.lda.smoothed_lda

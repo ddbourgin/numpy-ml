@@ -7,6 +7,10 @@ Nonparametric models
 
 TODO
 
+**Models**
+
+- :class:`~numpy_ml.nonparametric.KNN`
+
 .. raw:: html
 
    <h2>Gaussian Process Regression</h2>
@@ -44,8 +48,8 @@ functions `f`:
 
 .. math::
 
-        y \mid X, f  &\sim  \mathcal{N}( [f(x_1), \ldots, f(x_n)], \alpha I ) \\
-        f \mid X     &\sim  \text{GP}(0, K)
+    y \mid X, f  &\sim  \mathcal{N}( [f(x_1), \ldots, f(x_n)], \alpha I ) \\
+    f \mid X     &\sim  \text{GP}(0, K)
 
 Due to the conjugacy of the Gaussian Process prior with the regression model's
 Gaussian likelihood, the posterior will also be Gaussian and can be computed in
@@ -53,6 +57,10 @@ closed form.
 
 .. _`Gaussian process`: https://en.wikipedia.org/wiki/Gaussian_process
 .. _`Gaussian process regression`: https://en.wikipedia.org/wiki/Kriging
+
+**Models**
+
+- :class:`~numpy_ml.nonparametric.GPRegression`
 
 **References**
 
@@ -80,12 +88,17 @@ Unlike the Gaussian Process regression approach, however, kernel regression
 does not place a prior over `f`. Instead, it models :math:`f = \mathbb{E}[y |
 X] = \int_y \frac{p(X, y)}{p(X)} y \ \text{d}y` using a :doc:`kernel function
 <numpy_ml.utils.kernels>`, `k`, to estimate the smoothed data probabilities.
-For example, the :class:`Nadaraya-Watson <numpy-ml.nonparametric.KernelRegression>`
+For example, the :class:`Nadaraya-Watson <numpy_ml.nonparametric.KernelRegression>`
 estimator [4]_ [5]_ uses the following probability estimates:
 
 .. math::
     \hat{p}(X)  &=  \prod_{i=1}^N \hat{p}(x_i) = \prod_{i=1}^N \sum_{j=1}^N \frac{k(x_i - x_j)}{N} \\
     \hat{p}(X, y)  &  \prod_{i=1}^N \hat{p}(x_i, y_i) = \prod_{i=1}^N \sum_{j=1}^N \frac{k(x_i - x_j) k(y_i - y_j)}{N}
+
+
+**Models**
+
+- :class:`~numpy_ml.nonparametric.KernelRegression`
 
 **References**
 
@@ -99,12 +112,13 @@ estimator [4]_ [5]_ uses the following probability estimates:
    <h2>See Also</h2>
 
 The :doc:`trees <numpy_ml.trees>` module contains other classic nonparametric
-approaches, including :class:`decision trees <numpy_ml.trees.DecisionTree>`,
-:class:`random forests <numpy_ml.trees.RandomForest>`, and :class:`gradient
-boosted decision trees <numpy_ml.trees.GradientBoostedDecisionTree>`.
+approaches, including :doc:`decision trees <numpy_ml.trees.dt>`,
+:doc:`random forests <numpy_ml.trees.rf>`, and :doc:`gradient
+boosted decision trees <numpy_ml.trees.gbdt>`.
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
    numpy_ml.nonparametric.knn
    numpy_ml.nonparametric.gp

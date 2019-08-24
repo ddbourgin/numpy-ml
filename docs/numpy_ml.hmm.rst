@@ -53,13 +53,18 @@ the EM algorithm is known as the `forward-backward`_ / `Baum-Welch algorithm`_.
 .. _forward-backward: https://en.wikipedia.org/wiki/Forward%E2%80%93backward_algorithm
 .. _Baum-Welch algorithm: https://en.wikipedia.org/wiki/Baum%E2%80%93Welch_algorithm
 
+**Models**
+
+- :class:`~numpy_ml.hmm.MultinomialHMM`
+
 **References**
     
-.. [1] Ghahramani (2001). "An Intro to HMMs and Bayesian networks,"
-       *International Journal of Pattern Recognition and AI.* 15(1): 9-42.
+.. [1] Ghahramani, Z. (2001). "An Intro to HMMs and Bayesian networks".
+       *International Journal of Pattern Recognition and AI, 15(1)*: 9-42.
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
    numpy_ml.hmm.MultinomialHMM
 

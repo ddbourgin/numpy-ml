@@ -25,10 +25,18 @@ Data structures
 	:undoc-members:
 	:inherited-members:
 
+``PQNode``
+-----------------
+
+.. autoclass:: numpy_ml.utils.data_structures.PQNode
+	:members:
+	:undoc-members:
+	:inherited-members:
+
 ``Dict``
 --------
 
 .. autoclass:: numpy_ml.utils.data_structures.Dict
 	:members:
 	:undoc-members:
-	:inherited-members:
+        :show-inheritance:

@@ -8,7 +8,11 @@ adjusting empirical probability estimates to account for insufficient data.
 In the descriptions below, we use the notation :math:`w^{j}_{i}`, :math:`i < j`, to
 denote the `(j - i)`-gram :math:`(w_{i}, w_{i+1}, \ldots, w_{j})`.
 
-**Laplace smoothing** is the assumption that each `n`-gram in a corpus occurs
+.. raw:: html
+
+   <h3>Laplace Smoothing</h3>
+
+`Laplace smoothing`_ is the assumption that each `n`-gram in a corpus occurs
 exactly one more time than it actually does. 
 
 .. math::
@@ -19,7 +23,17 @@ where :math:`c(a)` denotes the empirical count of the `n`-gram :math:`a` in the
 corpus, and :math:`|V|` corresponds to the number of unique `n`-grams in the
 corpus.
 
-**Additive/Lidstone smoothing** is a generalization of Laplace smoothing, where we
+.. _`Laplace smoothing`: https://en.wikipedia.org/wiki/Additive_smoothing
+
+**Models**
+
+- :class:`~numpy_ml.ngram.AdditiveNGram`
+
+.. raw:: html
+
+   <h3>Additive/Lidstone Smoothing</h3>
+
+`Additive/Lidstone smoothing`_ is a generalization of Laplace smoothing, where we
 assume that each `n`-gram in a corpus occurs `k` more times than it actually
 does (where `k` can be any non-negative value, but typically ranges between `[0, 1]`):
 
@@ -31,7 +45,18 @@ where :math:`c(a)` denotes the empirical count of the `n`-gram :math:`a` in the
 corpus, and :math:`|V|` corresponds to the number of unique `n`-grams in the
 corpus.
 
-**Good-Turing smoothing** is a more sophisticated technique which takes into
+.. _`Additive/Lidstone smoothing`: https://en.wikipedia.org/wiki/Additive_smoothing
+
+**Models**
+
+- :class:`~numpy_ml.ngram.AdditiveNGram`
+
+
+.. raw:: html
+
+   <h3>Good-Turing Smoothing</h3>
+
+`Good-Turing smoothing`_ is a more sophisticated technique which takes into
 account the identity of the particular `n`-gram when deciding the amount of
 smoothing to apply. It proceeds by allocating a portion of the probability
 space occupied by `n`-grams which occur with count `r+1` and dividing it among
@@ -46,6 +71,11 @@ where :math:`r^*` is the adjusted count for an `n`-gram which occurs `r` times,
 is the total number of `n`-grams in the corpus.
 
 .. _n-gram: https://en.wikipedia.org/wiki/N-gram
+.. _`Good-Turing smoothing`: https://en.wikipedia.org/wiki/Good%E2%80%93Turing_frequency_estimation
+
+**Models**
+
+- :class:`~numpy_ml.ngram.GoodTuringNGram`
 
 **References**
 
@@ -57,6 +87,7 @@ is the total number of `n`-grams in the corpus.
 
 .. toctree::
    :maxdepth: 3
+   :hidden:
 
    numpy_ml.ngram.mle
 

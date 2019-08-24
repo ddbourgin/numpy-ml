@@ -4,10 +4,10 @@ Tree-based models
 
    <h2>Decision Trees</h2>
 
-Decision trees are popular nonparametric models that iteratively split a
+`Decision trees`_ [1]_ are popular nonparametric models that iteratively split a
 training dataset into smaller, more homogenous subsets. Each node in the tree
-is associated with a decision rule which it uses to divide up the data it
-inherits from its parent node amongst each of its children. Each leaf node is
+is associated with a decision rule, which dictates how to divide the data the
+node inherits from its parent among each of its children. Each leaf node is
 associated with at least one data point from the original training set.
 
 At test time, new examples travel from the tree root to one of the leaves,
@@ -48,41 +48,61 @@ and :math:`P_{left}`/:math:`P_{right}` are the proportion of examples at the
 current node that are partitioned into the left / right children, respectively,
 by the proposed split.
 
+.. _`Decision trees`: https://en.wikipedia.org/wiki/Decision_tree_learning
+
+**Models**
+
+- :class:`~numpy_ml.trees.DecisionTree`
+
+**References**
+
+.. [1] Breiman, L., Friedman, J. H., Olshen, R. A., and Stone, C. J. (1984).
+   Classification and regression trees. Monterey, CA: Wadsworth & Brooks/Cole
+   Advanced Books & Software.
+
 .. raw:: html
 
    <h2>Bootstrap Aggregating</h2>
 
-Bootstrap aggregating (bagging) methods are an `ensembling approach`_ that
+`Bootstrap aggregating`_ (bagging) methods [2]_ are an `ensembling approach`_ that
 proceeds by creating `n` bootstrapped samples of a training dataset by sampling
 from it with replacement. A separate learner is fit on each of the `n`
 bootstrapped datasets, with the final bootstrap aggregated model prediction
 corresponding to the average (or majority vote, for classifiers) across each
 of the `n` learners' predictions for a given datapoint.
 
-The random forest model [1]_ [2]_ is a canonical example of bootstrap
+The `random forest`_ model [3]_ [4]_ is a canonical example of bootstrap
 aggregating. For this approach, each of the `n` learners is a different
 decision tree. In addition to training each decision tree on a different
-bootstrapped dataset, random forests employ a `random subspace`_ approach [3]_:
+bootstrapped dataset, random forests employ a `random subspace`_ approach [5]_:
 each decision tree is trained on a subsample (without replacement) of the full
 collection of dataset features. 
 
+.. _`Bootstrap aggregating`: https://en.wikipedia.org/wiki/Bootstrap_aggregating
+.. _`random forest`: https://en.wikipedia.org/wiki/Random_forest
 .. _`ensembling approach`: https://en.wikipedia.org/wiki/Ensemble_learning
 .. _`random subspace`: https://en.wikipedia.org/wiki/Random_subspace_method
 
+**Models**
+
+- :class:`~numpy_ml.trees.RandomForest`
+
 **References**
 
-.. [1] Ho, T. K. (1995). "Random decision forests". *Proceedings of the Third
-   International Conference on Document Analysis and Recognition, 1,* 278-282.
-.. [2] Breiman, L. (2001). "Random forests". *Machine Learning. 45(1),* 5-32.
-.. [3] Ho, T. K. (1998). "The random subspace method for constructing decision
+.. [2] Breiman, L. (1994). "Bagging predictors". *Technical Report 421.
+   Statistics Department, UC Berkeley*. 
+.. [3] Ho, T. K. (1995). "Random decision forests". *Proceedings of the Third
+   International Conference on Document Analysis and Recognition, 1*: 278-282.
+.. [4] Breiman, L. (2001). "Random forests". *Machine Learning. 45(1)*: 5-32.
+.. [5] Ho, T. K. (1998). "The random subspace method for constructing decision
    forests". *IEEE Transactions on Pattern Analysis and Machine Intelligence.
-   20(8),* 832-844.
+   20(8)*: 832-844.
 
 .. raw:: html
 
    <h2>Gradient Boosting</h2>
 
-Gradient boosting [4]_ [5]_ [6]_ is another popular `ensembling technique`_
+`Gradient boosting`_ [6]_ [7]_ [8]_ is another popular `ensembling technique`_
 that proceeds by iteratively fitting a sequence of `m` weak learners such that:
 
 .. math::
@@ -109,21 +129,27 @@ a weight, :math:`w_i`, computed via, e.g., `line-search`_ on the objective
 The current module implements gradient boosting using decision trees as the
 weak learners.
 
+.. _`Gradient boosting`: https://en.wikipedia.org/wiki/Gradient_boosting
 .. _`ensembling technique`: https://en.wikipedia.org/wiki/Ensemble_learning
 .. _`line-search`: https://en.wikipedia.org/wiki/Line_search
 
+**Models**
+
+- :class:`~numpy_ml.trees.GradientBoostedDecisionTree`
+
 **References**
 
-.. [4]  Breiman, L. (1997). "Arcing the edge". *Technical Report 486.
+.. [6]  Breiman, L. (1997). "Arcing the edge". *Technical Report 486.
    Statistics Department, UC Berkeley*. 
-.. [5] Friedman, J. H. (1999). "Greedy function approximation: A gradient
+.. [7] Friedman, J. H. (1999). "Greedy function approximation: A gradient
    boosting machine". *IMS 1999 Reitz Lecture*.
-.. [6]  Mason, L., Baxter, J., Bartlett, P. L., Frean, M. (1999). "Boosting
+.. [8]  Mason, L., Baxter, J., Bartlett, P. L., Frean, M. (1999). "Boosting
    algorithms as gradient descent" *Advances in Neural Information Processing
-   Systems, 12*, 512–518.
+   Systems, 12*: 512–518.
 
 .. toctree::
    :maxdepth: 3
+   :hidden:
 
    numpy_ml.trees.dt
 
