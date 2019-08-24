@@ -23,3 +23,20 @@ table.field-list td {
         color: #fff !important;
     }
 }
+
+/* don't show table delimiters */
+table.docutils {
+    border: none !important;
+    -moz-box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    box-shadow: none !important;
+}
+
+table.docutils td, table.docutils th {
+    border: none;
+    padding: 0.0em 0.0em;
+}
+
+table.footnote td {
+    padding: 0.3em 0.5em;
+}
