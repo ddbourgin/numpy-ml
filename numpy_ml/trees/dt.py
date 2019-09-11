@@ -158,7 +158,7 @@ class DecisionTree:
         for i in feat_idxs:
             vals = X[:, i]
             levels = np.unique(vals)
-            thresholds = (levels[:-1] + levels[1:]) / 2
+            thresholds = (levels[:-1] + levels[1:]) / 2 if len(levels) > 1 else levels
             gains = np.array([self._impurity_gain(Y, t, vals) for t in thresholds])
 
             if gains.max() > best_gain:
