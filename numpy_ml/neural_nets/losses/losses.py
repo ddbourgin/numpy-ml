@@ -246,7 +246,7 @@ class VAELoss(ObjectiveBase):
 
         References
         ----------
-        .. [1] Kingma & Welling (2014). "Auto-encoding variational Bayes".
+        .. [1] Kingma, D. P. & Welling, M. (2014). "Auto-encoding variational Bayes".
            *arXiv preprint arXiv:1312.6114.* https://arxiv.org/pdf/1312.6114.pdf
         """
         super().__init__()
@@ -331,7 +331,7 @@ class VAELoss(ObjectiveBase):
 class WGAN_GPLoss(ObjectiveBase):
     def __init__(self, lambda_=10):
         """
-        The loss function for a Wasserstein GAN with gradient penalty.
+        The loss function for a Wasserstein GAN [*]_ [*]_ with gradient penalty.
 
         Notes
         -----
@@ -364,19 +364,20 @@ class WGAN_GPLoss(ObjectiveBase):
             \mathbf{z}  &\sim  \mathcal{N}(0, \mathbb{1}) \\\\
             \\alpha  &\sim  \\text{Uniform}(0, 1)
 
+        References
+        ----------
+        .. [*] Gulrajani, I., Ahmed, F., Arjovsky, M., Dumoulin, V., &
+           Courville, A. (2017) "Improved training of Wasserstein GANs"
+           *Advances in Neural Information Processing Systems, 31*: 5769-5779.
+        .. [*] Goodfellow, I. J, Abadie, P. A., Mirza, M., Xu, B., Farley, D.
+           W., Ozair, S., Courville, A., & Bengio, Y. (2014) "Generative
+           adversarial nets" *Advances in Neural Information Processing
+           Systems, 27*: 2672-2680.
+
         Parameters
         ----------
         lambda_ : float
             The gradient penalty coefficient. Default is 10.
-
-        References
-        ----------
-        .. [1] Gulrajani et al. (2017) "Improved training of Wasserstein GANs"
-           *Advances in Neural Information Processing Systems, 31*, 5769-5779.
-           https://arxiv.org/pdf/1704.00028.pdf
-        .. [2] Goodfellow et al. (2014) "Generative adversarial nets" *Advances in
-           Neural Information Processing Systems, 27*, 2672-2680.
-           https://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf
         """
         self.lambda_ = lambda_
         super().__init__()
@@ -424,11 +425,9 @@ class WGAN_GPLoss(ObjectiveBase):
             Whether to calculate the loss for the critic ('C') or the generator
             ('G'). If calculating loss for the critic, `Y_real` and
             `gradInterp` must not be None.
-        Y_real : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,)`, or
-        None
+        Y_real : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,)` or None
             The output of the critic for `X_real`. Default is None.
-        gradInterp : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,
-        n_feats)` or None
+        gradInterp : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_feats)` or None
             The gradient of the critic output for `X_interp` wrt. `X_interp`.
             Default is None.
 
@@ -468,11 +467,9 @@ class WGAN_GPLoss(ObjectiveBase):
             Whether to calculate the gradient for the critic loss ('C') or the
             generator loss ('G'). If calculating grads for the critic, `Y_real`
             and `gradInterp` must not be None.
-        Y_real : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,)`, or
-        None
+        Y_real : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,)` or None
             The output of the critic for `X_real`. Default is None.
-        gradInterp : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex,
-        n_feats)`, or None
+        gradInterp : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_feats)` or None
             The gradient of the critic output on `X_interp` wrt. `X_interp`.
             Default is None.
 
@@ -566,6 +563,14 @@ class NCELoss(ObjectiveBase):
         function, and :math:`Q(x)` corresponds to the probability of the values
         in `x` under `Q`.
 
+        References
+        ----------
+        .. [1] Gutmann, M. & Hyvarinen, A. (2010). Noise-contrastive
+           estimation: A new estimation principle for unnormalized statistical
+           models. *AISTATS, 13*: 297-304.
+        .. [2] Minh, A. & Teh, Y. W. (2012). A fast and simple algorithm for
+           training neural probabilistic language models. *ICML, 29*: 1751-1758.
+
         Parameters
         ----------
         n_classes : int
@@ -581,7 +586,7 @@ class NCELoss(ObjectiveBase):
         optimizer : str, :doc:`Optimizer <numpy_ml.neural_nets.optimizers>` object, or None
             The optimization strategy to use when performing gradient updates
             within the :meth:`update` method.  If None, use the :class:`SGD
-            <numpy_ml.neural_nets.optimizers.optimizers.SGD>` optimizer with
+            <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
         subtract_log_label_prob : bool
             Whether to subtract the log of the probability of each label under
@@ -598,13 +603,6 @@ class NCELoss(ObjectiveBase):
             The loss hyperparameter values.
         derived_variables: dict
             Useful intermediate values computed during the loss computation.
-
-        References
-        ----------
-        .. [1] Gutmann & Hyvarinen (2010). Noise-contrastive estimation: A new
-               estimation principle for unnormalized statistical models. *AISTATS 13*.
-        .. [2] Minh & Teh (2012). A fast and simple algorithm for training neural
-               probabilistic language models. *ICML 29*.
         """
         super().__init__()
 

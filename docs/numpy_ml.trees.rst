@@ -10,6 +10,18 @@ is associated with a decision rule, which dictates how to divide the data the
 node inherits from its parent among each of its children. Each leaf node is
 associated with at least one data point from the original training set.
 
+.. figure:: img/decision_tree.png
+    :width: 95%
+    :align: center
+
+    A binary decision tree trained on the dataset :math:`X = \{ \mathbf{x}_1,
+    \ldots, \mathbf{x}_{10} \}`. Each example in the dataset is a 5-dimensional
+    vector of real-valued features labeled :math:`x_1, \ldots, x_5`. Unshaded
+    circles correspond to internal decision nodes, while shaded circles
+    correspond to leaf nodes. Each leaf node is associated with a subset of the
+    examples in `X`, selected based on the decision rules along the path from
+    root to leaf.
+
 At test time, new examples travel from the tree root to one of the leaves,
 their path through the tree determined by the decision rules at each of the
 nodes it visits. When a test example arrives at a leaf node, the targets for
