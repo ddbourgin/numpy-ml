@@ -3817,8 +3817,8 @@ class LSTMCell(LayerBase):
 
         # compute the input to the gate functions at timestep t
         _Go = Zt @ Wo + bo
-        _Gf = Zt @ Wf + bo
-        _Gu = Zt @ Wu + bo
+        _Gf = Zt @ Wf + bf
+        _Gu = Zt @ Wu + bu
         _Gc = Zt @ Wc + bc
 
         # compute gradients wrt the *input* to each gate
