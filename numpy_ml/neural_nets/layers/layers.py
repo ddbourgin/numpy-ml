@@ -1842,10 +1842,10 @@ class Embedding(LayerBase):
         if self.pool is None:
             for ix, v_id in enumerate(X.flatten()):
                 dW[v_id] += dLdy[ix]
-        elif self.pool is "sum":
+        elif self.pool == "sum":
             for ix, v_ids in enumerate(X):
                 dW[v_ids] += dLdy[ix]
-        elif self.pool is "mean":
+        elif self.pool == "mean":
             for ix, v_ids in enumerate(X):
                 dW[v_ids] += dLdy[ix] / len(v_ids)
         return dW
