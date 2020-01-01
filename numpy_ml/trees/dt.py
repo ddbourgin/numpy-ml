@@ -119,7 +119,7 @@ class DecisionTree:
         assert self.classifier, "`predict_class_probs` undefined for classifier = False"
         return np.array([self._traverse(x, self.root, prob=True) for x in X])
 
-    def _grow(self, X, Y):
+    def _grow(self, X, Y, cur_depth=0):
         # if all labels are the same, return a leaf
         if len(set(Y)) == 1:
             if self.classifier:
@@ -128,14 +128,16 @@ class DecisionTree:
             return Leaf(prob) if self.classifier else Leaf(Y[0])
 
         # if we have reached max_depth, return a leaf
-        if self.depth >= self.max_depth:
+        if cur_depth >= self.max_depth:
             v = np.mean(Y, axis=0)
             if self.classifier:
                 v = np.bincount(Y, minlength=self.n_classes) / len(Y)
             return Leaf(v)
 
+        cur_depth += 1
+        self.depth = max(self.depth, cur_depth)
+
         N, M = X.shape
-        self.depth += 1
         feat_idxs = np.random.choice(M, self.n_feats, replace=False)
 
         # greedily select the best split according to `criterion`
@@ -144,8 +146,8 @@ class DecisionTree:
         r = np.argwhere(X[:, feat] > thresh).flatten()
 
         # grow the children that result from the split
-        left = self._grow(X[l, :], Y[l])
-        right = self._grow(X[r, :], Y[r])
+        left = self._grow(X[l, :], Y[l], cur_depth)
+        right = self._grow(X[r, :], Y[r], cur_depth)
         return Node(left, right, (feat, thresh))
 
     def _segment(self, X, Y, feat_idxs):
