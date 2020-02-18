@@ -7,8 +7,8 @@ The purpose of the project is to provide reference implementations of common
 machine learning components for rapid prototyping and experimentation. With
 that in mind, don't just read the docs -- read the source!
 
-.. _numpy-ml: http://www.github.com/ddbourgin/numpy-ml
-.. _NumPy: http://numpy.scipy.org/
+.. _numpy-ml: https://www.github.com/ddbourgin/numpy-ml
+.. _NumPy: https://numpy.org/
 .. _standard library: https://docs.python.org/3/library/
 
 .. topic:: This documentation is under development!
