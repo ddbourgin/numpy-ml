@@ -20,8 +20,11 @@ class Edge(object):
             The id of the vertex the edge goes from
         to: int
             The id of the vertex the edge goes to
-        w: float, callable, or None
-            The edge weight, if applicable. Default is None.
+        w: float, :class:`Object` instance, or None
+            The edge weight, if applicable. If weight is an arbitrary Object it
+            must have a method called 'sample' which takes no arguments and
+            returns a random sample from the weight distribution. If `w` is
+            None, no weight is assumed. Default is None.
         """
         self.fr = fr
         self.to = to
@@ -32,7 +35,7 @@ class Edge(object):
 
     @property
     def weight(self):
-        return self._w() if callable(self._w) else self._w
+        return self._w.sample() if hasattr(self._w, "sample") else self._w
 
     def reverse(self):
         """Reverse the edge direction"""
@@ -145,7 +148,7 @@ class Graph(ABC):
         -------
         complete_paths : list of lists
             A list of all paths from `s_i` to `e_i`. Each path is represented
-            as a list of vertices.
+            as a list of interal vertex indices.
         """
         complete_paths = []
         queue = [(s_i, [s_i])]
