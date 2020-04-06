@@ -13,18 +13,18 @@ Policies
 .. autoclass:: numpy_ml.bandits.policies.EpsilonGreedy
     :members:
     :undoc-members:
-    :inherited-members:
+    :show-inheritance:
 
 ``UCB1``
 --------
 .. autoclass:: numpy_ml.bandits.policies.UCB1
     :members:
     :undoc-members:
-    :inherited-members:
+    :show-inheritance:
 
 ``ThompsonSamplingBetaBinomial``
 --------------------------------
 .. autoclass:: numpy_ml.bandits.policies.ThompsonSamplingBetaBinomial
     :members:
     :undoc-members:
-    :inherited-members:
+    :show-inheritance:

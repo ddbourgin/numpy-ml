@@ -32,6 +32,8 @@ that in mind, don't just read the docs -- read the source!
 
    numpy_ml.ngram
 
+   numpy_ml.bandits
+
    numpy_ml.rl_models
 
    numpy_ml.nonparametric

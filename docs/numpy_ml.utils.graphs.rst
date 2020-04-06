@@ -20,14 +20,14 @@ Graphs
 .. autoclass:: numpy_ml.utils.graphs.DiGraph
     :members:
     :undoc-members:
-    :inherited-members:
+    :show-inheritance:
 
 ``UndirectedGraph``
 -------------------
 .. autoclass:: numpy_ml.utils.graphs.UndirectedGraph
     :members:
     :undoc-members:
-    :inherited-members:
+    :show-inheritance:
 
 ``random_unweighted_graph``
 ---------------------------
