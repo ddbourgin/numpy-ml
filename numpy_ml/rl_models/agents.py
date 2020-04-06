@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from ._utils import EnvModel, env_stats, tile_state_space
+from .rl_utils import EnvModel, env_stats, tile_state_space
 from ..utils.data_structures import Dict
 
 

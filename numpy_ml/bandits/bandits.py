@@ -40,6 +40,7 @@ class Bandit(ABC):
         return self._pull(arm_id)
 
     def reset(self):
+        """Reset the bandit step and action counters to zero."""
         self.step = 0
         self.pull_counts = {i: 0 for i in range(self.n_arms)}
 
@@ -47,12 +48,13 @@ class Bandit(ABC):
     def _pull(self, arm_id):
         pass
 
-    @abstractmethod
+    @property
     def hyperparameters(self):
+        """A dictionary of the bandit hyperparameters"""
         return {}
 
 
-class MultiArmedBanditMultinomialPayoff(Bandit):
+class MABMultinomialPayoff(Bandit):
     def __init__(self, payoffs, payoff_probs):
         """
         A multi-armed bandit where each arm is associated with a different
@@ -61,12 +63,12 @@ class MultiArmedBanditMultinomialPayoff(Bandit):
         Parameters
         ----------
         payoffs : ragged list of length `n`
-            The payoff values for each of the `n` bandits. `payoffs[k][i]`
-            holds the `i`th payoff value for arm `k`.
+            The payoff values for each of the `n` bandits. ``payoffs[k][i]``
+            holds the `i` th payoff value for arm `k`.
         payoff_probs : ragged list of length `n`
             A list of the probabilities associated with each of the payoff
-            values in `payoffs`. `payoff_probs[k][i]` holds the probability of
-            payoff index `i` for arm `k`.
+            values in ``payoffs``. ``payoff_probs[k][i]`` holds the probability
+            of payoff index `i` for arm `k`.
         """
         super().__init__(payoffs, payoff_probs)
 
@@ -83,13 +85,13 @@ class MultiArmedBanditMultinomialPayoff(Bandit):
         self.best_ev = np.max(self.arm_evs)
 
     def __repr__(self):
-        fstr = "MultiArmedBanditMultinomialPayoff(payoffs={}, payoff_probs={})"
+        fstr = "MABMultinomialPayoff(payoffs={}, payoff_probs={})"
         return fstr.format(self.payoffs, self.payoff_probs)
 
     @property
     def hyperparameters(self):
         return {
-            "id": "MultiArmedBanditMultinomialPayoff",
+            "id": "MABMultinomialPayoff",
             "payoffs": self.payoffs,
             "payoff_probs": self.payoff_probs,
         }
@@ -100,8 +102,18 @@ class MultiArmedBanditMultinomialPayoff(Bandit):
         return np.random.choice(payoffs, p=probs)
 
 
-class MultiArmedBanditBernoulliPayoff(Bandit):
+class MABBernoulliPayoff(Bandit):
     def __init__(self, payoff_probs):
+        """
+        A multi-armed bandit where each arm is associated with an independent
+        Bernoulli payoff distribution.
+
+        Parameters
+        ----------
+        payoff_probs : list of length `n`
+            A list of the payoff probability for each arm. ``payoff_probs[k]``
+            holds the probability of payoff for arm `k`.
+        """
         payoffs = [1] * len(payoff_probs)
         super().__init__(payoffs, payoff_probs)
 
@@ -117,7 +129,7 @@ class MultiArmedBanditBernoulliPayoff(Bandit):
     @property
     def hyperparameters(self):
         return {
-            "id": "MultiArmedBanditBernoulliPayoff",
+            "id": "MABBernoulliPayoff",
             "payoff_probs": self.payoff_probs,
         }
 
@@ -125,11 +137,11 @@ class MultiArmedBanditBernoulliPayoff(Bandit):
         return int(np.random.rand() <= self.payoff_probs[arm_id])
 
 
-class MultiArmedBanditGaussianPayoff(Bandit):
+class MABGaussianPayoff(Bandit):
     def __init__(self, payoff_dists, payoff_probs):
         """
         A multi-armed bandit that is similar to
-        :class:`MultiArmedBanditBernoulliPayoff`, but instead of each arm having
+        :class:`MABBernoulliPayoff`, but instead of each arm having
         a fixed payout of 1, the payoff values are sampled from independent
         Gaussian RVs.
 
@@ -137,11 +149,11 @@ class MultiArmedBanditGaussianPayoff(Bandit):
         ----------
         payoff_dists : list 2-tuples of length `n`
             The parameters the distributions over payoff values for each of the
-            `n` arms. Specifically, `payoffs[k]` is a tuple of (mean, variance)
+            `n` arms. Specifically, ``payoffs[k]`` is a tuple of (mean, variance)
             for the Gaussian distribution over payoffs associated with arm `k`.
         payoff_probs : list of length `n`
             A list of the probabilities associated with each of the payoff
-            values in `payoffs`. `payoff_probs[k]` holds the probability of
+            values in ``payoffs``. ``payoff_probs[k]`` holds the probability of
             payoff for arm `k`.
         """
         super().__init__(payoff_dists, payoff_probs)
@@ -158,7 +170,7 @@ class MultiArmedBanditGaussianPayoff(Bandit):
     @property
     def hyperparameters(self):
         return {
-            "id": "MultiArmedBanditGaussianPayoff",
+            "id": "MABGaussianPayoff",
             "payoff_dists": self.payoff_dists,
             "payoff_probs": self.payoff_probs,
         }
@@ -173,7 +185,7 @@ class MultiArmedBanditGaussianPayoff(Bandit):
         return reward
 
 
-class ShortestPathBandit(Bandit):
+class MABShortestPath(Bandit):
     def __init__(self, G, start_vertex, end_vertex):
         """
         A weighted graph shortest path problem formulated as a multi-armed
@@ -187,7 +199,7 @@ class ShortestPathBandit(Bandit):
 
         Parameters
         ----------
-        G : :doc:`Graph <numpy_ml.utils.graphs.Graph>` instance
+        G : :class:`Graph <numpy_ml.utils.graphs.Graph>` instance
             A weighted graph object. Weights can be fixed or probabilistic.
         start_vertex : int
             The index of the path's start vertex in the graph
@@ -218,7 +230,7 @@ class ShortestPathBandit(Bandit):
     @property
     def hyperparameters(self):
         return {
-            "id": "ShortestPathBandit",
+            "id": "MABShortestPath",
             "G": self.G,
             "end_vertex": self.end_vertex,
             "start_vertex": self.start_vertex,

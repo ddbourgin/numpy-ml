@@ -3,9 +3,9 @@ from collections import namedtuple
 import numpy as np
 
 from .bandits import (
-    MultiArmedBanditMultinomialPayoff,
-    MultiArmedBanditBernoulliPayoff,
-    ShortestPathBandit,
+    MABMultinomialPayoff,
+    MABBernoulliPayoff,
+    MABShortestPath,
 )
 from .trainer import MABTrainer
 from .policies import EpsilonGreedy, UCB1, ThompsonSamplingBetaBinomial
@@ -24,13 +24,13 @@ def random_multinomial_mab(n_arms=10, n_choices_per_arm=5, reward_range=[0, 1]):
         payoffs.append(list(r))
         payoff_probs.append(list(p))
 
-    return MultiArmedBanditMultinomialPayoff(payoffs, payoff_probs)
+    return MABMultinomialPayoff(payoffs, payoff_probs)
 
 
 def random_bernoulli_mab(n_arms=10):
     p = np.random.uniform(size=n_arms)
     payoff_probs = p / p.sum()
-    return MultiArmedBanditBernoulliPayoff(payoff_probs)
+    return MABBernoulliPayoff(payoff_probs)
 
 
 def plot_epsilon_greedy_multinomial_payoff():
@@ -107,6 +107,6 @@ def plot_ucb1_gaussian_shortest_path():
         V[idx], V[-1] = V[-1], V[idx]
 
     print("Starting bandit")
-    mab = ShortestPathBandit(G, V[0], V[-1])
+    mab = MABShortestPath(G, V[0], V[-1])
     policy = UCB1(C=1, ev_prior=0.5)
     policy = MABTrainer().train(policy, mab, ep_length, n_episodes, n_duplicates)

@@ -171,9 +171,17 @@ class Graph(ABC):
 
 
 class DiGraph(Graph):
-    """ Directed graph """
-
     def __init__(self, V, E):
+        """
+        A generic directed graph object.
+
+        Parameters
+        ----------
+        V : list
+            A list of vertex IDs.
+        E : list of :class:`Edge <numpy_ml.utils.graphs.Edge>` objects
+            A list of directed edges connecting pairs of vertices in ``V``.
+        """
         super().__init__(V, E)
         self.is_directed = True
         self._topological_ordering = []
@@ -202,22 +210,22 @@ class DiGraph(Graph):
         the nodes in `G` by their DFS "last visit time," from greatest to
         smallest.
 
-        This implementation follows a recursive, DFS-based approach [*]_ which
+        This implementation follows a recursive, DFS-based approach [1]_ which
         may break if the graph is very large. For an iterative version, see
-        Khan's algorithm [**]_ .
+        Khan's algorithm [2]_ .
+
+        References
+        ----------
+        .. [1] Tarjan, R. (1976), Edge-disjoint spanning trees and depth-first
+           search, *Acta Informatica, 6 (2)*: 171–185.
+        .. [2] Kahn, A. (1962), Topological sorting of large networks,
+           *Communications of the ACM, 5 (11)*: 558–562.
 
         Returns
         -------
         ordering : list or None
-            A topoligical ordering of the vertex indices if the graph is a DAG.
-            If the graph contains cycles, this ordering will be None.
-
-        References
-        ----------
-        .. [*] Tarjan, R. (1976), Edge-disjoint spanning trees and depth-first
-           search, *Acta Informatica, 6 (2)*: 171–185.
-        .. [**] Kahn, A. (1962), Topological sorting of large networks,
-           *Communications of the ACM, 5 (11)*: 558–562.
+            A topoligical ordering of the vertex indices if the graph is a DAG,
+            otherwise None.
         """
         ordering = []
         visited = set()
@@ -256,9 +264,21 @@ class DiGraph(Graph):
 
 
 class UndirectedGraph(Graph):
-    """ Undirected graph """
-
     def __init__(self, V, E):
+        """
+        A generic undirected graph object.
+
+        Parameters
+        ----------
+        V : list
+            A list of vertex IDs.
+        E : list of :class:`Edge <numpy_ml.utils.graphs.Edge>` objects
+            A list of edges connecting pairs of vertices in ``V``. For any edge
+            connecting vertex `u` to vertex `v`, :class:`UndirectedGraph
+            <numpy_ml.utils.graphs.UndirectedGraph>` will assume that there
+            exists a corresponding edge connecting `v` to `u`, even if this is
+            not present in `E`.
+        """
         super().__init__(V, E)
         self.is_directed = False
 
@@ -283,6 +303,10 @@ def random_unweighted_graph(n_vertices, edge_prob=0.5, directed=False):
     """
     Generate an unweighted Erdős-Rényi random graph [*]_.
 
+    References
+    ----------
+    .. [*] Erdős, P. and Rényi, A. (1959). On Random Graphs, *Publ. Math. 6*, 290.
+
     Parameters
     ----------
     n_vertices : int
@@ -297,10 +321,6 @@ def random_unweighted_graph(n_vertices, edge_prob=0.5, directed=False):
     -------
     G : :class:`Graph` instance
         The resulting random graph.
-
-    References
-    ----------
-    .. [*] Erdős, P. and Rényi, A. (1959). On Random Graphs, Publ. Math. 6, 290.
     """
     vertices = list(range(n_vertices))
     candidates = permutations(vertices, 2) if directed else combinations(vertices, 2)

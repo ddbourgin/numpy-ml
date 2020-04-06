@@ -62,7 +62,7 @@ class MABTrainer:
         self,
         policy,
         bandit,
-        horizon,
+        ep_length,
         n_episodes,
         n_duplicates,
         plot=True,
@@ -74,11 +74,11 @@ class MABTrainer:
 
         Parameters
         ----------
-        policy : :class:`PolicyBase` instance
-            The MAB policy to train.
-        bandit : :class:`Bandit` instance
+        policy : :class:`BanditPolicyBase <numpy_ml.bandits.policies.BanditPolicyBase>` instance
+            The multi-armed bandit policy to train.
+        bandit : :class:`Bandit <numpy_ml.bandits.bandits.Bandit>` instance
             The environment to run the agent on.
-        horizon : int
+        ep_length : int
             The number of pulls allowed in each episode
         n_episodes : int
             The number of episodes per run
@@ -93,7 +93,7 @@ class MABTrainer:
 
         Returns
         -------
-        policy : :class:`PolicyBase` instance
+        policy : :class:`BanditPolicyBase <numpy_ml.bandits.policies.BanditPolicyBase>` instance
             The policy trained during the last (i.e. most recent) duplicate
             run.
         """
@@ -109,12 +109,12 @@ class MABTrainer:
             for e_id in range(n_episodes):
                 ep_reward = 0
 
-                for s in range(horizon):
+                for s in range(ep_length):
                     rwd, arm = policy.act(bandit)
                     ep_reward += rwd
 
                 loss = mse(bandit, policy)
-                regret = (bandit.best_ev * horizon) - ep_reward
+                regret = (bandit.best_ev * ep_length) - ep_reward
                 cregret += regret
 
                 L["mse"][e_id + 1].append(loss)
@@ -129,7 +129,7 @@ class MABTrainer:
             self._print_run_summary(bandit, policy, regret)
 
         if plot:
-            self._plot_reward(bandit.best_ev * horizon, policy)
+            self._plot_reward(bandit.best_ev * ep_length, policy)
 
         return policy
 
