@@ -20,10 +20,12 @@ class BanditPolicyBase(ABC):
 
     @property
     def hyperparameters(self):
+        """A dictionary containing the policy hyperparameters"""
         return {}
 
     @property
     def parameters(self):
+        """A dictionary containing the current policy parameters"""
         return {}
 
     def act(self, bandit):
@@ -32,15 +34,15 @@ class BanditPolicyBase(ABC):
 
         Parameters
         ----------
-        bandit : :class:`bandit.Bandit` instance
-            The multi-arm bandit to act upon
+        bandit : :class:`Bandit <numpy_ml.bandits.bandits.Bandit>` instance
+            The multi-armed bandit to act upon
 
         Returns
         -------
         rwd : float
-            The reward received after pulling `arm_id`
+            The reward received after pulling ``arm_id``.
         arm_id : int
-            The arm that was pulled to generate `rwd`
+            The arm that was pulled to generate ``rwd``.
         """
         if not self.is_initialized:
             self.pull_counts = {i: 0 for i in range(bandit.n_arms)}
@@ -147,15 +149,15 @@ class UCB1(BanditPolicyBase):
 
         .. math::
 
-            UCB(a, t) = EV_t(a) + C \sqrt{\\frac{2 \log t}{N_t(a)}}
+            \\text{UCB}(a, t) = \\text{EV}_t(a) + C \sqrt{\\frac{2 \log t}{N_t(a)}}
 
-        where `UCB(a, t)` is the upper confidence bound on the expected value
-        of arm `a` at time `t`, :math:`EV_t(a)` is the average of the rewards
-        recieved so far from pulling arm `a`, `C` is a parameter controlling
-        the confidence upper bound of the estimate for `UCB(a, t)` (for
-        logarithmic regret bounds, `C` must equal 1), and `N_t(a)` is the
-        number of times arm `a` has been pulled during the previous `t - 1`
-        timesteps.
+        where :math:`\\text{UCB}(a, t)` is the upper confidence bound on the
+        expected value of arm `a` at time `t`, :math:`\\text{EV}_t(a)` is the
+        average of the rewards recieved so far from pulling arm `a`, `C` is a
+        parameter controlling the confidence upper bound of the estimate for
+        :math:`\\text{UCB}(a, t)` (for logarithmic regret bounds, `C` must
+        equal 1), and :math:`N_t(a)` is the number of times arm `a` has been
+        pulled during the previous `t - 1` timesteps.
 
         References
         ----------
@@ -209,25 +211,34 @@ class UCB1(BanditPolicyBase):
 class ThompsonSamplingBetaBinomial(BanditPolicyBase):
     def __init__(self, alpha=1, beta=1):
         """
-        A conjugate Thompson sampling policy for multi-arm bandits with
+        A conjugate Thompson sampling [1]_ [2]_ policy for multi-arm bandits with
         Bernoulli likelihoods.
 
         Notes
         -----
         The policy assumes independent Beta priors on the arm payoff
-        probabilities, :math:`theta`:
+        probabilities, :math:`\\theta`:
 
-        ..math::
+        .. math::
 
             \\theta_k \sim \\text{Beta}(\\alpha_k, \\beta_k)
 
-        where :math:`k \in 1,\ldots,K` indexes arms in the MAB and
+        where :math:`k \in \{1,\ldots,K \}` indexes arms in the MAB and
         :math:`\\theta_k` is the parameter of the Bernoulli likelihood
         for arm `k`. The sampler proceeds by selecting actions in proportion to
         the posterior probability that they are optimal. Thanks to the
         conjugacy between the Beta prior and Bernoulli likelihood the posterior
         for each arm is also Beta-distributed and can be sampled from
         efficiently.
+
+        References
+        ----------
+        .. [1] Thompson, W. (1933). On the likelihood that one unknown
+           probability exceeds another in view of the evidence of two samples.
+           *Biometrika, 25(3/4)*, 285-294.
+        .. [2] Chapelle, O., & Li, L. (2011). An empirical evaluation of
+           Thompson sampling. *Advances in Neural Information Processing
+           Systems, 24*, 2249-2257.
 
         Parameters
         ----------
@@ -261,7 +272,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
 
     def _initialize_params(self, bandit):
         bhp = bandit.hyperparameters
-        assert bhp["id"] == "MultiArmedBanditBernoulliPayoff"
+        assert bhp["id"] == "MABBernoulliPayoff"
 
         # initialize the model prior
         if isinstance(self.alpha, numbers.Number):
