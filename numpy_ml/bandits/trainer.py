@@ -53,9 +53,9 @@ def smooth(prev, cur, weight):
     return weight * prev + (1 - weight) * cur
 
 
-class Trainer:
+class MABTrainer:
     """
-    An object to facilitate multi-arm bandit training and evaluation.
+    An object to facilitate multi-armed bandit training and evaluation.
     """
 
     def train(

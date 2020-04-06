@@ -261,7 +261,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
 
     def _initialize_params(self, bandit):
         bhp = bandit.hyperparameters
-        assert bhp["id"] == "MultiArmBanditBernoulliPayoff"
+        assert bhp["id"] == "MultiArmedBanditBernoulliPayoff"
 
         # initialize the model prior
         if isinstance(self.alpha, numbers.Number):

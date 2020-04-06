@@ -2,12 +2,12 @@ from collections import namedtuple
 
 import numpy as np
 
-from .bandit import (
-    MultiArmBanditMultinomialPayoff,
-    MultiArmBanditBernoulliPayoff,
+from .bandits import (
+    MultiArmedBanditMultinomialPayoff,
+    MultiArmedBanditBernoulliPayoff,
     ShortestPathBandit,
 )
-from .trainer import Trainer
+from .trainer import MABTrainer
 from .policies import EpsilonGreedy, UCB1, ThompsonSamplingBetaBinomial
 from ..utils.graphs import random_DAG, DiGraph, Edge
 
@@ -24,13 +24,13 @@ def random_multinomial_mab(n_arms=10, n_choices_per_arm=5, reward_range=[0, 1]):
         payoffs.append(list(r))
         payoff_probs.append(list(p))
 
-    return MultiArmBanditMultinomialPayoff(payoffs, payoff_probs)
+    return MultiArmedBanditMultinomialPayoff(payoffs, payoff_probs)
 
 
 def random_bernoulli_mab(n_arms=10):
     p = np.random.uniform(size=n_arms)
     payoff_probs = p / p.sum()
-    return MultiArmBanditBernoulliPayoff(payoff_probs)
+    return MultiArmedBanditBernoulliPayoff(payoff_probs)
 
 
 def plot_epsilon_greedy_multinomial_payoff():
@@ -45,7 +45,7 @@ def plot_epsilon_greedy_multinomial_payoff():
 
     mab = random_multinomial_mab(N, K, rrange)
     policy = EpsilonGreedy(epsilon=0.05, ev_prior=rrange[1] / 2)
-    policy = Trainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
+    policy = MABTrainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
 
 
 def plot_ucb1_multinomial_payoff():
@@ -61,7 +61,7 @@ def plot_ucb1_multinomial_payoff():
 
     mab = random_multinomial_mab(N, K, rrange)
     policy = UCB1(C=C, ev_prior=rrange[1] / 2)
-    policy = Trainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
+    policy = MABTrainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
 
 
 def plot_thompson_sampling_beta_binomial_payoff():
@@ -74,7 +74,7 @@ def plot_thompson_sampling_beta_binomial_payoff():
 
     mab = random_bernoulli_mab(N)
     policy = ThompsonSamplingBetaBinomial(alpha=1, beta=1)
-    policy = Trainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
+    policy = MABTrainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
 
 
 def plot_ucb1_gaussian_shortest_path():
@@ -109,4 +109,4 @@ def plot_ucb1_gaussian_shortest_path():
     print("Starting bandit")
     mab = ShortestPathBandit(G, V[0], V[-1])
     policy = UCB1(C=1, ev_prior=0.5)
-    policy = Trainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
+    policy = MABTrainer().train(policy, mab, ep_length, n_episodes, n_duplicates)
