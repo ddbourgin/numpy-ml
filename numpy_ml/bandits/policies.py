@@ -6,7 +6,7 @@ import numpy as np
 
 class BanditPolicyBase(ABC):
     def __init__(self):
-        """A simple base class for multi-arm bandit policies"""
+        """A simple base class for multi-armed bandit policies"""
         self.step = 0
         self.pull_counts = {}
         self.ev_estimates = {}
@@ -83,23 +83,39 @@ class BanditPolicyBase(ABC):
 
 
 class EpsilonGreedy(BanditPolicyBase):
-    def __init__(self, epsilon=0.05, ev_prior=99):
+    def __init__(self, epsilon=0.05, ev_prior=0.5):
         """
-        An epsilon-greedy policy for multi-arm bandit problems.
+        An epsilon-greedy policy for multi-armed bandit problems.
 
         Notes
         -----
         Epsilon-greedy policies greedily select the arm with the highest
         expected payoff with probability :math:`1-\epsilon`, and selects an arm
-        uniformly at random with probability :math:`\epsilon`.
+        uniformly at random with probability :math:`\epsilon`:
+
+        .. math::
+
+            P(a) = \left\{
+                 \\begin{array}{lr}
+                   \epsilon / N + (1 - \epsilon) &\\text{if }a = \\arg \max_{a' \in \mathcal{A}} \mathbb{E}_{q_{\hat{\\theta}}}[r \mid a']\\\\
+                   \epsilon / N &\\text{otherwise}
+                 \end{array}
+               \\right.
+
+        where :math:`N = |\mathcal{A}|` is the number of arms,
+        :math:`q_{\hat{\\theta}}` is the estimate of the arm payoff
+        distribution under current model parameters :math:`\hat{\\theta}`, and
+        :math:`\mathbb{E}_{q_{\hat{\\theta}}}[r \mid a']` is the expected
+        reward under :math:`q_{\hat{\\theta}}` of receiving reward `r` after
+        taking action :math:`a'`.
 
         Parameters
         ----------
         epsilon : float in [0, 1]
             The probability of taking a random action. Default is 0.05.
         ev_prior : float
-            The starting expected value for each arm before any data has been
-            observed. Default is 99.
+            The starting expected payoff for each arm before any data has been
+            observed. Default is 0.5.
         """
         super().__init__()
         self.epsilon = epsilon
@@ -136,11 +152,11 @@ class EpsilonGreedy(BanditPolicyBase):
 class UCB1(BanditPolicyBase):
     def __init__(self, C=1, ev_prior=0.5):
         """
-        A UCB1 policy [*]_ for multi-arm bandit problems.
+        A UCB1 policy for multi-armed bandit problems.
 
         Notes
         -----
-        The UCB1 algorithm guarantees the cumulative regret is bounded by log
+        The UCB1 algorithm [*]_ guarantees the cumulative regret is bounded by log
         `t`, where `t` is the current timestep. To make this guarantee UCB1
         assumes all arm payoffs are between 0 and 1.
 
@@ -211,25 +227,37 @@ class UCB1(BanditPolicyBase):
 class ThompsonSamplingBetaBinomial(BanditPolicyBase):
     def __init__(self, alpha=1, beta=1):
         """
-        A conjugate Thompson sampling [1]_ [2]_ policy for multi-arm bandits with
+        A conjugate Thompson sampling [1]_ [2]_ policy for multi-armed bandits with
         Bernoulli likelihoods.
 
         Notes
         -----
-        The policy assumes independent Beta priors on the arm payoff
+        The policy assumes independent Beta priors on the Bernoulli arm payoff
         probabilities, :math:`\\theta`:
 
         .. math::
 
-            \\theta_k \sim \\text{Beta}(\\alpha_k, \\beta_k)
+            \\theta_k \sim \\text{Beta}(\\alpha_k, \\beta_k) \\\\
+            r \mid \\theta_k \sim \\text{Bernoulli}(\\theta_k)
 
         where :math:`k \in \{1,\ldots,K \}` indexes arms in the MAB and
-        :math:`\\theta_k` is the parameter of the Bernoulli likelihood
-        for arm `k`. The sampler proceeds by selecting actions in proportion to
-        the posterior probability that they are optimal. Thanks to the
-        conjugacy between the Beta prior and Bernoulli likelihood the posterior
-        for each arm is also Beta-distributed and can be sampled from
-        efficiently.
+        :math:`\\theta_k` is the parameter of the Bernoulli likelihood for arm
+        `k`. The sampler begins by selecting an arm with probability
+        proportional to it's payoff probability under the initial Beta prior.
+        After pulling the sampled arm and receiving a reward, `r`, the sampler
+        computes the posterior over the model parameters (arm payoffs) via
+        Bayes' rule, and then samples a new action in proportion to it's payoff
+        probability under this posterior. This process (i.e., sample action
+        from posterior, take action and receive reward, compute updated
+        posterior) is repeated until the number of trials is exhausted.
+
+        Note that due to the conjugacy between the Beta prior and Bernoulli
+        likelihood the posterior for each arm will also be Beta-distributed and
+        can computed and sampled from efficiently:
+
+        .. math::
+
+            \\theta_k \mid r \sim \\text{Beta}(\\alpha_k + r, \\beta_k + 1 - r)
 
         References
         ----------

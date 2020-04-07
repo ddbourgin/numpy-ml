@@ -147,7 +147,7 @@ class MABGaussianPayoff(Bandit):
 
         Parameters
         ----------
-        payoff_dists : list 2-tuples of length `n`
+        payoff_dists : list of 2-tuples of length `n`
             The parameters the distributions over payoff values for each of the
             `n` arms. Specifically, ``payoffs[k]`` is a tuple of (mean, variance)
             for the Gaussian distribution over payoffs associated with arm `k`.

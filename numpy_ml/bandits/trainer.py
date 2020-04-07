@@ -77,7 +77,7 @@ class MABTrainer:
         policy : :class:`BanditPolicyBase <numpy_ml.bandits.policies.BanditPolicyBase>` instance
             The multi-armed bandit policy to train.
         bandit : :class:`Bandit <numpy_ml.bandits.bandits.Bandit>` instance
-            The environment to run the agent on.
+            The environment to run the policy on.
         ep_length : int
             The number of pulls allowed in each episode
         n_episodes : int
