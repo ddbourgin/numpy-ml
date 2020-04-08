@@ -20,6 +20,14 @@ power other ML algorithms across the repo.
     - Minkowski-p distance
     - Hamming distance
 
+- `graphs.py` implements simple data structures and algorithms for graph
+  processing.
+    - Undirected + directed graph objects allowing for probabilistic edge weights
+    - Graph generators (Erdos-Renyi, random DAGs)
+    - Topological sorting for DAGs
+    - Cycle detection
+    - Simple path-finding
+
 - `windows.py` implements several common windowing functions
     - Hann
     - Hamming

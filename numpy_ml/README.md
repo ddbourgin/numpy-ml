@@ -101,6 +101,12 @@ This repo includes code for the following models:
     - Additive/Lidstone smoothing
     - Simple Good-Turing smoothing
 
+8. **Multi-armed bandit models**
+    - UCB1 
+    - Epsilon-greedy
+    - Thompson sampling w/ conjugate priors
+        - Beta-Bernoulli sampler
+
 8. **Reinforcement learning models**
     - Cross-entropy method agent
     - First visit on-policy Monte Carlo agent
@@ -126,7 +132,7 @@ This repo includes code for the following models:
     - Feature standardization
     - One-hot encoding / decoding
     - Huffman coding / decoding
-    - Term frequency-inverse document frequency encoding
+    - Term frequency-inverse document frequency (TF-IDF) encoding
     - MFCC encoding
 
 11. **Utilities**
@@ -135,3 +141,4 @@ This repo includes code for the following models:
     - Priority queue
     - Ball tree 
     - Discrete sampler
+    - Graph processing and generators

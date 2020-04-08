@@ -1,6 +1,7 @@
 import numpy as np
 
 import scipy
+import networkx as nx
 
 from sklearn.neighbors import BallTree as sk_BallTree
 from sklearn.metrics.pairwise import rbf_kernel as sk_rbf
@@ -11,6 +12,7 @@ from sklearn.metrics.pairwise import polynomial_kernel as sk_poly
 from .distance_metrics import euclidean
 from .kernels import LinearKernel, PolynomialKernel, RBFKernel
 from .data_structures import BallTree
+from .graphs import DiGraph, UndirectedGraph, Edge, random_unweighted_graph, random_DAG
 
 #######################################################################
 #                               Kernels                               #
@@ -18,6 +20,8 @@ from .data_structures import BallTree
 
 
 def test_linear_kernel():
+    np.random.seed(12345)
+
     while True:
         N = np.random.randint(1, 100)
         M = np.random.randint(1, 100)
@@ -34,6 +38,8 @@ def test_linear_kernel():
 
 
 def test_polynomial_kernel():
+    np.random.seed(12345)
+
     while True:
         N = np.random.randint(1, 100)
         M = np.random.randint(1, 100)
@@ -53,6 +59,8 @@ def test_polynomial_kernel():
 
 
 def test_radial_basis_kernel():
+    np.random.seed(12345)
+
     while True:
         N = np.random.randint(1, 100)
         M = np.random.randint(1, 100)
@@ -79,6 +87,8 @@ def test_radial_basis_kernel():
 
 
 def test_euclidean():
+    np.random.seed(12345)
+
     while True:
         N = np.random.randint(1, 100)
         x = np.random.rand(N)
@@ -95,6 +105,8 @@ def test_euclidean():
 
 
 def test_ball_tree():
+    np.random.seed(12345)
+
     while True:
         N = np.random.randint(2, 100)
         M = np.random.randint(2, 100)
@@ -127,4 +139,120 @@ def test_ball_tree():
             np.testing.assert_almost_equal(mine_neighb[i], theirs_neighb[i])
             np.testing.assert_almost_equal(mine_dist[i], theirs_dist[i])
 
+        print("PASSED")
+
+
+#######################################################################
+#                               Graphs                                #
+#######################################################################
+
+
+def from_networkx(G_nx):
+    """ Convert a networkx graph to my graph representation"""
+    V = list(G_nx.nodes)
+    edges = list(G_nx.edges)
+    is_weighted = "weight" in G_nx[edges[0][0]][edges[0][1]]
+
+    E = []
+    for e in edges:
+        if is_weighted:
+            E.append(Edge(e[0], e[1], G_nx[e[0]][e[1]]["weight"]))
+        else:
+            E.append(Edge(e[0], e[1]))
+
+    return DiGraph(V, E) if nx.is_directed(G_nx) else UndirectedGraph(V, E)
+
+
+def to_networkx(G):
+    """Convert my graph representation to a networkx graph"""
+    G_nx = nx.DiGraph() if G.is_directed else nx.Graph()
+    V = list(G._V2I.keys())
+    G_nx.add_nodes_from(V)
+
+    for v in V:
+        fr_i = G._V2I[v]
+        edges = G._G[fr_i]
+
+        for edge in edges:
+            G_nx.add_edge(edge.fr, edge.to, weight=edge._w)
+    return G_nx
+
+
+def test_all_paths():
+    np.random.seed(12345)
+
+    while True:
+        p = np.random.rand()
+        directed = np.random.rand() < 0.5
+        G = random_unweighted_graph(n_vertices=10, edge_prob=p, directed=directed)
+
+        nodes = G._I2V.keys()
+        G_nx = to_networkx(G)
+
+        # for each graph, test all_paths for all pairs of start and end
+        # vertices. note that graph is not guaranteed to be connected, so many
+        # paths will be empty
+        for s_i in nodes:
+            for e_i in nodes:
+                if s_i == e_i:
+                    continue
+
+                paths = G.all_paths(s_i, e_i)
+                paths_nx = nx.all_simple_paths(G_nx, source=s_i, target=e_i, cutoff=10)
+
+                paths = sorted(paths)
+                paths_nx = sorted(list(paths_nx))
+
+                for p1, p2 in zip(paths, paths_nx):
+                    np.testing.assert_array_equal(p1, p2)
+
+                print("PASSED")
+
+
+def test_random_DAG():
+    np.random.seed(12345)
+
+    while True:
+        p = np.random.uniform(0.25, 1)
+        n_v = np.random.randint(5, 50)
+
+        G = random_DAG(n_v, p)
+        G_nx = to_networkx(G)
+
+        assert nx.is_directed_acyclic_graph(G_nx)
+        print("PASSED")
+
+
+def test_topological_ordering():
+    np.random.seed(12345)
+
+    while True:
+        p = np.random.uniform(0.25, 1)
+        n_v = np.random.randint(5, 10)
+
+        G = random_DAG(n_v, p)
+        G_nx = to_networkx(G)
+
+        if nx.is_directed_acyclic_graph(G_nx):
+            topo_order = G.topological_ordering()
+
+            #  test topological order
+            seen_it = set()
+            for n_i in topo_order:
+                seen_it.add(n_i)
+                assert any([c_i in seen_it for c_i in G.get_neighbors(n_i)]) == False
+
+            print("PASSED")
+
+
+def test_is_acyclic():
+    np.random.seed(12345)
+
+    while True:
+        p = np.random.rand()
+        directed = np.random.rand() < 0.5
+        G = random_unweighted_graph(n_vertices=10, edge_prob=p, directed=True)
+        G_nx = to_networkx(G)
+
+        assert G.is_acyclic() == nx.is_directed_acyclic_graph(G_nx)
         print("PASSED")
