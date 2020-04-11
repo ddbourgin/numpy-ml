@@ -1,4 +1,4 @@
-Modules 
+Modules
 ========
 
 ``BidirectionalLSTM``
@@ -30,4 +30,3 @@ Modules
 .. autoclass:: numpy_ml.neural_nets.modules.WavenetResidualModule
     :members:
     :undoc-members:
-

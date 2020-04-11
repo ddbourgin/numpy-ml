@@ -3,7 +3,7 @@ The `agents.py` module implements a number of standard reinforcement learning (R
 can be run on [OpenAI gym](https://gym.openai.com/) environments.
 
 1. **Monte Carlo Methods**
-    - First-visit Monte Carlo updates (on-policy) 
+    - First-visit Monte Carlo updates (on-policy)
     - Incremental weighted importance sampling (off-policy)
     - Cross-entropy method ([Mannor, Rubinstein, & Gat, 2003](https://www.aaai.org/Papers/ICML/2003/ICML03-068.pdf))
 
@@ -24,4 +24,3 @@ can be run on [OpenAI gym](https://gym.openai.com/) environments.
 
 <img src="img/DynaAgent-Taxi-v2.png" align='center' height="400" />
 </p>
-

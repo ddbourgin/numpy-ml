@@ -1,4 +1,4 @@
-General 
+General
 #######
 
 ``FeatureHasher``
@@ -30,4 +30,3 @@ General
 
 .. automodule:: numpy_ml.preprocessing.general
 	:members: minibatch
-

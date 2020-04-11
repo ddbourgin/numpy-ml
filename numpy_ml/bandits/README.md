@@ -1,9 +1,9 @@
 # Bandits
-The `bandit.py` module includes several simple multi-arm bandit 
+The `bandit.py` module includes several simple multi-arm bandit
 environments.
 
 The `policies.py` module implements a number of standard multi-arm bandit
-policies. 
+policies.
 
 1. **Bandits**
     - MAB: Bernoulli, Multinomial, and Gaussian payout distributions
@@ -21,4 +21,3 @@ policies.
 
 <img src="img/EpsilonGreedy.png" align='center' height="400" />
 </p>
-

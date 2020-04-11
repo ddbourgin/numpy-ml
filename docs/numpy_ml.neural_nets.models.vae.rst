@@ -7,4 +7,3 @@ Variational auto-encoder (``neural_nets.models.vae``)
     :undoc-members:
     :inherited-members:
     :show-inheritance:
-

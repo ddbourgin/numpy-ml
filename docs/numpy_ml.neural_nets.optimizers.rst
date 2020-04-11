@@ -1,4 +1,4 @@
-Optimizers 
+Optimizers
 ===========
 Popular gradient-based strategies for optimizing parameters in neural networks.
 
@@ -43,4 +43,3 @@ found via different optimization strategies, see:
     :members:
     :undoc-members:
     :show-inheritance:
-
