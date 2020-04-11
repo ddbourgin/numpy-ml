@@ -11,9 +11,9 @@ This repo includes code for the following models:
 
 3. **Latent Dirichlet allocation** (topic model)
     - Standard model with MLE parameter estimation via variational EM
-    - Smoothed model with MAP parameter estimation via MCMC 
+    - Smoothed model with MAP parameter estimation via MCMC
 
-4. **Neural networks** 
+4. **Neural networks**
     * Layers / Layer-wise ops
         - Add
         - Flatten
@@ -21,9 +21,9 @@ This repo includes code for the following models:
         - Softmax
         - Fully-connected/Dense
         - Sparse evolutionary connections
-        - LSTM 
-        - Elman-style RNN 
-        - Max + average pooling 
+        - LSTM
+        - Elman-style RNN
+        - Max + average pooling
         - Dot-product attention
         - Embedding layer
         - Restricted Boltzmann machine (w. CD-n training)
@@ -31,24 +31,24 @@ This repo includes code for the following models:
         - 2D convolution (w. padding, dilation, and stride)
         - 1D convolution (w. padding, dilation, stride, and causality)
     * Modules
-        - Bidirectional LSTM 
+        - Bidirectional LSTM
         - ResNet-style residual blocks (identity and convolution)
         - WaveNet-style residual blocks with dilated causal convolutions
         - Transformer-style multi-headed scaled dot product attention
     * Regularizers
-        - Dropout 
+        - Dropout
     * Normalization
         - Batch normalization (spatial and temporal)
         - Layer normalization (spatial and temporal)
     * Optimizers
-        - SGD w/ momentum 
-        - AdaGrad 
-        - RMSProp 
+        - SGD w/ momentum
+        - AdaGrad
+        - RMSProp
         - Adam
     * Learning Rate Schedulers
         - Constant
         - Exponential
-        - Noam/Transformer 
+        - Noam/Transformer
         - Dlib scheduler
     * Weight Initializers
         - Glorot/Xavier uniform and normal
@@ -85,13 +85,13 @@ This repo includes code for the following models:
 
 5. **Tree-based models**
     - Decision trees (CART)
-    - [Bagging] Random forests 
+    - [Bagging] Random forests
     - [Boosting] Gradient-boosted decision trees
 
 6. **Linear models**
     - Ridge regression
     - Logistic regression
-    - Ordinary least squares 
+    - Ordinary least squares
     - Bayesian linear regression w/ conjugate priors
         - Unknown mean, known variance (Gaussian prior)
         - Unknown mean, unknown variance (Normal-Gamma / Normal-Inverse-Wishart prior)
@@ -102,7 +102,7 @@ This repo includes code for the following models:
     - Simple Good-Turing smoothing
 
 8. **Multi-armed bandit models**
-    - UCB1 
+    - UCB1
     - Epsilon-greedy
     - Thompson sampling w/ conjugate priors
         - Beta-Bernoulli sampler
@@ -139,6 +139,6 @@ This repo includes code for the following models:
     - Similarity kernels
     - Distance metrics
     - Priority queue
-    - Ball tree 
+    - Ball tree
     - Discrete sampler
     - Graph processing and generators

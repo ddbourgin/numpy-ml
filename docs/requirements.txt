@@ -1,8 +1,8 @@
 numpy
-scipy 
+scipy
 
 # all this is for the dang tests
-matplotlib 
+matplotlib
 seaborn
 pandas
 sklearn

@@ -1,4 +1,4 @@
-Full networks 
+Full networks
 ==============
 
 ``WGAN_GP``

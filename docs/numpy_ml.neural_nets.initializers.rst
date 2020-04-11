@@ -1,4 +1,4 @@
-Initializers 
+Initializers
 =============
 
 ``ActivationInitializer``

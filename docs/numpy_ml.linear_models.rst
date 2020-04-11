@@ -1,4 +1,4 @@
-Linear models 
+Linear models
 #############
 
 The linear models module contains several popular instances of the generalized linear model (GLM).
@@ -230,7 +230,7 @@ We can also compute a closed-form solution for the posterior predictive distribu
 .. math::
 
     y^* \mid X^*, X, Y \sim \mathcal{N}(X^* \mu_b, \ X^* \text{cov}_b X^{* \top} + I)
-    
+
 **Models**
 
 - :class:`~numpy_ml.linear_models.BayesianLinearRegressionUnknownVariance`

@@ -6,4 +6,4 @@ Losses (``trees.losses``)
 	:members:
 	:undoc-members:
 	:inherited-members:
-	:show-inheritance:	
+	:show-inheritance:

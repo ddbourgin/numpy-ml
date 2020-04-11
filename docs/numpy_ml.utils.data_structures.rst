@@ -1,4 +1,4 @@
-Data structures 
+Data structures
 ================
 
 ``BallTree``

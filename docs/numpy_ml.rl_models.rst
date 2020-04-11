@@ -1,4 +1,4 @@
-Reinforcement learning 
+Reinforcement learning
 ######################
 
 .. toctree::

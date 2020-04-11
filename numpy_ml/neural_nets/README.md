@@ -1,15 +1,15 @@
 # Neural network models
 This module implements building-blocks for larger neural network models in the
 Keras-style. This module does _not_ implement a general autograd system in order
-emphasize conceptual understanding over flexibility. 
+emphasize conceptual understanding over flexibility.
 
-1. **Activations**. Common activation nonlinearities. Includes: 
+1. **Activations**. Common activation nonlinearities. Includes:
     - Rectified linear units (ReLU) ([Hahnloser et al., 2000](http://invibe.net/biblio_database_dyva/woda/data/att/6525.file.pdf))
     - Leaky rectified linear units
       ([Maas, Hannun, & Ng, 2013](https://ai.stanford.edu/~amaas/papers/relu_hybrid_icml2013_final.pdf))
     - Exponential linear units (ELU) ([Clevert, Unterthiner, & Hochreiter, 2016](http://arxiv.org/abs/1511.07289))
     - Scaled exponential linear units ([Klambauer, Unterthiner, & Mayr, 2017](https://arxiv.org/pdf/1706.02515.pdf))
-    - Softplus units 
+    - Softplus units
     - Hard sigmoid units
     - Exponential units
     - Hyperbolic tangent (tanh)
@@ -18,7 +18,7 @@ emphasize conceptual understanding over flexibility.
 
 2. **Losses**. Common loss functions. Includes:
     - Squared error
-    - Categorical cross entropy 
+    - Categorical cross entropy
     - VAE Bernoulli loss ([Kingma & Welling, 2014](https://arxiv.org/abs/1312.6114))
     - Wasserstein loss with gradient penalty ([Gulrajani et al., 2017](https://arxiv.org/pdf/1704.00028.pdf))
     - Noise contrastive estimation (NCE) loss ([Gutmann & Hyv&auml;rinen](https://www.cs.helsinki.fi/u/ahyvarin/papers/Gutmann10AISTATS.pdf); [Minh & Teh, 2012](https://www.cs.toronto.edu/~amnih/papers/ncelm.pdf))
@@ -28,14 +28,14 @@ emphasize conceptual understanding over flexibility.
 
 4. **Layers**. Common layers / layer-wise operations that can be composed to
    create larger neural networks. Includes:
-    - Fully-connected 
+    - Fully-connected
     - Sparse evolutionary ([Mocanu et al., 2018](https://www.nature.com/articles/s41467-018-04316-3))
     - Dot-product attention ([Luong, Pho, & Manning, 2015](https://arxiv.org/pdf/1508.04025.pdf); [Vaswani et al., 2017](https://arxiv.org/pdf/1706.03762.pdf))
     - 1D and 2D convolution (with stride, padding, and dilation) ([van den Oord et al., 2016](https://arxiv.org/pdf/1609.03499.pdf); [Yu & Kolton, 2016](https://arxiv.org/pdf/1511.07122.pdf))
     - 2D "deconvolution" (with stride and padding) ([Zeiler et al., 2010](https://www.matthewzeiler.com/mattzeiler/deconvolutionalnetworks.pdf))
     - Restricted Boltzmann machines (with CD-_n_ training) ([Smolensky, 1996](http://stanford.edu/~jlmcc/papers/PDP/Volume%201/Chap6_PDP86.pdf); [Carreira-Perpiñán & Hinton, 2005](http://www.cs.toronto.edu/~fritz/absps/cdmiguel.pdf))
     - Elementwise multiplication
-    - Embedding 
+    - Embedding
     - Summation
     - Flattening
     - Softmax
@@ -65,7 +65,7 @@ emphasize conceptual understanding over flexibility.
     - Truncated normal
 
 7. **Modules**. Common multi-layer blocks that appear across many deep networks.
-   Includes: 
+   Includes:
     - Bidirectional LSTMs ([Schuster & Paliwal, 1997](https://pdfs.semanticscholar.org/4b80/89bc9b49f84de43acc2eb8900035f7d492b2.pdf))
     - ResNet-style "identity" (i.e., `same`-convolution) residual blocks ([He et al., 2015](https://arxiv.org/pdf/1512.03385.pdf))
     - ResNet-style "convolutional" (i.e., parametric) residual blocks ([He et al., 2015](https://arxiv.org/pdf/1512.03385.pdf))
@@ -79,15 +79,15 @@ emphasize conceptual understanding over flexibility.
 [Goodfellow et al., 2014](https://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf))
     - `w2v.py`: word2vec model with CBOW and skip-gram architectures and
       training via noise contrastive estimation ([Mikolov et al., 2012](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf))
-    
+
 8. **Utils**. Common helper functions, primarily for dealing with CNNs.
    Includes:
-    - `im2col` 
-    - `col2im` 
-    - `conv1D` 
+    - `im2col`
+    - `col2im`
+    - `conv1D`
     - `conv2D`
     - `dilate`
-    - `deconv2D` 
+    - `deconv2D`
     - `minibatch`
     - Various weight initialization utilities
     - Various padding and convolution arithmetic utilities

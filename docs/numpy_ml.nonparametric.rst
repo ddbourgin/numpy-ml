@@ -1,4 +1,4 @@
-Nonparametric models 
+Nonparametric models
 ####################
 
 .. raw:: html

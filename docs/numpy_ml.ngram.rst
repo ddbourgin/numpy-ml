@@ -13,7 +13,7 @@ denote the `(j - i)`-gram :math:`(w_{i}, w_{i+1}, \ldots, w_{j})`.
    <h3>Laplace Smoothing</h3>
 
 `Laplace smoothing`_ is the assumption that each `n`-gram in a corpus occurs
-exactly one more time than it actually does. 
+exactly one more time than it actually does.
 
 .. math::
 
