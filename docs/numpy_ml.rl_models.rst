@@ -9,5 +9,3 @@ Reinforcement learning
    numpy_ml.rl_models.trainer
 
    numpy_ml.rl_models.rl_utils
-
-   numpy_ml.rl_models.tiles

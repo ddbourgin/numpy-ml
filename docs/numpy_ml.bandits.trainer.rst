@@ -1,9 +1,9 @@
 Trainer
 =======
 
-``MABTrainer``
---------------
-.. autoclass:: numpy_ml.bandits.trainer.MABTrainer
+``BanditTrainer``
+------------------
+.. autoclass:: numpy_ml.bandits.trainer.BanditTrainer
     :members:
     :undoc-members:
     :inherited-members:

@@ -9,31 +9,45 @@ Bandit Environments
     :inherited-members:
 
 
-``MABMultinomialPayoff``
+``MultinomialBandit``
 -------------------------
-.. autoclass:: numpy_ml.bandits.MABMultinomialPayoff
+.. autoclass:: numpy_ml.bandits.MultinomialBandit
     :members:
     :undoc-members:
     :show-inheritance:
 
-``MABBernoulliPayoff``
+``BernoulliBandit``
 -----------------------
-.. autoclass:: numpy_ml.bandits.MABBernoulliPayoff
+.. autoclass:: numpy_ml.bandits.BernoulliBandit
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-``MABGaussianPayoff``
+``GaussianBandit``
 ----------------------
-.. autoclass:: numpy_ml.bandits.MABGaussianPayoff
+.. autoclass:: numpy_ml.bandits.GaussianBandit
     :members:
     :undoc-members:
     :show-inheritance:
 
-``MABShortestPath``
---------------------
-.. autoclass:: numpy_ml.bandits.MABShortestPath
+``ShortestPathBandit``
+-----------------------
+.. autoclass:: numpy_ml.bandits.ShortestPathBandit
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``ContextualBernoulliBandit``
+------------------------------
+.. autoclass:: numpy_ml.bandits.ContextualBernoulliBandit
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``ContextualLinearBandit``
+------------------------------
+.. autoclass:: numpy_ml.bandits.ContextualLinearBandit
     :members:
     :undoc-members:
     :show-inheritance:
