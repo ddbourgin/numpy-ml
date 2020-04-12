@@ -87,8 +87,8 @@ class BanditTrainer:
         ep_length,
         n_episodes,
         n_duplicates,
-        smooth_weight=0.999,
         seed=12345,
+        smooth_weight=0.999,
     ):
         """
         Compare the performance of multiple policies on the same bandit
@@ -106,16 +106,16 @@ class BanditTrainer:
             The number of episodes per run
         n_duplicates: int
             The number of runs to evaluate
+        seed : int
+            The seed for the random number generator. Default is 12345.
         smooth_weight : float in [0, 1]
             The smoothing weight. Values closer to 0 result in less smoothing,
             values closer to 1 produce more aggressive smoothing. Default is
             0.999.
-        seed : int
-            The seed for the random number generator. Default is 12345.
         """  # noqa: E501
         self.init_logs(policies)
         fig, all_axes = plt.subplots(len(policies), 2, sharex=True)
-        fig.set_size_inches(8.5, 10.5)
+        fig.set_size_inches(10.5, len(policies) * 5.25)
 
         for policy, axes in zip(policies, all_axes):
             np.random.seed(seed)
@@ -128,11 +128,23 @@ class BanditTrainer:
                 ep_length,
                 n_episodes,
                 n_duplicates,
-                plot=True,
-                smooth_weight=0.999,
-                verbose=False,
                 axes=axes,
+                plot=True,
+                verbose=False,
+                smooth_weight=0.999,
             )
+
+        # enforce the same y-ranges across plots for straightforward comparison
+        a1_r, a2_r = zip(*[(a1.get_ylim(), a2.get_ylim()) for (a1, a2) in all_axes])
+
+        a1_min = min(a1_r, key=lambda x: x[0])[0]
+        a1_max = max(a1_r, key=lambda x: x[1])[1]
+        a2_min = min(a2_r, key=lambda x: x[0])[0]
+        a2_max = max(a2_r, key=lambda x: x[1])[1]
+
+        for (a1, a2) in all_axes:
+            a1.set_ylim(a1_min, a1_max)
+            a2.set_ylim(a2_min, a2_max)
 
         sdir = get_scriptdir()
         plt.savefig("{}/img/{}.png".format(sdir, "comparison"), dpi=300)
@@ -148,10 +160,10 @@ class BanditTrainer:
         n_episodes,
         n_duplicates,
         plot=True,
-        smooth_weight=0.999,
-        print_every=100,
-        verbose=True,
         axes=None,
+        verbose=True,
+        print_every=100,
+        smooth_weight=0.999,
     ):
         """
         Train a MAB policies on a multi-armed bandit problem, logging training
@@ -172,19 +184,19 @@ class BanditTrainer:
         plot : bool
             Whether to generate a plot of the policy's average reward and
             regret across the episodes. Default is True.
-        smooth_weight : float in [0, 1]
-            The smoothing weight. Values closer to 0 result in less smoothing,
-            values closer to 1 produce more aggressive smoothing. Default is
-            0.999.
-        print_every : int
-            The number of episodes to run before printing loss values to
-            stdout. This is ignored if ``verbose`` is false. Default is 100.
-        verbose : boolean
-            Whether to print run statistics during training. Default is True.
         axes : list of :py:class:`Axis <matplotlib.axes.Axis>` instances or None
             If not None and ``plot = True``, these are the axes that will be
             used to plot the cumulative reward and regret, respectively.
             Default is None.
+        verbose : boolean
+            Whether to print run statistics during training. Default is True.
+        print_every : int
+            The number of episodes to run before printing loss values to
+            stdout. This is ignored if ``verbose`` is false. Default is 100.
+        smooth_weight : float in [0, 1]
+            The smoothing weight. Values closer to 0 result in less smoothing,
+            values closer to 1 produce more aggressive smoothing. Default is
+            0.999.
 
         Returns
         -------
@@ -245,7 +257,7 @@ class BanditTrainer:
 
     def init_logs(self, policies):
         """
-        Initialize the episode logs
+        Initialize the episode logs.
 
         Notes
         -----
