@@ -1,3 +1,5 @@
+"""Reinforcement learning agents that can be run on OpenAI gym environs"""
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
 
@@ -42,58 +44,106 @@ class AgentBase(ABC):
 
     @abstractmethod
     def act(self, obs):
+        """Generate an action given the current observation"""
         raise NotImplementedError
 
     @abstractmethod
     def greedy_policy(self, **kwargs):
+        """
+        Take a greedy action.
+
+        Returns
+        -------
+        total_reward : float
+            The total reward on the episode.
+        n_steps : float
+            The total number of steps taken on the episode.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def run_episode(self, max_steps, render=False):
+        """
+        Run the agent on a single episode.
+
+        Parameters
+        ----------
+        max_steps : int
+            The maximum number of steps to run an episode
+        render : bool
+            Whether to render the episode during training
+
+        Returns
+        -------
+        reward : float
+            The total reward on the episode, averaged over the theta samples.
+        steps : float
+            The total number of steps taken on the episode, averaged over the
+            theta samples.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def update(self):
+        r"""
+        Update the agent parameters according to the rewards accrued on the
+        current episode.
+
+        Returns
+        -------
+        avg_reward : float
+            The average reward earned by the best `retain_prcnt` theta samples
+            on the current episode.
+        """
         raise NotImplementedError
 
 
 class CrossEntropyAgent(AgentBase):
     def __init__(self, env, n_samples_per_episode=500, retain_prcnt=0.2):
-        """
+        r"""
         A cross-entropy method agent.
 
         Notes
         -----
-        The cross-entropy method agent only operates on ``envs`` with discrete
-        action spaces.
+        The cross-entropy method [1]_ [2]_ agent only operates on ``envs`` with
+        discrete action spaces.
 
         On each episode the agent generates `n_theta_samples` of the parameters
-        (:math:`\\theta`) for its behavior policy. The `i`'th sample at
+        (:math:`\theta`) for its behavior policy. The `i`'th sample at
         timestep `t` is:
 
         .. math::
 
-            \\theta_i  &=  \{\mathbf{W}_i^{(t)}, \mathbf{b}_i^{(t)} \} \\\\
-            \\theta_i  &\sim  \mathcal{N}(\mu^{(t)}, \Sigma^{(t)})
+            \theta_i  &=  \{\mathbf{W}_i^{(t)}, \mathbf{b}_i^{(t)} \} \\
+            \theta_i  &\sim  \mathcal{N}(\mu^{(t)}, \Sigma^{(t)})
 
         Weights (:math:`\mathbf{W}_i`) and bias (:math:`\mathbf{b}_i`) are the
         parameters of the softmax policy:
 
         .. math::
 
-            \mathbf{z}_i  &=  \\text{obs} \cdot \mathbf{W}_i + \mathbf{b}_i \\\\
-            p(a_i^{(t + 1)})  &=  \\frac{e^{\mathbf{z}_i}}{\sum_j e^{z_{ij}}} \\\\
-            a^{(t + 1)}  &=  \\arg \max_j p(a_j^{(t+1)})
+            \mathbf{z}_i  &=  \text{obs} \cdot \mathbf{W}_i + \mathbf{b}_i \\
+            p(a_i^{(t + 1)})  &=  \frac{e^{\mathbf{z}_i}}{\sum_j e^{z_{ij}}} \\
+            a^{(t + 1)}  &=  \arg \max_j p(a_j^{(t+1)})
 
         At the end of each episode, the agent takes the top `retain_prcnt`
-        highest scoring :math:`\\theta` samples and combines them to generate
-        the mean and variance of the distribution of :math:`\\theta` for the
+        highest scoring :math:`\theta` samples and combines them to generate
+        the mean and variance of the distribution of :math:`\theta` for the
         next episode:
 
         .. math::
 
-            \mu^{(t+1)}  &=  \\text{avg}(\\texttt{best_thetas}^{(t)}) \\\\
-            \Sigma^{(t+1)}  &=  \\text{var}(\\texttt{best_thetas}^{(t)})
+            \mu^{(t+1)}  &=  \text{avg}(\texttt{best_thetas}^{(t)}) \\
+            \Sigma^{(t+1)}  &=  \text{var}(\texttt{best_thetas}^{(t)})
+
+        References
+        ----------
+        .. [1] Mannor, S., Rubinstein, R., & Gat, Y. (2003). The cross entropy
+           method for fast policy search. In *Proceedings of the 20th Annual
+           ICML, 20*.
+        .. [2] Rubinstein, R. (1997). optimization of computer simulation
+           models with rare events, *European Journal of Operational Research,
+           99*, 89–112.
 
         Parameters
         ----------
@@ -143,7 +193,7 @@ class CrossEntropyAgent(AgentBase):
         self.episode_history = {"rewards": [], "state_actions": []}
 
     def act(self, obs):
-        """
+        r"""
         Generate actions according to a softmax policy.
 
         Notes
@@ -153,8 +203,8 @@ class CrossEntropyAgent(AgentBase):
 
         .. math::
 
-            \pi(a | x^{(t)}) = \\text{softmax}(
-                \\text{obs}^{(t)} \cdot \mathbf{W}_i^{(t)} + \mathbf{b}_i^{(t)} )
+            \pi(a | x^{(t)}) = \text{softmax}(
+                \text{obs}^{(t)} \cdot \mathbf{W}_i^{(t)} + \mathbf{b}_i^{(t)} )
 
         where :math:`\mathbf{W}` is a learned weight matrix, `obs` is the observation
         at timestep `t`, and **b** is a learned bias vector.
@@ -276,7 +326,7 @@ class CrossEntropyAgent(AgentBase):
         return total_reward, n_steps
 
     def update(self):
-        """
+        r"""
         Update :math:`\mu` and :math:`\Sigma` according to the rewards accrued on
         the current episode.
 
@@ -406,7 +456,7 @@ class MonteCarloAgent(AgentBase):
         self.episode_history = {"state_actions": [], "rewards": []}
 
     def _epsilon_soft_policy(self, s, a=None):
-        """
+        r"""
         Epsilon-soft exploration policy.
 
         Notes
@@ -424,12 +474,14 @@ class MonteCarloAgent(AgentBase):
 
         .. math::
 
-            \pi(a \mid s)  &=  1 - \epsilon + \\frac{\epsilon}{|A(s)|}  &&\\text{if} a = a^*
-            \pi(a \mid s)  &=  \\frac{\epsilon}{|A(s)|}                 &&\\text{if} a \\neq a^*
+            \pi(a \mid s)  &=
+                1 - \epsilon + \frac{\epsilon}{|A(s)|}  &&\text{if} a = a^*
+            \pi(a \mid s)  &=
+                \frac{\epsilon}{|A(s)|}                 &&\text{if} a \neq a^*
 
         where :math:`|A(s)|` is the number of actions available in state `s`
         and :math:`a^* \in A(s)` is the greedy action in state `s` (i.e.,
-        :math:`a^* = \\arg \max_a Q(s, a)`).
+        :math:`a^* = \arg \max_a Q(s, a)`).
 
         Note that epsilon-greedy policies are instances of epsilon-soft
         policies, defined as policies for which :math:`\pi(a|s) \geq \epsilon / |A(s)|`
@@ -508,7 +560,7 @@ class MonteCarloAgent(AgentBase):
         return out
 
     def _on_policy_update(self):
-        """
+        r"""
         Update the `Q` function using an on-policy first-visit Monte Carlo
         update.
 
@@ -519,8 +571,8 @@ class MonteCarloAgent(AgentBase):
         .. math::
 
             Q'(s, a) \leftarrow
-                \\text{avg}(\\text{reward following first visit to } (s, a)
-                \\text{ across all episodes})
+                \text{avg}(\text{reward following first visit to } (s, a)
+                \text{ across all episodes})
 
         RL agents seek to learn action values conditional on subsequent optimal
         behavior, but they need to behave non-optimally in order to explore all
@@ -588,7 +640,7 @@ class MonteCarloAgent(AgentBase):
                 break
 
     def act(self, obs):
-        """
+        r"""
         Execute the behavior policy--an :math:`\epsilon`-soft policy used to
         generate actions during training.
 
@@ -602,7 +654,7 @@ class MonteCarloAgent(AgentBase):
         action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             An action sampled from the distribution over actions defined by the
             epsilon-soft policy.
-        """
+        """  # noqa: E501
         s = self._obs2num[obs]
         return self.behavior_policy(s)
 
@@ -751,14 +803,51 @@ class TemporalDifferenceAgent(AgentBase):
         off_policy=False,
         temporal_discount=0.99,
     ):
-        """
-        A temporal difference learning agent with expected SARSA (on-policy) or
-        TD(0) `Q`-learning (off-policy) updates.
+        r"""
+        A temporal difference learning agent with expected SARSA (on-policy) [3]_ or
+        TD(0) `Q`-learning (off-policy) [4]_ updates.
 
         Notes
         -----
-        The agent requires a discrete action space, but will try to discretize
-        the observation space via tiling if it is continuous.
+        The expected SARSA on-policy TD(0) update is:
+
+        .. math::
+
+            Q(s, a) \leftarrow Q(s, a) + \eta \left(
+                r + \gamma \mathbb{E}_\pi[Q(s', a') \mid s'] - Q(s, a)
+            \right)
+
+        and the TD(0) off-policy Q-learning upate is:
+
+        .. math::
+
+            Q(s, a) \leftarrow Q(s, a) + \eta (
+                r + \gamma \max_a \left\{ Q(s', a) \right\} - Q(s, a)
+            )
+
+        where in each case we have taken action `a` in state `s`, received
+        reward `r`, and transitioned into state :math:`s'`. In the above
+        equations, :math:`\eta` is a learning rate parameter, :math:`\gamma` is
+        a temporal discount factor, and :math:`\mathbb{E}_\pi[ Q[s', a'] \mid
+        s']` is the expected value under the current policy :math:`\pi` of the
+        Q function conditioned that we are in state :math:`s'`.
+
+        Observe that the expected SARSA update can be used for both on- and
+        off-policy methods. In an off-policy context, if the target policy is
+        greedy and the expectation is taken wrt. the target policy then the
+        expected SARSA update is exactly Q-learning.
+
+        NB. For this implementation the agent requires a discrete action
+        space, but will try to discretize the observation space via tiling if
+        it is continuous.
+
+        References
+        ----------
+        .. [3] Rummery, G. & Niranjan, M. (1994). *On-Line Q-learning Using
+           Connectionist Systems*. Tech Report 166. Cambridge University
+           Department of Engineering.
+        .. [4] Watkins, C. (1989). Learning from delayed rewards. *PhD thesis,
+           Cambridge University*.
 
         Parameters
         ----------
@@ -963,12 +1052,12 @@ class TemporalDifferenceAgent(AgentBase):
         return total_reward, n_steps
 
     def _epsilon_soft_policy(self, s, a=None):
-        """
+        r"""
         Epsilon-soft exploration policy.
 
-        In epsilon-soft policies, :math:`\pi(a|s) > 0` for all s ∈ S and all a ∈ A(s) at
-        the start of training. As learning progresses, pi gradually shifts
-        closer and closer to a deterministic optimal policy.
+        In epsilon-soft policies, :math:`\pi(a|s) > 0` for all s ∈ S and all a
+        ∈ A(s) at the start of training. As learning progresses, :math:`\pi`
+        gradually shifts closer and closer to a deterministic optimal policy.
 
         In particular, we have:
 
@@ -1006,7 +1095,7 @@ class TemporalDifferenceAgent(AgentBase):
         action_prob : float in range [0, 1]
             If `a` is not None, returns the probability of `a` under the
             epsilon-soft policy.
-        """
+        """  # noqa: E501
         E, P = self.env_info, self.parameters
 
         # TODO: this assumes all actions are available in every state
@@ -1053,7 +1142,7 @@ class TemporalDifferenceAgent(AgentBase):
         action_prob : float in range [0, 1]
             If `a` is not None, returns the probability of `a` under the
             greedy policy.
-        """
+        """  # noqa: E501
         P, E = self.parameters, self.env_info
         n_actions = np.prod(E["n_actions_per_dim"])
         a_star = np.argmax([P["Q"][(s, aa)] for aa in range(n_actions)])
@@ -1067,7 +1156,9 @@ class TemporalDifferenceAgent(AgentBase):
         """
         Update the Q function using the expected SARSA on-policy TD(0) update:
 
-            Q[s, a] <- Q[s, a] + lr * [r + temporal_discount * E[Q[s', a'] | s'] - Q[s, a]]
+            Q[s, a] <- Q[s, a] + lr * [
+                r + temporal_discount * E[Q[s', a'] | s'] - Q[s, a]
+            ]
 
         where
 
@@ -1108,7 +1199,9 @@ class TemporalDifferenceAgent(AgentBase):
         """
         Update the `Q` function using the TD(0) Q-learning update:
 
-            Q[s, a] <- Q[s, a] + lr * (r + temporal_discount * max_a { Q[s', a] } - Q[s, a])
+            Q[s, a] <- Q[s, a] + lr * (
+                r + temporal_discount * max_a { Q[s', a] } - Q[s, a]
+            )
 
         Parameters
         ----------
@@ -1129,9 +1222,7 @@ class TemporalDifferenceAgent(AgentBase):
         Q[(s, a)] = qsa + self.lr * (r + self.temporal_discount * np.max(Qs_) - qsa)
 
     def update(self):
-        """
-        Update the parameters of the model online after each new state-action.
-        """
+        """Update the parameters of the model online after each new state-action."""
         H, HS = self.hyperparameters, self.episode_history
         (s, a), r = HS["state_actions"][-2], HS["rewards"][-1]
         s_, a_ = HS["state_actions"][-1]
@@ -1142,7 +1233,7 @@ class TemporalDifferenceAgent(AgentBase):
             self._on_policy_update(s, a, r, s_, a_)
 
     def act(self, obs):
-        """
+        r"""
         Execute the behavior policy--an :math:`\epsilon`-soft policy used to
         generate actions during training.
 
@@ -1156,7 +1247,7 @@ class TemporalDifferenceAgent(AgentBase):
         action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             An action sampled from the distribution over actions defined by the
             epsilon-soft policy.
-        """
+        """  # noqa: E501
         s = self._obs2num[obs]
         return self.behavior_policy(s)
 
@@ -1225,9 +1316,58 @@ class DynaAgent(AgentBase):
         temporal_discount=0.9,
         n_simulated_actions=50,
     ):
-        """
-        A Dyna-`Q` / Dyna-`Q+` agent with full TD(0) `Q`-learning updates via
-        prioritized-sweeping.
+        r"""
+        A Dyna-`Q` / Dyna-`Q+` agent [5]_ with full TD(0) `Q`-learning updates via
+        prioritized-sweeping [6]_ .
+
+        Notes
+        -----
+        This approach consists of three components: a planning method involving
+        simulated actions, a direct RL method where the agent directly interacts
+        with the environment, and a model-learning method where the agent
+        learns to better represent the environment during planning.
+
+        During planning, the agent performs random-sample one-step tabular
+        Q-planning with prioritized sweeping. This entails using a priority
+        queue to retrieve the state-action pairs from the agent's history which
+        would stand to have the largest change to their Q-values if backed up.
+        Specifically, for state action pair `(s, a)` the priority value is:
+
+        .. math::
+
+            P = \sum_{s'} p(s') | r + \gamma \max_a \{Q(s', a) \} - Q(s, a) |
+
+        which corresponds to the absolute magnitude of the TD(0) Q-learning
+        backup for the pair.
+
+        When the first pair in the queue is backed up, the effect on each of
+        its predecessor pairs is computed. If the predecessor's priority is
+        greater than a small threshold the pair is added to the queue and the
+        process is repeated until either the queue is empty or we have exceeded
+        `n_simulated_actions` updates. These backups occur without the agent
+        taking any action in the environment and thus constitute simulations
+        based on the agent's current model of the environment (i.e., its
+        tabular state-action history).
+
+        During the direct RL phase, the agent takes an action based on its
+        current behavior policy and Q function and receives a reward from the
+        environment. The agent logs this state-action-reward-new state tuple in
+        its interaction table (i.e., environment model) and updates its Q
+        function using a full-backup version of the Q-learning update:
+
+        .. math::
+
+            Q(s, a) \leftarrow Q(s, a) + \eta \sum_{r, s'} p(r, s' \mid s, a)
+                \left(r + \gamma \max_a \{ Q(s', a) \} - Q(s, a) \right)
+
+        References
+        ----------
+        .. [5] Sutton, R. (1990). Integrated architectures for learning,
+           planning, and reacting based on approximating dynamic programming.
+           In *Proceedings of the 7th Annual ICML*, 216-224.
+        .. [6] Moore, A. & Atkeson, C. (1993). Prioritized sweeping:
+           Reinforcement learning with less data and less time. *Machine
+           Learning, 13(1)*, 103-130.
 
         Parameters
         ----------
@@ -1312,13 +1452,13 @@ class DynaAgent(AgentBase):
         self.derived_variables = {
             "episode_num": 0,
             "sweep_queue": {},
-            "visited": set([]),
+            "visited": set(),
             "steps_since_last_visit": defaultdict(lambda: 0),
         }
 
         if self.q_plus:
             self.derived_variables["steps_since_last_visit"] = defaultdict(
-                np.random.rand
+                np.random.rand,
             )
 
         self.hyperparameters = {
@@ -1338,7 +1478,7 @@ class DynaAgent(AgentBase):
         self.episode_history = {"state_actions": [], "rewards": []}
 
     def act(self, obs):
-        """
+        r"""
         Execute the behavior policy--an :math:`\epsilon`-soft policy used to
         generate actions during training.
 
@@ -1352,7 +1492,7 @@ class DynaAgent(AgentBase):
         action : int, float, or :py:class:`ndarray <numpy.ndarray>`
             An action sampled from the distribution over actions defined by the
             epsilon-soft policy.
-        """
+        """  # noqa: E501
         s = self._obs2num[obs]
         return self.behavior_policy(s)
 
@@ -1400,7 +1540,7 @@ class DynaAgent(AgentBase):
         action_prob : float in range [0, 1]
             If `a` is not None, returns the probability of `a` under the
             epsilon-soft policy.
-        """
+        """  # noqa: E501
         E, P = self.env_info, self.parameters
 
         # TODO: this assumes all actions are available in every state
@@ -1447,7 +1587,7 @@ class DynaAgent(AgentBase):
         action_prob : float in range [0, 1]
             If `a` is not None, returns the probability of `a` under the
             greedy policy.
-        """
+        """  # noqa: E501
         E, Q = self.env_info, self.parameters["Q"]
         n_actions = np.prod(E["n_actions_per_dim"])
         a_star = np.argmax([Q[(s, aa)] for aa in range(n_actions)])
@@ -1628,7 +1768,6 @@ class DynaAgent(AgentBase):
         steps : float
             The number of steps taken on the episode.
         """
-
         return self._episode(max_steps, render, update=False)
 
     def train_episode(self, max_steps, render=False):
