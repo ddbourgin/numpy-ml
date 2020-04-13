@@ -1,19 +1,23 @@
-import numbers
+"""A module containing exploration policies for various multi-armed bandit problems."""
+
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import numpy as np
+
+from ..utils.testing import is_number
 
 
 class BanditPolicyBase(ABC):
     def __init__(self):
         """A simple base class for multi-armed bandit policies"""
         self.step = 0
-        self.pull_counts = {}
         self.ev_estimates = {}
         self.is_initialized = False
         super().__init__()
 
     def __repr__(self):
+        """Return a string representation of the policy"""
         HP = self.hyperparameters
         params = ", ".join(["{}={}".format(k, v) for (k, v) in HP.items() if k != "id"])
         return "{}({})".format(HP["id"], params)
@@ -21,14 +25,22 @@ class BanditPolicyBase(ABC):
     @property
     def hyperparameters(self):
         """A dictionary containing the policy hyperparameters"""
-        return {}
+        pass
 
     @property
     def parameters(self):
         """A dictionary containing the current policy parameters"""
-        return {}
+        pass
 
-    def act(self, bandit):
+    @abstractmethod
+    def _initialize_params(self, bandit):
+        """
+        Initialize any policy-specific parameters that depend on information
+        from the bandit environment.
+        """
+        pass
+
+    def act(self, bandit, context=None):
         """
         Select an arm and sample from its payoff distribution.
 
@@ -36,6 +48,10 @@ class BanditPolicyBase(ABC):
         ----------
         bandit : :class:`Bandit <numpy_ml.bandits.bandits.Bandit>` instance
             The multi-armed bandit to act upon
+        context : :py:class:`ndarray <numpy.ndarray>` of shape `(D,)` or None
+            The context vector for the current timestep if interacting with a
+            contextual bandit. Otherwise, this argument is unused. Default is
+            None.
 
         Returns
         -------
@@ -45,46 +61,46 @@ class BanditPolicyBase(ABC):
             The arm that was pulled to generate ``rwd``.
         """
         if not self.is_initialized:
-            self.pull_counts = {i: 0 for i in range(bandit.n_arms)}
             self._initialize_params(bandit)
 
-        arm_id = self._select_arm(bandit)
-        rwd = self._pull_arm(bandit, arm_id)
-        self._update_params(arm_id, rwd)
+        arm_id = self._select_arm(bandit, context)
+        rwd = self._pull_arm(bandit, arm_id, context)
+        self._update_params(arm_id, rwd, context)
         return rwd, arm_id
 
-    def _pull_arm(self, bandit, arm_id):
+    def _pull_arm(self, bandit, arm_id, context):
+        """Execute a bandit action and return the received reward."""
         self.step += 1
-        self.pull_counts[arm_id] += 1
-        return bandit.pull(arm_id)
-
-    def _initialize_params(self, bandit):
-        self.ev_estimates = {i: self.ev_prior for i in range(bandit.n_arms)}
-        self.is_initialized = True
+        return bandit.pull(arm_id, context)
 
     def reset(self):
-        """Reset policy parameters and counters to their initial state"""
+        """Reset the policy parameters and counters to their initial states."""
         self.step = 0
         self._reset_params()
-        self.pull_counts = {}
         self.is_initialized = False
 
     @abstractmethod
-    def _select_arm(self, bandit):
+    def _select_arm(self, bandit, context):
+        """Select an arm based on the current context"""
         pass
 
     @abstractmethod
-    def _update_params(self, bandit):
+    def _update_params(self, bandit, context):
+        """Update the policy parameters after an interaction"""
         pass
 
     @abstractmethod
     def _reset_params(self):
-        self.ev_estimates = {}
+        """
+        Reset any model-specific parameters. This gets called within the
+        public `self.reset()` method.
+        """
+        pass
 
 
 class EpsilonGreedy(BanditPolicyBase):
     def __init__(self, epsilon=0.05, ev_prior=0.5):
-        """
+        r"""
         An epsilon-greedy policy for multi-armed bandit problems.
 
         Notes
@@ -96,17 +112,19 @@ class EpsilonGreedy(BanditPolicyBase):
         .. math::
 
             P(a) = \left\{
-                 \\begin{array}{lr}
-                   \epsilon / N + (1 - \epsilon) &\\text{if }a = \\arg \max_{a' \in \mathcal{A}} \mathbb{E}_{q_{\hat{\\theta}}}[r \mid a']\\\\
-                   \epsilon / N &\\text{otherwise}
+                 \begin{array}{lr}
+                   \epsilon / N + (1 - \epsilon) &\text{if }
+                        a = \arg \max_{a' \in \mathcal{A}}
+                            \mathbb{E}_{q_{\hat{\theta}}}[r \mid a']\\
+                   \epsilon / N &\text{otherwise}
                  \end{array}
-               \\right.
+               \right.
 
         where :math:`N = |\mathcal{A}|` is the number of arms,
-        :math:`q_{\hat{\\theta}}` is the estimate of the arm payoff
-        distribution under current model parameters :math:`\hat{\\theta}`, and
-        :math:`\mathbb{E}_{q_{\hat{\\theta}}}[r \mid a']` is the expected
-        reward under :math:`q_{\hat{\\theta}}` of receiving reward `r` after
+        :math:`q_{\hat{\theta}}` is the estimate of the arm payoff
+        distribution under current model parameters :math:`\hat{\theta}`, and
+        :math:`\mathbb{E}_{q_{\hat{\theta}}}[r \mid a']` is the expected
+        reward under :math:`q_{\hat{\theta}}` of receiving reward `r` after
         taking action :math:`a'`.
 
         Parameters
@@ -120,20 +138,31 @@ class EpsilonGreedy(BanditPolicyBase):
         super().__init__()
         self.epsilon = epsilon
         self.ev_prior = ev_prior
+        self.pull_counts = defaultdict(lambda: 0)
 
     @property
     def parameters(self):
+        """A dictionary containing the current policy parameters"""
         return {"ev_estimates": self.ev_estimates}
 
     @property
     def hyperparameters(self):
+        """A dictionary containing the policy hyperparameters"""
         return {
             "id": "EpsilonGreedy",
             "epsilon": self.epsilon,
             "ev_prior": self.ev_prior,
         }
 
-    def _select_arm(self, bandit):
+    def _initialize_params(self, bandit):
+        """
+        Initialize any policy-specific parameters that depend on information
+        from the bandit environment.
+        """
+        self.ev_estimates = {i: self.ev_prior for i in range(bandit.n_arms)}
+        self.is_initialized = True
+
+    def _select_arm(self, bandit, context=None):
         if np.random.rand() < self.epsilon:
             arm_id = np.random.choice(bandit.n_arms)
         else:
@@ -141,17 +170,23 @@ class EpsilonGreedy(BanditPolicyBase):
             (arm_id, _) = max(ests.items(), key=lambda x: x[1])
         return arm_id
 
-    def _update_params(self, arm_id, reward):
+    def _update_params(self, arm_id, reward, context=None):
         E, C = self.ev_estimates, self.pull_counts
+        C[arm_id] += 1
         E[arm_id] += (reward - E[arm_id]) / (C[arm_id])
 
     def _reset_params(self):
+        """
+        Reset any model-specific parameters. This gets called within the
+        public `self.reset()` method.
+        """
         self.ev_estimates = {}
+        self.pull_counts = defaultdict(lambda: 0)
 
 
 class UCB1(BanditPolicyBase):
     def __init__(self, C=1, ev_prior=0.5):
-        """
+        r"""
         A UCB1 policy for multi-armed bandit problems.
 
         Notes
@@ -165,13 +200,13 @@ class UCB1(BanditPolicyBase):
 
         .. math::
 
-            \\text{UCB}(a, t) = \\text{EV}_t(a) + C \sqrt{\\frac{2 \log t}{N_t(a)}}
+            \text{UCB}(a, t) = \text{EV}_t(a) + C \sqrt{\frac{2 \log t}{N_t(a)}}
 
-        where :math:`\\text{UCB}(a, t)` is the upper confidence bound on the
-        expected value of arm `a` at time `t`, :math:`\\text{EV}_t(a)` is the
+        where :math:`\text{UCB}(a, t)` is the upper confidence bound on the
+        expected value of arm `a` at time `t`, :math:`\text{EV}_t(a)` is the
         average of the rewards recieved so far from pulling arm `a`, `C` is a
         parameter controlling the confidence upper bound of the estimate for
-        :math:`\\text{UCB}(a, t)` (for logarithmic regret bounds, `C` must
+        :math:`\text{UCB}(a, t)` (for logarithmic regret bounds, `C` must
         equal 1), and :math:`N_t(a)` is the number of times arm `a` has been
         pulled during the previous `t - 1` timesteps.
 
@@ -196,19 +231,27 @@ class UCB1(BanditPolicyBase):
 
     @property
     def parameters(self):
-        return {
-            "ev_estimates": self.ev_estimates,
-        }
+        """A dictionary containing the current policy parameters"""
+        return {"ev_estimates": self.ev_estimates}
 
     @property
     def hyperparameters(self):
+        """A dictionary containing the policy hyperparameters"""
         return {
             "C": self.C,
             "id": "UCB1",
             "ev_prior": self.ev_prior,
         }
 
-    def _select_arm(self, bandit):
+    def _initialize_params(self, bandit):
+        """
+        Initialize any policy-specific parameters that depend on information
+        from the bandit environment.
+        """
+        self.ev_estimates = {i: self.ev_prior for i in range(bandit.n_arms)}
+        self.is_initialized = True
+
+    def _select_arm(self, bandit, context=None):
         # add eps to avoid divide-by-zero errors on the first pull of each arm
         eps = np.finfo(float).eps
         N, T = bandit.n_arms, self.step + 1
@@ -216,17 +259,23 @@ class UCB1(BanditPolicyBase):
         scores = [E[a] + self.C * np.sqrt(np.log(T) / (C[a] + eps)) for a in range(N)]
         return np.argmax(scores)
 
-    def _update_params(self, arm_id, reward):
+    def _update_params(self, arm_id, reward, context=None):
         E, C = self.ev_estimates, self.pull_counts
+        C[arm_id] += 1
         E[arm_id] += (reward - E[arm_id]) / (C[arm_id])
 
     def _reset_params(self):
+        """
+        Reset any model-specific parameters. This gets called within the
+        public `self.reset()` method.
+        """
         self.ev_estimates = {}
+        self.pull_counts = defaultdict(lambda: 0)
 
 
 class ThompsonSamplingBetaBinomial(BanditPolicyBase):
     def __init__(self, alpha=1, beta=1):
-        """
+        r"""
         A conjugate Thompson sampling [1]_ [2]_ policy for multi-armed bandits with
         Bernoulli likelihoods.
 
@@ -237,11 +286,11 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
 
         .. math::
 
-            \\theta_k \sim \\text{Beta}(\\alpha_k, \\beta_k) \\\\
-            r \mid \\theta_k \sim \\text{Bernoulli}(\\theta_k)
+            \theta_k \sim \text{Beta}(\alpha_k, \beta_k) \\
+            r \mid \theta_k \sim \text{Bernoulli}(\theta_k)
 
         where :math:`k \in \{1,\ldots,K \}` indexes arms in the MAB and
-        :math:`\\theta_k` is the parameter of the Bernoulli likelihood for arm
+        :math:`\theta_k` is the parameter of the Bernoulli likelihood for arm
         `k`. The sampler begins by selecting an arm with probability
         proportional to it's payoff probability under the initial Beta prior.
         After pulling the sampled arm and receiving a reward, `r`, the sampler
@@ -257,7 +306,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
 
         .. math::
 
-            \\theta_k \mid r \sim \\text{Beta}(\\alpha_k + r, \\beta_k + 1 - r)
+            \theta_k \mid r \sim \text{Beta}(\alpha_k + r, \beta_k + 1 - r)
 
         References
         ----------
@@ -284,6 +333,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
 
     @property
     def parameters(self):
+        """A dictionary containing the current policy parameters"""
         return {
             "ev_estimates": self.ev_estimates,
             "alphas": self.alphas,
@@ -292,6 +342,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
 
     @property
     def hyperparameters(self):
+        """A dictionary containing the policy hyperparameters"""
         return {
             "id": "ThompsonSamplingBetaBinomial",
             "alpha": self.alpha,
@@ -300,19 +351,20 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
 
     def _initialize_params(self, bandit):
         bhp = bandit.hyperparameters
-        assert bhp["id"] == "MABBernoulliPayoff"
+        fstr = "ThompsonSamplingBetaBinomial only defined for BernoulliBandit, got: {}"
+        assert bhp["id"] == "BernoulliBandit", fstr.format(bhp["id"])
 
         # initialize the model prior
-        if isinstance(self.alpha, numbers.Number):
+        if is_number(self.alpha):
             self.alphas = [self.alpha] * bandit.n_arms
-        if isinstance(self.beta, numbers.Number):
+        if is_number(self.beta):
             self.betas = [self.beta] * bandit.n_arms
         assert len(self.alphas) == len(self.betas) == bandit.n_arms
 
         self.ev_estimates = {i: self._map_estimate(i, 1) for i in range(bandit.n_arms)}
         self.is_initialized = True
 
-    def _select_arm(self, bandit):
+    def _select_arm(self, bandit, context):
         if not self.is_initialized:
             self._initialize_prior(bandit)
 
@@ -322,7 +374,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
         # greedily select an action based on this sample
         return np.argmax(posterior_sample)
 
-    def _update_params(self, arm_id, rwd):
+    def _update_params(self, arm_id, rwd, context):
         """
         Compute the parameters of the Beta posterior, P(payoff prob | rwd),
         for arm `arm_id`.
@@ -332,7 +384,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
         self.ev_estimates[arm_id] = self._map_estimate(arm_id, rwd)
 
     def _map_estimate(self, arm_id, rwd):
-        """compute the current MAP estimate for an arm's payoff probability"""
+        """Compute the current MAP estimate for an arm's payoff probability"""
         A, B = self.alphas, self.betas
         if A[arm_id] > 1 and B[arm_id] > 1:
             map_payoff_prob = (A[arm_id] - 1) / (A[arm_id] + B[arm_id] - 2)
@@ -347,5 +399,91 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
         return map_payoff_prob
 
     def _reset_params(self):
+        """
+        Reset any model-specific parameters. This gets called within the
+        public `self.reset()` method.
+        """
         self.alphas, self.betas = [], []
+        self.ev_estimates = {}
+
+
+class LinUCB(BanditPolicyBase):
+    def __init__(self, alpha=1):
+        """
+        A disjoint linear UCB policy [*]_ for contextual linear bandits.
+
+        Notes
+        -----
+        LinUCB is only defined for :class:`ContextualLinearBandit<numpy_ml.bandits.bandits.ContextualLinearBandit>`.
+
+        References
+        ----------
+        .. [*] Li, L., Chu, W., Langford, J., & Schapire, R. (2010). A
+           contextual-bandit approach to personalized news article
+           recommendation. In *Proceedings of the 19th International Conference
+           on World Wide Web*, 661-670.
+
+        Parameters
+        ----------
+        alpha : float
+            A confidence/optimisim parameter affecting the amount of
+            exploration. Default is 1.
+        """  # noqa
+        super().__init__()
+
+        self.alpha = alpha
+        self.A, self.b = [], []
+        self.is_initialized = False
+
+    @property
+    def parameters(self):
+        """A dictionary containing the current policy parameters"""
+        return {"ev_estimates": self.ev_estimates, "A": self.A, "b": self.b}
+
+    @property
+    def hyperparameters(self):
+        """A dictionary containing the policy hyperparameters"""
+        return {
+            "id": "LinUCB",
+            "alpha": self.alpha,
+        }
+
+    def _initialize_params(self, bandit):
+        """
+        Initialize any policy-specific parameters that depend on information
+        from the bandit environment.
+        """
+        bhp = bandit.hyperparameters
+        fstr = "LinUCB only defined for contextual linear bandits, got: {}"
+        assert bhp["id"] == "ContextualLinearBandit", fstr.format(bhp["id"])
+
+        self.A, self.b = [], []
+        for _ in range(bandit.n_arms):
+            self.A.append(np.eye(bandit.D))
+            self.b.append(np.zeros(bandit.D))
+
+        self.is_initialized = True
+
+    def _select_arm(self, bandit, context):
+        probs = []
+        for a in range(bandit.n_arms):
+            C, A, b = context[:, a], self.A[a], self.b[a]
+            A_inv = np.linalg.inv(A)
+            theta_hat = A_inv @ b
+            p = theta_hat @ C + self.alpha * np.sqrt(C.T @ A_inv @ C)
+
+            probs.append(p)
+        return np.argmax(probs)
+
+    def _update_params(self, arm_id, rwd, context):
+        """Compute the parameters for A and b."""
+        self.A[arm_id] += context[:, arm_id] @ context[:, arm_id].T
+        self.b[arm_id] += rwd * context[:, arm_id]
+
+    def _reset_params(self):
+        """
+        Reset any model-specific parameters. This gets called within the
+        public `self.reset()` method.
+        """
+        self.A, self.b = [], []
         self.ev_estimates = {}
