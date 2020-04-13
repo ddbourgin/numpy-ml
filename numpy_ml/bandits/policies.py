@@ -414,7 +414,7 @@ class LinUCB(BanditPolicyBase):
 
         Notes
         -----
-        LinUCB is only defined for :class:`ContextualLinearBandit<numpy_ml.bandits.bandits.ContextualLinearBandit>`.
+        LinUCB is only defined for :class:`ContextualLinearBandit<numpy_ml.bandits.bandits.ContextualLinearBandit>` environments.
 
         References
         ----------
