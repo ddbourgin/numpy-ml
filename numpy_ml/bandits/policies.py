@@ -32,14 +32,6 @@ class BanditPolicyBase(ABC):
         """A dictionary containing the current policy parameters"""
         pass
 
-    @abstractmethod
-    def _initialize_params(self, bandit):
-        """
-        Initialize any policy-specific parameters that depend on information
-        from the bandit environment.
-        """
-        pass
-
     def act(self, bandit, context=None):
         """
         Select an arm and sample from its payoff distribution.
@@ -68,16 +60,16 @@ class BanditPolicyBase(ABC):
         self._update_params(arm_id, rwd, context)
         return rwd, arm_id
 
-    def _pull_arm(self, bandit, arm_id, context):
-        """Execute a bandit action and return the received reward."""
-        self.step += 1
-        return bandit.pull(arm_id, context)
-
     def reset(self):
         """Reset the policy parameters and counters to their initial states."""
         self.step = 0
         self._reset_params()
         self.is_initialized = False
+
+    def _pull_arm(self, bandit, arm_id, context):
+        """Execute a bandit action and return the received reward."""
+        self.step += 1
+        return bandit.pull(arm_id, context)
 
     @abstractmethod
     def _select_arm(self, bandit, context):
@@ -87,6 +79,14 @@ class BanditPolicyBase(ABC):
     @abstractmethod
     def _update_params(self, bandit, context):
         """Update the policy parameters after an interaction"""
+        pass
+
+    @abstractmethod
+    def _initialize_params(self, bandit):
+        """
+        Initialize any policy-specific parameters that depend on information
+        from the bandit environment.
+        """
         pass
 
     @abstractmethod
@@ -267,7 +267,7 @@ class UCB1(BanditPolicyBase):
     def _reset_params(self):
         """
         Reset any model-specific parameters. This gets called within the
-        public `self.reset()` method.
+        public :method:`reset` method.
         """
         self.ev_estimates = {}
         self.pull_counts = defaultdict(lambda: 0)
@@ -282,7 +282,7 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
         Notes
         -----
         The policy assumes independent Beta priors on the Bernoulli arm payoff
-        probabilities, :math:`\\theta`:
+        probabilities, :math:`\theta`:
 
         .. math::
 
@@ -414,7 +414,7 @@ class LinUCB(BanditPolicyBase):
 
         Notes
         -----
-        LinUCB is only defined for :class:`ContextualLinearBandit <numpy_ml.bandits.bandits.ContextualLinearBandit>` environments.
+        LinUCB is only defined for :class:`ContextualLinearBandit <numpy_ml.bandits.ContextualLinearBandit>` environments.
 
         References
         ----------

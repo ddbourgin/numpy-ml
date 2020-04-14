@@ -21,6 +21,29 @@ class Bandit(ABC):
         params = ", ".join(["{}={}".format(k, v) for (k, v) in HP.items() if k != "id"])
         return "{}({})".format(HP["id"], params)
 
+    @property
+    def hyperparameters(self):
+        """A dictionary of the bandit hyperparameters"""
+        return {}
+
+    @abstractmethod
+    def oracle_payoff(self, context=None):
+        """
+        Return the expected reward for an optimal agent.
+
+        Parameters
+        ----------
+        context : :py:class:`ndarray <numpy.ndarray>` of shape `(D, K)` or None
+            The current context matrix for each of the bandit arms, if
+            applicable. Default is None.
+
+        Returns
+        -------
+        optimal_rwd : float
+            The expected reward under an optimal policy.
+        """
+        pass
+
     def pull(self, arm_id, context=None):
         """
         "Pull" (i.e., sample from) a given arm's payoff distribution.
@@ -43,24 +66,6 @@ class Bandit(ABC):
         self.step += 1
         return self._pull(arm_id, context)
 
-    @abstractmethod
-    def oracle_payoff(self, context=None):
-        """
-        Return the expected reward for an optimal agent.
-
-        Parameters
-        ----------
-        context : :py:class:`ndarray <numpy.ndarray>` of shape `(D, K)` or None
-            The current context matrix for each of the bandit arms, if
-            applicable. Default is None.
-
-        Returns
-        -------
-        optimal_rwd : float
-            The expected reward under an optimal policy.
-        """
-        pass
-
     def reset(self):
         """Reset the bandit step and action counters to zero."""
         self.step = 0
@@ -68,11 +73,6 @@ class Bandit(ABC):
     @abstractmethod
     def _pull(self, arm_id):
         pass
-
-    @property
-    def hyperparameters(self):
-        """A dictionary of the bandit hyperparameters"""
-        return {}
 
 
 class MultinomialBandit(Bandit):
@@ -114,11 +114,6 @@ class MultinomialBandit(Bandit):
             "payoff_probs": self.payoff_probs,
         }
 
-    def _pull(self, arm_id, context):
-        payoffs = self.payoffs[arm_id]
-        probs = self.payoff_probs[arm_id]
-        return np.random.choice(payoffs, p=probs)
-
     def oracle_payoff(self, context=None):
         """
         Return the expected reward for an optimal agent.
@@ -134,6 +129,11 @@ class MultinomialBandit(Bandit):
             The expected reward under an optimal policy.
         """
         return self.best_ev
+
+    def _pull(self, arm_id, context):
+        payoffs = self.payoffs[arm_id]
+        probs = self.payoff_probs[arm_id]
+        return np.random.choice(payoffs, p=probs)
 
 
 class BernoulliBandit(Bandit):
@@ -168,9 +168,6 @@ class BernoulliBandit(Bandit):
             "payoff_probs": self.payoff_probs,
         }
 
-    def _pull(self, arm_id, context):
-        return int(np.random.rand() <= self.payoff_probs[arm_id])
-
     def oracle_payoff(self, context=None):
         """
         Return the expected reward for an optimal agent.
@@ -186,6 +183,9 @@ class BernoulliBandit(Bandit):
             The expected reward under an optimal policy.
         """
         return self.best_ev
+
+    def _pull(self, arm_id, context):
+        return int(np.random.rand() <= self.payoff_probs[arm_id])
 
 
 class GaussianBandit(Bandit):
@@ -286,15 +286,6 @@ class ShortestPathBandit(Bandit):
         placeholder = [None] * len(self.paths)
         super().__init__(placeholder, placeholder)
 
-    def _calc_arm_evs(self):
-        I2V = self.G.get_vertex
-        evs = np.zeros(len(self.paths))
-        for p_ix, path in enumerate(self.paths):
-            for ix, v_i in enumerate(path[:-1]):
-                e = [e for e in self.adj_dict[v_i] if e.to == I2V(path[ix + 1])][0]
-                evs[p_ix] -= e.weight
-        return evs
-
     @property
     def hyperparameters(self):
         """A dictionary of the bandit hyperparameters"""
@@ -304,15 +295,6 @@ class ShortestPathBandit(Bandit):
             "end_vertex": self.end_vertex,
             "start_vertex": self.start_vertex,
         }
-
-    def _pull(self, arm_id, context):
-        reward = 0
-        I2V = self.G.get_vertex
-        path = self.paths[arm_id]
-        for ix, v_i in enumerate(path[:-1]):
-            e = [e for e in self.adj_dict[v_i] if e.to == I2V(path[ix + 1])][0]
-            reward -= e.weight
-        return reward
 
     def oracle_payoff(self, context=None):
         """
@@ -329,6 +311,24 @@ class ShortestPathBandit(Bandit):
             The expected reward under an optimal policy.
         """
         return self.best_ev
+
+    def _calc_arm_evs(self):
+        I2V = self.G.get_vertex
+        evs = np.zeros(len(self.paths))
+        for p_ix, path in enumerate(self.paths):
+            for ix, v_i in enumerate(path[:-1]):
+                e = [e for e in self.adj_dict[v_i] if e.to == I2V(path[ix + 1])][0]
+                evs[p_ix] -= e.weight
+        return evs
+
+    def _pull(self, arm_id, context):
+        reward = 0
+        I2V = self.G.get_vertex
+        path = self.paths[arm_id]
+        for ix, v_i in enumerate(path[:-1]):
+            e = [e for e in self.adj_dict[v_i] if e.to == I2V(path[ix + 1])][0]
+            reward -= e.weight
+        return reward
 
 
 class ContextualBernoulliBandit(Bandit):
@@ -379,12 +379,6 @@ class ContextualBernoulliBandit(Bandit):
         context[np.random.choice(D), :] = 1
         return random_one_hot_matrix(1, D).ravel()
 
-    def _pull(self, arm_id, context):
-        D, K = self.context_probs.shape
-        arm_probs = context[:, arm_id] @ self.context_probs
-        arm_rwds = (np.random.rand(K) <= arm_probs).astype(int)
-        return arm_rwds[arm_id]
-
     def oracle_payoff(self, context):
         """
         Return the expected reward for an optimal agent.
@@ -401,6 +395,12 @@ class ContextualBernoulliBandit(Bandit):
             The expected reward under an optimal policy.
         """
         return context[:, 0] @ self.best_ev
+
+    def _pull(self, arm_id, context):
+        D, K = self.context_probs.shape
+        arm_probs = context[:, arm_id] @ self.context_probs
+        arm_rwds = (np.random.rand(K) <= arm_probs).astype(int)
+        return arm_rwds[arm_id]
 
 
 class ContextualLinearBandit(Bandit):
@@ -484,12 +484,6 @@ class ContextualLinearBandit(Bandit):
         """
         return np.random.normal(size=(self.D, self.K))
 
-    def _pull(self, arm_id, context):
-        K, thetas = self.K, self.thetas
-        self._noise = np.random.normal(scale=self.payoff_variance, size=self.K)
-        self.arm_evs = np.array([context[:, k] @ thetas[:, k] for k in range(K)])
-        return (self.arm_evs + self._noise)[arm_id]
-
     def oracle_payoff(self, context):
         """
         Return the expected reward for an optimal agent.
@@ -507,3 +501,9 @@ class ContextualLinearBandit(Bandit):
         """
         best_arm = np.argmax(self.arm_evs)
         return self.arm_evs[best_arm]
+
+    def _pull(self, arm_id, context):
+        K, thetas = self.K, self.thetas
+        self._noise = np.random.normal(scale=self.payoff_variance, size=self.K)
+        self.arm_evs = np.array([context[:, k] @ thetas[:, k] for k in range(K)])
+        return (self.arm_evs + self._noise)[arm_id]
