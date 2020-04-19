@@ -103,6 +103,7 @@ This repo includes code for the following models:
 
 8. **Multi-armed bandit models**
     - UCB1
+    - LinUCB
     - Epsilon-greedy
     - Thompson sampling w/ conjugate priors
         - Beta-Bernoulli sampler
