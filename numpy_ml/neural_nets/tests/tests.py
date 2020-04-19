@@ -1,3 +1,4 @@
+# flake8: noqa
 import time
 from copy import deepcopy
 
@@ -507,7 +508,7 @@ def test_squared_error_grad(N=None):
 
 def test_cross_entropy_grad(N=None):
     from ..losses import CrossEntropy
-    from ..activations import Softmax
+    from ..layers import Softmax
 
     N = np.inf if N is None else N
 
@@ -524,7 +525,7 @@ def test_cross_entropy_grad(N=None):
 
         # the cross_entropy_gradient returns the gradient wrt. z (NOT softmax(z))
         z = random_tensor((n_examples, n_classes))
-        y_pred = sm.fn(z)
+        y_pred = sm.forward(z)
 
         assert_almost_equal(mine.grad(y, y_pred), gold(y, z), decimal=5)
         print("PASSED")
@@ -614,23 +615,6 @@ def test_softplus_activation(N=None):
 
     mine = SoftPlus()
     gold = lambda z: F.softplus(torch.FloatTensor(z)).numpy()
-
-    i = 0
-    while i < N:
-        n_dims = np.random.randint(1, 100)
-        z = random_stochastic_matrix(1, n_dims)
-        assert_almost_equal(mine.fn(z), gold(z))
-        print("PASSED")
-        i += 1
-
-
-def test_softsign_activation(N=None):
-    from ..activations import SoftSign
-
-    N = np.inf if N is None else N
-
-    mine = SoftSign()
-    gold = lambda z: F.softsign(torch.FloatTensor(z)).numpy()
 
     i = 0
     while i < N:
@@ -756,24 +740,6 @@ def test_softplus_grad(N=None):
 
     mine = SoftPlus()
     gold = torch_gradient_generator(F.softplus)
-
-    i = 0
-    while i < N:
-        n_ex = np.random.randint(1, 100)
-        n_dims = np.random.randint(1, 100)
-        z = random_tensor((n_ex, n_dims), standardize=True)
-        assert_almost_equal(mine.grad(z), gold(z))
-        print("PASSED")
-        i += 1
-
-
-def test_softsign_grad(N=None):
-    from ..activations import SoftSign
-
-    N = np.inf if N is None else N
-
-    mine = SoftSign()
-    gold = torch_gradient_generator(F.softsign)
 
     i = 0
     while i < N:
