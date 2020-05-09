@@ -38,6 +38,8 @@ that in mind, don't just read the docs -- read the source!
 
    numpy_ml.nonparametric
 
+   numpy_ml.factorization
+
    numpy_ml.trees
 
    numpy_ml.neural_nets

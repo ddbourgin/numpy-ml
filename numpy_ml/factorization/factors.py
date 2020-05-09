@@ -25,7 +25,7 @@ class VanillaALS:
         where :math:`||\cdot||` denotes the Frobenius norm, **X** is the
         :math:`N \times M` data matrix, :math:`\mathbf{W}` and
         :math:`\mathbf{H}` are learned factor matrices with dimensions :math:`N
-        \times K` and :math:`K \times M`, respectively. :math:`\alpha` is a
+        \times K` and :math:`K \times M`, respectively, and :math:`\alpha` is a
         user-defined regularization weight.
 
         ALS proceeds by alternating between fixing **W** and optimizing for
@@ -36,8 +36,8 @@ class VanillaALS:
         References
         ----------
         .. [1] Gillis, N. (2014). The why and how of nonnegative matrix
-        factorization.  *Regularization, optimization, kernels, and support
-        vector machines*, 12(257), 257-291.
+           factorization.  *Regularization, optimization, kernels, and support
+           vector machines, 12(257)*, 257-291.
 
         Parameters
         ----------
@@ -294,14 +294,15 @@ class NMF:
            \mathbf{X}^{(j)} :=
                 \mathbf{X} - \mathbf{WH}^\top + \mathbf{w}_j \mathbf{h}_j^\top
 
-        where :math:`\mathbf{X}^{(j)}` is the `j`th residue, **X** is the input
-        data matrix, and :math:`\mathbf{w}_j` and :math:`\mathbf{h}_j` are the
-        `j`th columns of the current factor matrices **W** and **H**. HALS
-        proceeds by minimizing the cost for each residue, first with respect to
-        :math:`\mathbf{w}_j` holding :math:`\mathbf{h}_j` fixed, and then with
-        respect to :math:`\mathbf{h}_j`, holding the newly updated
-        :math:`\mathbf{w}_j` fixed. The residue cost :math:`\mathcal{L}^{(j)}`
-        for :math:`\mathbf{X}^{j}` is simply:
+        where :math:`\mathbf{X}^{(j)}` is the :math:`j^{th}` residue, **X** is
+        the input data matrix, and :math:`\mathbf{w}_j` and
+        :math:`\mathbf{h}_j` are the :math:`j^{th}` columns of the current
+        factor matrices **W** and **H**. HALS proceeds by minimizing the cost
+        for each residue, first with respect to :math:`\mathbf{w}_j` holding
+        :math:`\mathbf{h}_j` fixed, and then with respect to
+        :math:`\mathbf{h}_j`, holding the newly updated :math:`\mathbf{w}_j`
+        fixed. The residue cost :math:`\mathcal{L}^{(j)}` for
+        :math:`\mathbf{X}^{j}` is simply:
 
         .. math::
 
