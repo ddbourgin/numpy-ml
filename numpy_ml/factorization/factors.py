@@ -295,18 +295,16 @@ class NMF:
         the input data matrix, and :math:`\mathbf{w}_j` and
         :math:`\mathbf{h}_j` are the :math:`j^{th}` columns of the current
         factor matrices **W** and **H**. HALS proceeds by minimizing the cost
-        for each residue, first with respect to :math:`\mathbf{w}_j` holding
-        :math:`\mathbf{h}_j` fixed, and then with respect to
-        :math:`\mathbf{h}_j`, holding the newly updated :math:`\mathbf{w}_j`
-        fixed. The residue cost :math:`\mathcal{L}^{(j)}` for
-        :math:`\mathbf{X}^{j}` is simply:
+        for each residue, first with respect to :math:`\mathbf{w}_j`, and then
+        with respect to :math:`\mathbf{h}_j`. In either case, the cost for
+        residue `j`, :math:`\mathcal{L}^{(j)}` is simply:
 
         .. math::
 
             \mathcal{L}^{(j)} :=
                 || \mathbf{X}^{(j)} - \mathbf{w}_j \mathbf{h}_j^\top ||
 
-        where :math:`||\cdot||` denotes the Frobenius norm. For NMF, this
+        where :math:`||\cdot||` denotes the Frobenius norm. For NMF,
         minimization is performed under the constraint that all elements of
         both **W** and **H** are nonnegative.
 

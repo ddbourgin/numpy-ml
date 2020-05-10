@@ -15,8 +15,8 @@ associated with at least one data point from the original training set.
     :align: center
 
     A binary decision tree trained on the dataset :math:`X = \{ \mathbf{x}_1,
-    \ldots, \mathbf{x}_{10} \}`. Each example in the dataset is a 5-dimensional
-    vector of real-valued features labeled :math:`x_1, \ldots, x_5`. Unshaded
+    \ldots, \mathbf{x}_{10} \}`. Each example in the dataset is a 4-dimensional
+    vector of real-valued features labeled :math:`x_1, \ldots, x_4`. Unshaded
     circles correspond to internal decision nodes, while shaded circles
     correspond to leaf nodes. Each leaf node is associated with a subset of the
     examples in `X`, selected based on the decision rules along the path from
@@ -52,13 +52,13 @@ impurity after a particular split is
 .. math::
 
     \Delta \mathcal{L} = \mathcal{L}(\text{Parent}) -
-        P_{left} \mathcal{L}(\text{Left child}) -
-            (1 - P_{left})\mathcal{L}(\text{Right child})
+        P_{\text{left}} \mathcal{L}(\text{Left child}) -
+            (1 - P_{\text{left}})\mathcal{L}(\text{Right child})
 
 where :math:`\mathcal{L}(x)` is the impurity of the dataset at node `x`,
-and :math:`P_{left}`/:math:`P_{right}` are the proportion of examples at the
-current node that are partitioned into the left / right children, respectively,
-by the proposed split.
+and :math:`P_{\text{left}}`/:math:`P_{\text{right}}` are the proportion of
+examples at the current node that are partitioned into the left / right
+children, respectively, by the proposed split.
 
 .. _`Decision trees`: https://en.wikipedia.org/wiki/Decision_tree_learning
 
@@ -123,7 +123,7 @@ that proceeds by iteratively fitting a sequence of `m` weak learners such that:
 
 where `b` is a fixed initial estimate for the targets, :math:`\eta` is
 a learning rate parameter, and :math:`w_{i}` and :math:`g_{i}`
-denote the weights and predictions for `i` th learner.
+denote the weights and predictions of the :math:`i^{th}` learner.
 
 At each training iteration a new weak learner is fit to predict the negative
 gradient of the loss with respect to the previous prediction,

@@ -406,14 +406,14 @@ class ContextualBernoulliBandit(Bandit):
 class ContextualLinearBandit(Bandit):
     def __init__(self, K, D, payoff_variance=1):
         r"""
-        A linear multi-armed bandit where .
+        A contextual linear multi-armed bandit.
 
         Notes
         -----
         In a contextual linear bandit the expected payoff of an arm :math:`a
         \in \mathcal{A}` at time `t` is a linear combination of its context
         vector :math:`\mathbf{x}_{t,a}` with a coefficient vector
-        :math:`\\theta_a`:
+        :math:`\theta_a`:
 
         .. math::
 
