@@ -140,20 +140,18 @@ class VanillaALS:
 
     def _fit(self, X, W, H, verbose):
         self._init_factor_matrices(X, W, H)
-        prev_loss = loss = np.inf
         W, H = self.W, self.H
 
         for i in range(self.max_iter):
-            prev_loss = loss
             W = self._update_factor(X, H.T)
             H = self._update_factor(X.T, W).T
 
             loss = self._loss(X, W @ H)
 
             if verbose:
-                print("[Iter {}] Loss: {:.6f}".format(i + 1, loss))
+                print("[Iter {}] Loss: {:.8f}".format(i + 1, loss))
 
-            if (prev_loss - loss) <= self.tol:
+            if loss <= self.tol:
                 break
 
         return W, H, loss
@@ -252,8 +250,7 @@ class NMF:
 
     def _update_H(self, X, W, H):
         """Perform the fast HALS update for H"""
-        #  eps = np.finfo(float).eps
-        eps = 1e-16
+        eps = np.finfo(float).eps
         XtW = X.T @ W  # dim: (M, K)
         WtW = W.T @ W  # dim: (K, K)
 
@@ -264,7 +261,7 @@ class NMF:
 
     def _update_W(self, X, W, H):
         """Perform the fast HALS update for W"""
-        eps = 1e-16  # np.finfo(float).eps
+        eps = np.finfo(float).eps
         XHt = X @ H.T  # dim: (N, K)
         HHt = H @ H.T  # dim: (K, K)
 
@@ -360,16 +357,14 @@ class NMF:
         self._init_factor_matrices(X, W, H)
 
         W, H = self.W, self.H
-        prev_loss = loss = np.inf
         for i in range(self.max_iter):
-            prev_loss = loss
             H = self._update_H(X, W, H)
             W = self._update_W(X, W, H)
             loss = self._loss(X, W @ H)
 
             if verbose:
-                print("[Iter {}] Loss: {:.4f}".format(i + 1, loss))
+                print("[Iter {}] Loss: {:.8f}".format(i + 1, loss))
 
-            if (prev_loss - loss) <= self.tol:
+            if loss <= self.tol:
                 break
         return W, H, loss
