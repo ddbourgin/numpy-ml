@@ -106,6 +106,7 @@ This repo includes code for the following models:
     - Epsilon-greedy
     - Thompson sampling w/ conjugate priors
         - Beta-Bernoulli sampler
+    - LinUCB
 
 8. **Reinforcement learning models**
     - Cross-entropy method agent
@@ -120,7 +121,11 @@ This repo includes code for the following models:
     - k-Nearest neighbors classification and regression
     - Gaussian process regression
 
-10. **Preprocessing**
+10. **Matrix factorization**
+    - Regularized alternating least-squares
+    - Non-negative matrix factorization
+
+11. **Preprocessing**
     - Discrete Fourier transform (1D signals)
     - Discrete cosine transform (type-II) (1D signals)
     - Bilinear interpolation (2D signals)
@@ -135,7 +140,7 @@ This repo includes code for the following models:
     - Term frequency-inverse document frequency (TF-IDF) encoding
     - MFCC encoding
 
-11. **Utilities**
+12. **Utilities**
     - Similarity kernels
     - Distance metrics
     - Priority queue

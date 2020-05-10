@@ -419,9 +419,10 @@ class ContextualLinearBandit(Bandit):
 
             \mathbb{E}[r_{t, a} \mid \mathbf{x}_{t, a}] = \mathbf{x}_{t,a}^\top \theta_a
 
-        In this implementation, the arm coefficient vectors are sampled
-        independently from a Uniform distribution on the interval between -1
-        and 1, and the specific reward at timestep `t` is normally distributed:
+        In this implementation, the arm coefficient vectors :math:`\theta` are
+        initialized independently from a uniform distribution on the interval
+        [-1, 1], and the specific reward at timestep `t` is normally
+        distributed:
 
         .. math::
 
@@ -473,8 +474,8 @@ class ContextualLinearBandit(Bandit):
 
     def get_context(self):
         """
-        Sample a context vector from a standard normal distribution for each of
-        the arms.
+        Sample the context vectors for each arm from a multivariate standard
+        normal distribution.
 
         Returns
         -------
