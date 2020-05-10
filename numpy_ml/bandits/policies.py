@@ -202,13 +202,12 @@ class UCB1(BanditPolicyBase):
 
             \text{UCB}(a, t) = \text{EV}_t(a) + C \sqrt{\frac{2 \log t}{N_t(a)}}
 
-        where :math:`\text{UCB}(a, t)` is the upper confidence bound on the
-        expected value of arm `a` at time `t`, :math:`\text{EV}_t(a)` is the
-        average of the rewards recieved so far from pulling arm `a`, `C` is a
-        parameter controlling the confidence upper bound of the estimate for
-        :math:`\text{UCB}(a, t)` (for logarithmic regret bounds, `C` must
-        equal 1), and :math:`N_t(a)` is the number of times arm `a` has been
-        pulled during the previous `t - 1` timesteps.
+        where :math:`\text{EV}_t(a)` is the average of the rewards recieved so
+        far from pulling arm `a`, `C` is a free parameter controlling the
+        "optimism" of the confidence upper bound for :math:`\text{UCB}(a, t)`
+        (for logarithmic regret bounds, `C` must equal 1), and :math:`N_t(a)`
+        is the number of times arm `a` has been pulled during the previous `t -
+        1` timesteps.
 
         References
         ----------
@@ -220,7 +219,8 @@ class UCB1(BanditPolicyBase):
         ----------
         C : float in (0, +infinity)
             A confidence/optimisim parameter affecting the degree of
-            exploration. The UCB1 algorithm assumes `C=1`. Default is 1.
+            exploration, where larger values encourage greater exploration. The
+            UCB1 algorithm assumes `C=1`. Default is 1.
         ev_prior : float
             The starting expected value for each arm before any data has been
             observed. Default is 0.5.
@@ -292,10 +292,10 @@ class ThompsonSamplingBetaBinomial(BanditPolicyBase):
         where :math:`k \in \{1,\ldots,K \}` indexes arms in the MAB and
         :math:`\theta_k` is the parameter of the Bernoulli likelihood for arm
         `k`. The sampler begins by selecting an arm with probability
-        proportional to it's payoff probability under the initial Beta prior.
+        proportional to its payoff probability under the initial Beta prior.
         After pulling the sampled arm and receiving a reward, `r`, the sampler
         computes the posterior over the model parameters (arm payoffs) via
-        Bayes' rule, and then samples a new action in proportion to it's payoff
+        Bayes' rule, and then samples a new action in proportion to its payoff
         probability under this posterior. This process (i.e., sample action
         from posterior, take action and receive reward, compute updated
         posterior) is repeated until the number of trials is exhausted.
