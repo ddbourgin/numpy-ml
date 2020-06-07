@@ -1,3 +1,4 @@
+"""A module for different N-gram smoothing models"""
 import textwrap
 from abc import ABC, abstractmethod
 from collections import Counter
@@ -5,11 +6,11 @@ from collections import Counter
 import numpy as np
 
 from ..linear_models.lm import LinearRegression
-from ..preprocessing.nlp import tokenize_words, ngrams
+from ..preprocessing.nlp import tokenize_words, ngrams, strip_punctuation
 
 
 class NGramBase(ABC):
-    def __init__(self, N, unk=True, filter_stopwords=True):
+    def __init__(self, N, unk=True, filter_stopwords=True, filter_punctuation=True):
         """
         A simple word-level N-gram language model.
 
@@ -23,11 +24,13 @@ class NGramBase(ABC):
         self.N = N
         self.unk = unk
         self.filter_stopwords = filter_stopwords
+        self.filter_punctuation = filter_punctuation
 
         self.hyperparameters = {
             "N": N,
             "unk": unk,
             "filter_stopwords": filter_stopwords,
+            "filter_punctuation": filter_punctuation,
         }
 
         super().__init__()
@@ -57,20 +60,19 @@ class NGramBase(ABC):
         return self._train(corpus_fp, vocab=vocab, encoding=encoding)
 
     def _train(self, corpus_fp, vocab=None, encoding=None):
-        """
-        Actual N-gram training logic
-        """
+        """Actual N-gram training logic"""
         H = self.hyperparameters
         grams = {N: [] for N in range(1, self.N + 1)}
         counts = {N: Counter() for N in range(1, self.N + 1)}
-        filter_stop = H["filter_stopwords"]
+        filter_stop, filter_punc = H["filter_stopwords"], H["filter_punctuation"]
 
         _n_words = 0
-        tokens = set(["<unk>"])
+        tokens = {"<unk>"}
         bol, eol = ["<bol>"], ["<eol>"]
 
         with open(corpus_fp, "r", encoding=encoding) as text:
             for line in text:
+                line = strip_punctuation(line) if filter_punc else line
                 words = tokenize_words(line, filter_stopwords=filter_stop)
 
                 if vocab is not None:
@@ -174,7 +176,7 @@ class NGramBase(ABC):
         return sentences
 
     def perplexity(self, words, N):
-        """
+        r"""
         Calculate the model perplexity on a sequence of words.
 
         Notes
@@ -183,13 +185,13 @@ class NGramBase(ABC):
 
         .. math::
 
-            PP(W)  =  \\left( \\frac{1}{p(W)} \\right)^{1 / n}
+            PP(W)  =  \left( \frac{1}{p(W)} \right)^{1 / n}
 
         or simply
 
         .. math::
 
-            PP(W)  &=  \exp(-\log p(W) / n) \\\\
+            PP(W)  &=  \exp(-\log p(W) / n) \\
                    &=  \exp(H(W))
 
         where :math:`W = [w_1, \ldots, w_k]` is a sequence of words, `H(w)` is
@@ -216,7 +218,7 @@ class NGramBase(ABC):
         return np.exp(self.cross_entropy(words, N))
 
     def cross_entropy(self, words, N):
-        """
+        r"""
         Calculate the model cross-entropy on a sequence of words against the
         empirical distribution of words in a sample.
 
@@ -226,7 +228,7 @@ class NGramBase(ABC):
 
         .. math::
 
-            H(W) = -\\frac{\log p(W)}{n}
+            H(W) = -\frac{\log p(W)}{n}
 
         where :math:`W = [w_1, \ldots, w_k]` is a sequence of words, and `n` is
         the number of `N`-grams in `W`.
@@ -251,7 +253,10 @@ class NGramBase(ABC):
         return -(1 / n_ngrams) * self.log_prob(words, N)
 
     def _log_prob(self, words, N):
-        """Calculate the log probability of a sequence of words under the `N`-gram model"""
+        """
+        Calculate the log probability of a sequence of words under the
+        `N`-gram model
+        """
         assert N in self.counts, "You do not have counts for {}-grams".format(N)
 
         if N > len(words):
@@ -293,10 +298,15 @@ class NGramBase(ABC):
 
     @abstractmethod
     def log_prob(self, words, N):
+        """
+        Compute the log probability of a sequence of words under the
+        unsmoothed, maximum-likelihood `N`-gram language model.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def _log_ngram_prob(self, ngram):
+        """Return the unsmoothed log probability of the ngram"""
         raise NotImplementedError
 
 
@@ -319,6 +329,7 @@ class MLENGram(NGramBase):
             Whether to remove punctuation before training. Default is True.
         """
         super().__init__(N, unk, filter_stopwords, filter_punctuation)
+
         self.hyperparameters["id"] = "MLENGram"
 
     def log_prob(self, words, N):
@@ -352,7 +363,7 @@ class MLENGram(NGramBase):
 
 class AdditiveNGram(NGramBase):
     def __init__(
-        self, N, K=1, unk=True, filter_stopwords=True, filter_punctuation=True
+        self, N, K=1, unk=True, filter_stopwords=True, filter_punctuation=True,
     ):
         """
         An N-Gram model with smoothed probabilities calculated via additive /
@@ -384,11 +395,12 @@ class AdditiveNGram(NGramBase):
             Whether to remove punctuation before training. Default is True.
         """
         super().__init__(N, unk, filter_stopwords, filter_punctuation)
+
         self.hyperparameters["id"] = "AdditiveNGram"
         self.hyperparameters["K"] = K
 
     def log_prob(self, words, N):
-        """
+        r"""
         Compute the smoothed log probability of a sequence of words under the
         `N`-gram language model with additive smoothing.
 
@@ -398,15 +410,15 @@ class AdditiveNGram(NGramBase):
 
         .. math::
 
-            P(w_i \mid w_{i-1}) = \\frac{A + K}{B + KV}
+            P(w_i \mid w_{i-1}) = \frac{A + K}{B + KV}
 
         where
 
         .. math::
 
-            A  &=  \\text{Count}(w_{i-1}, w_i) \\\\
-            B  &=  \sum_j \\text{Count}(w_{i-1}, w_j) \\\\
-            V  &= |\{ w_j \ : \ \\text{Count}(w_{i-1}, w_j) > 0 \}|
+            A  &=  \text{Count}(w_{i-1}, w_i) \\
+            B  &=  \sum_j \text{Count}(w_{i-1}, w_j) \\
+            V  &= |\{ w_j \ : \ \text{Count}(w_{i-1}, w_j) > 0 \}|
 
         This is equivalent to pretending we've seen every possible `N`-gram
         sequence at least `K` times.
@@ -446,7 +458,7 @@ class AdditiveNGram(NGramBase):
 
 class GoodTuringNGram(NGramBase):
     def __init__(
-        self, N, conf=1.96, unk=True, filter_stopwords=True, filter_punctuation=True
+        self, N, conf=1.96, unk=True, filter_stopwords=True, filter_punctuation=True,
     ):
         """
         An N-Gram model with smoothed probabilities calculated with the simple
@@ -471,6 +483,7 @@ class GoodTuringNGram(NGramBase):
             Whether to remove punctuation before training. Default is True.
         """
         super().__init__(N, unk, filter_stopwords, filter_punctuation)
+
         self.hyperparameters["id"] = "GoodTuringNGram"
         self.hyperparameters["conf"] = conf
 
@@ -497,7 +510,7 @@ class GoodTuringNGram(NGramBase):
         self._calc_smoothed_counts()
 
     def log_prob(self, words, N):
-        """
+        r"""
         Compute the smoothed log probability of a sequence of words under the
         `N`-gram language model with Good-Turing smoothing.
 
@@ -507,21 +520,22 @@ class GoodTuringNGram(NGramBase):
 
         .. math::
 
-            P(w_i \mid w_{i-1}) = \\frac{C^*}{\\text{Count}(w_{i-1})}
+            P(w_i \mid w_{i-1}) = \frac{C^*}{\text{Count}(w_{i-1})}
 
         where :math:`C^*` is the Good-Turing smoothed estimate of the bigram
         count:
 
         .. math::
 
-            C^* = \\frac{(c + 1) \\text{NumCounts}(c + 1, 2)}{\\text{NumCounts}(c, 2)}
+            C^* = \frac{(c + 1) \text{NumCounts}(c + 1, 2)}{\text{NumCounts}(c, 2)}
 
         where
 
         .. math::
 
-            c  &=  \\text{Count}(w_{i-1}, w_i) \\\\
-            \\text{NumCounts}(r, k)  &=  |\{ k\\text{-gram} : \\text{Count}(k\\text{-gram}) = r \}|
+            c  &=  \text{Count}(w_{i-1}, w_i) \\
+            \text{NumCounts}(r, k)  &=
+                |\{ k\text{-gram} : \text{Count}(k\text{-gram}) = r \}|
 
         In words, the probability of an `N`-gram that occurs `r` times in the
         corpus is estimated by dividing up the probability mass occupied by
@@ -532,7 +546,7 @@ class GoodTuringNGram(NGramBase):
 
         .. math::
 
-            \log \\text{NumCounts}(r) = b + a \log r
+            \log \text{NumCounts}(r) = b + a \log r
 
         Under the Good-Turing estimator, the total probability assigned to
         unseen `N`-grams is equal to the relative occurrence of `N`-grams that
