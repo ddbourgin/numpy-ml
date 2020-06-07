@@ -1,3 +1,4 @@
+# flake8: noqa
 import gym
 
 from .trainer import Trainer
