@@ -14,9 +14,7 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("paper", font_scale=0.9)
 
-from .gbdt import GradientBoostedDecisionTree
-from .dt import DecisionTree
-from .rf import RandomForest
+from numpy_ml.trees import GradientBoostedDecisionTree, DecisionTree, RandomForest
 
 
 def plot():

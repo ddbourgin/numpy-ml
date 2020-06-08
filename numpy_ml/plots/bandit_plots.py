@@ -4,15 +4,20 @@ from collections import namedtuple
 
 import numpy as np
 
-from .bandits import (
+from numpy_ml.bandits import (
     MultinomialBandit,
     BernoulliBandit,
     ShortestPathBandit,
     ContextualLinearBandit,
 )
-from .trainer import BanditTrainer
-from .policies import EpsilonGreedy, UCB1, ThompsonSamplingBetaBinomial, LinUCB
-from ..utils.graphs import random_DAG, DiGraph, Edge
+from numpy_ml.bandits.trainer import BanditTrainer
+from numpy_ml.bandits.policies import (
+    EpsilonGreedy,
+    UCB1,
+    ThompsonSamplingBetaBinomial,
+    LinUCB,
+)
+from numpy_ml.utils.graphs import random_DAG, DiGraph, Edge
 
 
 def random_multinomial_mab(n_arms=10, n_choices_per_arm=5, reward_range=[0, 1]):

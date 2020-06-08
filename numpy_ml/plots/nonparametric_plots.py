@@ -1,3 +1,4 @@
+# flake8: noqa
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -8,10 +9,8 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("paper", font_scale=0.5)
 
-from .gp import GPRegression
-from ..linear_models.lm import LinearRegression
-from .kernel_regression import KernelRegression
-from .knn import KNN
+from numpy_ml.nonparametric import GPRegression, KNN, KernelRegression
+from numpy_ml.linear_models.lm import LinearRegression
 
 from sklearn.model_selection import train_test_split
 

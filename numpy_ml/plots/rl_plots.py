@@ -1,8 +1,8 @@
 # flake8: noqa
 import gym
 
-from .trainer import Trainer
-from .agents import (
+from numpy_ml.rl_models.trainer import Trainer
+from numpy_ml.rl_models.agents import (
     CrossEntropyAgent,
     MonteCarloAgent,
     TemporalDifferenceAgent,
