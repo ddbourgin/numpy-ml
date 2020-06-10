@@ -1,16 +1,20 @@
 """A trainer/runner object for executing and comparing MAB policies."""
 
+import warnings
 import os.path as op
 from collections import defaultdict
 
 import numpy as np
+
+from numpy_ml.utils.testing import DependencyWarning
 
 try:
     import matplotlib.pyplot as plt
 
     _PLOTTING = True
 except ImportError:
-    print("Cannot import matplotlib. Plotting functionality disabled.")
+    fstr = "Cannot import matplotlib. Plotting functionality disabled."
+    warnings.warn(fstr, DependencyWarning)
     _PLOTTING = False
 
 
@@ -114,8 +118,11 @@ class BanditTrainer:
             0.999.
         """  # noqa: E501
         self.init_logs(policies)
-        fig, all_axes = plt.subplots(len(policies), 2, sharex=True)
-        fig.set_size_inches(10.5, len(policies) * 5.25)
+
+        axes = None
+        if _PLOTTING:
+            fig, all_axes = plt.subplots(len(policies), 2, sharex=True)
+            fig.set_size_inches(10.5, len(policies) * 5.25)
 
         for policy, axes in zip(policies, all_axes):
             np.random.seed(seed)
@@ -146,11 +153,10 @@ class BanditTrainer:
             a1.set_ylim(a1_min, a1_max)
             a2.set_ylim(a2_min, a2_max)
 
-        sdir = get_scriptdir()
-        plt.savefig("{}/img/{}.png".format(sdir, "comparison"), dpi=300)
-
-        plt.show()
-        plt.close("all")
+        if _PLOTTING:
+            sdir = get_scriptdir()
+            plt.savefig("{}/img/{}.png".format(sdir, "comparison"), dpi=300)
+            plt.close("all")
 
     def train(
         self,

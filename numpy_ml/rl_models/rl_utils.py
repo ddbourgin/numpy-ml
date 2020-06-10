@@ -1,11 +1,28 @@
+"""Utilities for training and evaluating RL models on OpenAI gym environments"""
+import warnings
 from itertools import product
 from collections import defaultdict
 
 import numpy as np
 
-import gym
+from numpy_ml.utils.testing import DependencyWarning
+from numpy_ml.rl_models.tiles.tiles3 import tiles, IHT
 
-from .tiles.tiles3 import tiles, IHT
+NO_PD = False
+try:
+    import pandas as pd
+except ModuleNotFoundError:
+    NO_PD = True
+
+try:
+    import gym
+except ModuleNotFoundError:
+    fstr = (
+        "Agents in `numpy_ml.rl_models` use the OpenAI gym for training. "
+        "To install the gym environments, run `pip install gym`. For more"
+        " information, see https://github.com/openai/gym."
+    )
+    warnings.warn(fstr, DependencyWarning)
 
 
 class EnvModel(object):
@@ -29,23 +46,24 @@ class EnvModel(object):
         self._model = defaultdict(lambda: defaultdict(lambda: 0))
 
     def __setitem__(self, key, value):
+        """Set self[key] to value"""
         s, a, r, s_ = key
         self._model[(s, a)][(r, s_)] = value
 
     def __getitem__(self, key):
+        """Return the value associated with key"""
         s, a, r, s_ = key
         return self._model[(s, a)][(r, s_)]
 
     def __contains__(self, key):
+        """True if EnvModel contains `key`, else False"""
         s, a, r, s_ = key
         p1 = (s, a) in self.state_action_pairs()
         p2 = (r, s_) in self.reward_outcome_pairs()
         return p1 and p2
 
     def state_action_pairs(self):
-        """
-        Return all (state, action) pairs in the environment model
-        """
+        """Return all (state, action) pairs in the environment model"""
         return list(self._model.keys())
 
     def reward_outcome_pairs(self, s, a):
@@ -166,7 +184,7 @@ def tile_state_space(
     scale = 1.0 / obs_range
 
     # scale (state-)observation vector
-    scale_obs = lambda obs: obs * scale
+    scale_obs = lambda obs: obs * scale  # noqa: E731
 
     n_tiles = np.prod(grid_size) * n_tilings
     n_states = np.prod([n_tiles - i for i in range(n_tilings)])
@@ -180,16 +198,12 @@ def tile_state_space(
 
 
 def get_gym_environs():
-    """ List all valid OpenAI ``gym`` environment ids.  """
+    """List all valid OpenAI ``gym`` environment ids"""
     return [e.id for e in gym.envs.registry.all()]
 
 
 def get_gym_stats():
-    """ Return a pandas DataFrame of the environment IDs.  """
-    try:
-        import pandas as pd
-    except:
-        raise ImportError("Cannot import `pandas`; unable to run `get_gym_stats`")
+    """Return a pandas DataFrame of the environment IDs."""
     df = []
     for e in gym.envs.registry.all():
         print(e.id)
@@ -211,7 +225,7 @@ def get_gym_stats():
         "tuple_actions",
         "tuple_observations",
     ]
-    return pd.DataFrame(df)[cols]
+    return df if NO_PD else pd.DataFrame(df)[cols]
 
 
 def is_tuple(env):
@@ -305,13 +319,13 @@ def is_continuous(env, tuple_action, tuple_obs):
     Continuous = gym.spaces.box.Box
     if tuple_obs:
         spaces = env.observation_space.spaces
-        cont_obs = all([isinstance(s, Continuous) for s in spaces])
+        cont_obs = all(isinstance(s, Continuous) for s in spaces)
     else:
         cont_obs = isinstance(env.observation_space, Continuous)
 
     if tuple_action:
         spaces = env.action_space.spaces
-        cont_action = all([isinstance(s, Continuous) for s in spaces])
+        cont_action = all(isinstance(s, Continuous) for s in spaces)
     else:
         cont_action = isinstance(env.action_space, Continuous)
     return cont_action, cont_obs
@@ -432,7 +446,7 @@ def env_stats(env):
     cont_action, cont_obs = is_continuous(env, tuple_action, tuple_obs)
 
     n_actions_per_dim, action_ids, action_dim = action_stats(
-        env, md_action, cont_action
+        env, md_action, cont_action,
     )
     n_obs_per_dim, obs_ids, obs_dim = obs_stats(env, md_obs, cont_obs)
 

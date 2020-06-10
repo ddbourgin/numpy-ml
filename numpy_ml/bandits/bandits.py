@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..utils.testing import random_one_hot_matrix, is_number
+from numpy_ml.utils.testing import random_one_hot_matrix, is_number
 
 
 class Bandit(ABC):
