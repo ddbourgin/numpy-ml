@@ -16,7 +16,7 @@ PROJECT_URLS = {
 }
 
 setup(
-    name="numpy-ml-test7",
+    name="numpy-ml",
     version="0.1.0",
     author="David Bourgin",
     author_email="ddbourgin@gmail.com",
