@@ -5,10 +5,7 @@ learning algorithms implemented exclusively in NumPy? No?
 ## Installation
 
 ### For rapid experimentation
-To use the code in this repo as a starting point for ML prototyping and
-experimentation, it is easiest to just clone/fork the repository and begin
-hacking. To clone the repo and create a fresh
-[virtualenv](https://pypi.org/project/virtualenv/) for development, you can run:
+To use this code as a starting point for ML prototyping / experimentation, just clone the repository, create a new [virtualenv](https://pypi.org/project/virtualenv/), and start hacking:
 
 ```sh
 $ git clone https://github.com/ddbourgin/numpy-ml.git
@@ -17,8 +14,8 @@ $ pip install -r requirements-dev.txt
 ```
 
 ### For use as a package
-If you don't plan to modify the source much, you can also install numpy-ml as a
-Python package via pip: `pip install -u numpy_ml`.
+If you don't plan to modify the source, you can also install numpy-ml as a
+Python package: `pip install -u numpy_ml`.
 
 The reinforcement learning agents train on environments defined in the [OpenAI
 gym](https://github.com/openai/gym). To install these alongside numpy-ml, you
