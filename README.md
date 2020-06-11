@@ -24,9 +24,6 @@ can use `pip install -u numpy_ml[rl]`.
 ## Documentation
 For more details on the available models, see the [project documentation](https://numpy-ml.readthedocs.io/).
 
-## Examples
-Coming soon!
-
 ## Available models
 1. **Gaussian mixture model**
     - EM training
