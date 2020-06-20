@@ -17,11 +17,11 @@ PROJECT_URLS = {
 
 setup(
     name="numpy-ml",
-    version="0.1.1",
+    version="0.1.2",
     author="David Bourgin",
     author_email="ddbourgin@gmail.com",
     project_urls=PROJECT_URLS,
-    url="https://github.com/ddbourgin/numpy_ml",
+    url="https://github.com/ddbourgin/numpy-ml",
     description="Machine learning in NumPy",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
