@@ -1,7 +1,5 @@
+# flake8: noqa
 import numpy as np
-import matplotlib
-
-matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 
 import seaborn as sns
@@ -12,7 +10,7 @@ sns.set_style("white")
 sns.set_context("notebook", font_scale=0.8)
 
 from hmmlearn.hmm import MultinomialHMM as MHMM
-from .hmm import MultinomialHMM
+from numpy_ml.hmm import MultinomialHMM
 
 
 def generate_training_data(params, n_steps=500, n_examples=15):

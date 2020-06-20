@@ -82,7 +82,10 @@ class KNN:
 
             if H["classifier"]:
                 if H["weights"] == "uniform":
-                    pred = Counter(targets).most_common(1)[0][0]
+                    # for consistency with sklearn / scipy.stats.mode, return
+                    # the smallest class ID in the event of a tie
+                    counts = Counter(targets).most_common()
+                    pred, _ = sorted(counts, key=lambda x: (-x[1], x[0]))[0]
                 elif H["weights"] == "distance":
                     best_score = -np.inf
                     for label in set(targets):

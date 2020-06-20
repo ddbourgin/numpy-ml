@@ -1,7 +1,5 @@
+# flake8: noqa
 import numpy as np
-import matplotlib
-
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -10,7 +8,7 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("notebook", font_scale=0.7)
 
-from .activations import (
+from numpy_ml.neural_nets.activations import (
     Affine,
     ReLU,
     LeakyReLU,
