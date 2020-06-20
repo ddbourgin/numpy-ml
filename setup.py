@@ -17,7 +17,7 @@ PROJECT_URLS = {
 
 setup(
     name="numpy-ml",
-    version="0.1.0",
+    version="0.1.1",
     author="David Bourgin",
     author_email="ddbourgin@gmail.com",
     project_urls=PROJECT_URLS,
@@ -29,6 +29,7 @@ setup(
     packages=find_packages(),
     license="GPLv3+",
     include_package_data=True,
+    python_requires=">=3.5",
     extras_require={"rl": ["gym", "matplotlib"]},
     classifiers=[
         "Development Status :: 3 - Alpha",

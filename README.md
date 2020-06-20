@@ -10,22 +10,19 @@ To use this code as a starting point for ML prototyping / experimentation, just 
 ```sh
 $ git clone https://github.com/ddbourgin/numpy-ml.git
 $ cd numpy-ml && virtualenv npml && source npml/bin/activate
-$ pip install -r requirements-dev.txt
+$ pip3 install -r requirements-dev.txt
 ```
 
 ### As a package
 If you don't plan to modify the source, you can also install numpy-ml as a
-Python package: `pip install -u numpy_ml`.
+Python package: `pip3 install -u numpy_ml`.
 
 The reinforcement learning agents train on environments defined in the [OpenAI
 gym](https://github.com/openai/gym). To install these alongside numpy-ml, you
-can use `pip install -u numpy_ml[rl]`.
+can use `pip3 install -u 'numpy_ml[rl]'`.
 
 ## Documentation
 For more details on the available models, see the [project documentation](https://numpy-ml.readthedocs.io/).
-
-## Examples
-Coming soon!
 
 ## Available models
 1. **Gaussian mixture model**
