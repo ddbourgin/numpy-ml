@@ -1,0 +1,17 @@
+numpy
+scipy
+sklearn
+torch
+networkx
+matplotlib
+seaborn
+tensorflow
+gym
+keras
+huffman
+librosa
+nltk
+hmmlearn
+pre-commit
+tox
+pytest

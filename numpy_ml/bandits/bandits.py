@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..utils.testing import random_one_hot_matrix, is_number
+from numpy_ml.utils.testing import random_one_hot_matrix, is_number
 
 
 class Bandit(ABC):
@@ -104,6 +104,7 @@ class MultinomialBandit(Bandit):
         self.payoff_probs = payoff_probs
         self.arm_evs = np.array([sum(p * v) for p, v in zip(payoff_probs, payoffs)])
         self.best_ev = np.max(self.arm_evs)
+        self.best_arm = np.argmax(self.arm_evs)
 
     @property
     def hyperparameters(self):
@@ -127,8 +128,10 @@ class MultinomialBandit(Bandit):
         -------
         optimal_rwd : float
             The expected reward under an optimal policy.
+        optimal_arm : float
+            The arm ID with the largest expected reward.
         """
-        return self.best_ev
+        return self.best_ev, self.best_arm
 
     def _pull(self, arm_id, context):
         payoffs = self.payoffs[arm_id]
@@ -159,6 +162,7 @@ class BernoulliBandit(Bandit):
 
         self.arm_evs = self.payoff_probs
         self.best_ev = np.max(self.arm_evs)
+        self.best_arm = np.argmax(self.arm_evs)
 
     @property
     def hyperparameters(self):
@@ -181,8 +185,10 @@ class BernoulliBandit(Bandit):
         -------
         optimal_rwd : float
             The expected reward under an optimal policy.
+        optimal_arm : float
+            The arm ID with the largest expected reward.
         """
-        return self.best_ev
+        return self.best_ev, self.best_arm
 
     def _pull(self, arm_id, context):
         return int(np.random.rand() <= self.payoff_probs[arm_id])
@@ -217,6 +223,7 @@ class GaussianBandit(Bandit):
         self.payoff_probs = payoff_probs
         self.arm_evs = np.array([mu for (mu, var) in payoff_dists])
         self.best_ev = np.max(self.arm_evs)
+        self.best_arm = np.argmax(self.arm_evs)
 
     @property
     def hyperparameters(self):
@@ -249,8 +256,10 @@ class GaussianBandit(Bandit):
         -------
         optimal_rwd : float
             The expected reward under an optimal policy.
+        optimal_arm : float
+            The arm ID with the largest expected reward.
         """
-        return self.best_ev
+        return self.best_ev, self.best_arm
 
 
 class ShortestPathBandit(Bandit):
@@ -282,6 +291,7 @@ class ShortestPathBandit(Bandit):
 
         self.arm_evs = self._calc_arm_evs()
         self.best_ev = np.max(self.arm_evs)
+        self.best_arm = np.argmax(self.arm_evs)
 
         placeholder = [None] * len(self.paths)
         super().__init__(placeholder, placeholder)
@@ -309,8 +319,10 @@ class ShortestPathBandit(Bandit):
         -------
         optimal_rwd : float
             The expected reward under an optimal policy.
+        optimal_arm : float
+            The arm ID with the largest expected reward.
         """
-        return self.best_ev
+        return self.best_ev, self.best_arm
 
     def _calc_arm_evs(self):
         I2V = self.G.get_vertex
@@ -353,7 +365,8 @@ class ContextualBernoulliBandit(Bandit):
 
         self.context_probs = context_probs
         self.arm_evs = self.context_probs
-        self.best_ev = self.arm_evs.max(axis=1)
+        self.best_evs = self.arm_evs.max(axis=1)
+        self.best_arms = self.arm_evs.argmax(axis=1)
 
     @property
     def hyperparameters(self):
@@ -386,15 +399,17 @@ class ContextualBernoulliBandit(Bandit):
         Parameters
         ----------
         context : :py:class:`ndarray <numpy.ndarray>` of shape `(D, K)` or None
-            The current context matrix for each of the bandit arms, if
-            applicable. Default is None.
+            The current context matrix for each of the bandit arms.
 
         Returns
         -------
         optimal_rwd : float
             The expected reward under an optimal policy.
+        optimal_arm : float
+            The arm ID with the largest expected reward.
         """
-        return context[:, 0] @ self.best_ev
+        context_id = context[:, 0].argmax()
+        return self.best_evs[context_id], self.best_arms[context_id]
 
     def _pull(self, arm_id, context):
         D, K = self.context_probs.shape
@@ -499,9 +514,11 @@ class ContextualLinearBandit(Bandit):
         -------
         optimal_rwd : float
             The expected reward under an optimal policy.
+        optimal_arm : float
+            The arm ID with the largest expected reward.
         """
         best_arm = np.argmax(self.arm_evs)
-        return self.arm_evs[best_arm]
+        return self.arm_evs[best_arm], best_arm
 
     def _pull(self, arm_id, context):
         K, thetas = self.K, self.thetas

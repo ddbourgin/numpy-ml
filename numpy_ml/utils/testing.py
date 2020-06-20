@@ -1,3 +1,4 @@
+"""Utilities for writing unit tests"""
 import numbers
 import numpy as np
 
@@ -13,9 +14,7 @@ def is_symmetric(X):
 
 
 def is_symmetric_positive_definite(X):
-    """
-    Check that a matrix `X` is a symmetric and positive-definite.
-    """
+    """Check that a matrix `X` is a symmetric and positive-definite."""
     if is_symmetric(X):
         try:
             # if matrix is symmetric, check whether the Cholesky decomposition
@@ -133,3 +132,12 @@ def random_paragraph(n_words, vocab=None):
             "gubergren",
         ]
     return [np.random.choice(vocab) for _ in range(n_words)]
+
+
+#######################################################################
+#                           Custom Warnings                           #
+#######################################################################
+
+
+class DependencyWarning(RuntimeWarning):
+    pass

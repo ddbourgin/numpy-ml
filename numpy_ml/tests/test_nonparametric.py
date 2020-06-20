@@ -1,15 +1,19 @@
+# flake8: noqa
 import numpy as np
 
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from .knn import KNN
-from .gp import GPRegression
-from ..utils.distance_metrics import euclidean
+from numpy_ml.nonparametric.knn import KNN
+from numpy_ml.nonparametric.gp import GPRegression
+from numpy_ml.utils.distance_metrics import euclidean
 
 
-def test_knn_regression():
-    while True:
+def test_knn_regression(N=15):
+    np.random.seed(12345)
+
+    i = 0
+    while i < N:
         N = np.random.randint(2, 100)
         M = np.random.randint(2, 100)
         k = np.random.randint(1, N)
@@ -40,14 +44,18 @@ def test_knn_regression():
         for mine, theirs in zip(preds, gold_preds):
             np.testing.assert_almost_equal(mine, theirs)
         print("PASSED")
+        i += 1
 
 
-def test_knn_clf():
-    while True:
+def test_knn_clf(N=15):
+    np.random.seed(12345)
+
+    i = 0
+    while i < N:
         N = np.random.randint(2, 100)
         M = np.random.randint(2, 100)
         k = np.random.randint(1, N)
-        n_classes = np.random.randint(10)
+        n_classes = np.random.randint(2, 10)
         ls = np.min([np.random.randint(1, 10), N - 1])
         weights = "uniform"
 
@@ -61,10 +69,10 @@ def test_knn_clf():
 
         gold = KNeighborsClassifier(
             p=2,
+            metric="minkowski",
             leaf_size=ls,
             n_neighbors=k,
             weights=weights,
-            metric="minkowski",
             algorithm="ball_tree",
         )
         gold.fit(X, y)
@@ -73,10 +81,14 @@ def test_knn_clf():
         for mine, theirs in zip(preds, gold_preds):
             np.testing.assert_almost_equal(mine, theirs)
         print("PASSED")
+        i += 1
 
 
-def test_gp_regression():
-    while True:
+def test_gp_regression(N=15):
+    np.random.seed(12345)
+
+    i = 0
+    while i < N:
         alpha = np.random.rand()
         N = np.random.randint(2, 100)
         M = np.random.randint(2, 100)
@@ -104,3 +116,4 @@ def test_gp_regression():
         np.testing.assert_almost_equal(mll, gold_mll)
 
         print("PASSED")
+        i += 1

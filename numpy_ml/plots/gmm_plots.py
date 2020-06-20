@@ -1,10 +1,9 @@
+# flake8: noqa
 import numpy as np
 from sklearn.datasets.samples_generator import make_blobs
 
 from scipy.stats import multivariate_normal
-import matplotlib
 
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -13,7 +12,7 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("paper", font_scale=1)
 
-from .gmm import GMM
+from numpy_ml.gmm import GMM
 
 from matplotlib.colors import ListedColormap
 

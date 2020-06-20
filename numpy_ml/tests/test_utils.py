@@ -1,3 +1,4 @@
+# flake8: noqa
 import numpy as np
 
 import scipy
@@ -9,20 +10,26 @@ from sklearn.metrics.pairwise import linear_kernel as sk_linear
 from sklearn.metrics.pairwise import polynomial_kernel as sk_poly
 
 
-from .distance_metrics import euclidean
-from .kernels import LinearKernel, PolynomialKernel, RBFKernel
-from .data_structures import BallTree
-from .graphs import DiGraph, UndirectedGraph, Edge, random_unweighted_graph, random_DAG
+from numpy_ml.utils.distance_metrics import euclidean
+from numpy_ml.utils.kernels import LinearKernel, PolynomialKernel, RBFKernel
+from numpy_ml.utils.data_structures import BallTree
+from numpy_ml.utils.graphs import (
+    DiGraph,
+    UndirectedGraph,
+    Edge,
+    random_unweighted_graph,
+    random_DAG,
+)
 
 #######################################################################
 #                               Kernels                               #
 #######################################################################
 
 
-def test_linear_kernel():
+def test_linear_kernel(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         N = np.random.randint(1, 100)
         M = np.random.randint(1, 100)
         C = np.random.randint(1, 1000)
@@ -35,12 +42,13 @@ def test_linear_kernel():
 
         np.testing.assert_almost_equal(mine, gold)
         print("PASSED")
+        i += 1
 
 
-def test_polynomial_kernel():
+def test_polynomial_kernel(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         N = np.random.randint(1, 100)
         M = np.random.randint(1, 100)
         C = np.random.randint(1, 1000)
@@ -56,12 +64,13 @@ def test_polynomial_kernel():
 
         np.testing.assert_almost_equal(mine, gold)
         print("PASSED")
+        i += 1
 
 
-def test_radial_basis_kernel():
+def test_radial_basis_kernel(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         N = np.random.randint(1, 100)
         M = np.random.randint(1, 100)
         C = np.random.randint(1, 1000)
@@ -79,6 +88,7 @@ def test_radial_basis_kernel():
 
         np.testing.assert_almost_equal(mine, gold)
         print("PASSED")
+        i += 1
 
 
 #######################################################################
@@ -86,10 +96,10 @@ def test_radial_basis_kernel():
 #######################################################################
 
 
-def test_euclidean():
+def test_euclidean(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         N = np.random.randint(1, 100)
         x = np.random.rand(N)
         y = np.random.rand(N)
@@ -97,6 +107,7 @@ def test_euclidean():
         theirs = scipy.spatial.distance.euclidean(x, y)
         np.testing.assert_almost_equal(mine, theirs)
         print("PASSED")
+        i += 1
 
 
 #######################################################################
@@ -104,10 +115,10 @@ def test_euclidean():
 #######################################################################
 
 
-def test_ball_tree():
+def test_ball_tree(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         N = np.random.randint(2, 100)
         M = np.random.randint(2, 100)
         k = np.random.randint(1, N)
@@ -135,11 +146,12 @@ def test_ball_tree():
         theirs_dist = theirs_dist.flatten()[sort_ix]
         theirs_neighb = X[ind.flatten()[sort_ix]]
 
-        for i in range(len(theirs_dist)):
-            np.testing.assert_almost_equal(mine_neighb[i], theirs_neighb[i])
-            np.testing.assert_almost_equal(mine_dist[i], theirs_dist[i])
+        for j in range(len(theirs_dist)):
+            np.testing.assert_almost_equal(mine_neighb[j], theirs_neighb[j])
+            np.testing.assert_almost_equal(mine_dist[j], theirs_dist[j])
 
         print("PASSED")
+        i += 1
 
 
 #######################################################################
@@ -148,7 +160,7 @@ def test_ball_tree():
 
 
 def from_networkx(G_nx):
-    """ Convert a networkx graph to my graph representation"""
+    """Convert a networkx graph to my graph representation"""
     V = list(G_nx.nodes)
     edges = list(G_nx.edges)
     is_weighted = "weight" in G_nx[edges[0][0]][edges[0][1]]
@@ -178,13 +190,13 @@ def to_networkx(G):
     return G_nx
 
 
-def test_all_paths():
+def test_all_paths(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         p = np.random.rand()
         directed = np.random.rand() < 0.5
-        G = random_unweighted_graph(n_vertices=10, edge_prob=p, directed=directed)
+        G = random_unweighted_graph(n_vertices=5, edge_prob=p, directed=directed)
 
         nodes = G._I2V.keys()
         G_nx = to_networkx(G)
@@ -207,12 +219,13 @@ def test_all_paths():
                     np.testing.assert_array_equal(p1, p2)
 
                 print("PASSED")
+                i += 1
 
 
-def test_random_DAG():
+def test_random_DAG(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         p = np.random.uniform(0.25, 1)
         n_v = np.random.randint(5, 50)
 
@@ -221,12 +234,13 @@ def test_random_DAG():
 
         assert nx.is_directed_acyclic_graph(G_nx)
         print("PASSED")
+        i += 1
 
 
-def test_topological_ordering():
+def test_topological_ordering(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         p = np.random.uniform(0.25, 1)
         n_v = np.random.randint(5, 10)
 
@@ -243,12 +257,13 @@ def test_topological_ordering():
                 assert any([c_i in seen_it for c_i in G.get_neighbors(n_i)]) == False
 
             print("PASSED")
+            i += 1
 
 
-def test_is_acyclic():
+def test_is_acyclic(N=1):
     np.random.seed(12345)
-
-    while True:
+    i = 0
+    while i < N:
         p = np.random.rand()
         directed = np.random.rand() < 0.5
         G = random_unweighted_graph(n_vertices=10, edge_prob=p, directed=True)
@@ -256,3 +271,4 @@ def test_is_acyclic():
 
         assert G.is_acyclic() == nx.is_directed_acyclic_graph(G_nx)
         print("PASSED")
+        i += 1

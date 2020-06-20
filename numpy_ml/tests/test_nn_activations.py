@@ -1,4 +1,4 @@
-import sys
+# flake8: noqa
 import time
 import numpy as np
 
@@ -8,8 +8,7 @@ from scipy.special import expit
 import torch
 import torch.nn.functional as F
 
-sys.path.append("../..")
-from utils.testing import random_stochastic_matrix, random_tensor
+from numpy_ml.utils.testing import random_stochastic_matrix, random_tensor
 
 
 def torch_gradient_generator(fn, **kwargs):
@@ -46,56 +45,56 @@ def err_fmt(params, golds, ix, warn_str=""):
 #######################################################################
 #                            Test Suite                               #
 #######################################################################
-
-
-def test_activations(N=50):
-    print("Testing Sigmoid activation")
-    time.sleep(1)
-    test_sigmoid_activation(N)
-    test_sigmoid_grad(N)
-
-    #  print("Testing Softmax activation")
-    #  time.sleep(1)
-    #  test_softmax_activation(N)
-    #  test_softmax_grad(N)
-
-    print("Testing Tanh activation")
-    time.sleep(1)
-    test_tanh_grad(N)
-
-    print("Testing ReLU activation")
-    time.sleep(1)
-    test_relu_activation(N)
-    test_relu_grad(N)
-
-    print("Testing ELU activation")
-    time.sleep(1)
-    test_elu_activation(N)
-    test_elu_grad(N)
-
-    print("Testing SELU activation")
-    time.sleep(1)
-    test_selu_activation(N)
-    test_selu_grad(N)
-
-    print("Testing LeakyRelu activation")
-    time.sleep(1)
-    test_leakyrelu_activation(N)
-    test_leakyrelu_grad(N)
-
-    print("Testing SoftPlus activation")
-    time.sleep(1)
-    test_softplus_activation(N)
-    test_softplus_grad(N)
-
+#
+#
+#  def test_activations(N=50):
+#      print("Testing Sigmoid activation")
+#      time.sleep(1)
+#      test_sigmoid_activation(N)
+#      test_sigmoid_grad(N)
+#
+#      #  print("Testing Softmax activation")
+#      #  time.sleep(1)
+#      #  test_softmax_activation(N)
+#      #  test_softmax_grad(N)
+#
+#      print("Testing Tanh activation")
+#      time.sleep(1)
+#      test_tanh_grad(N)
+#
+#      print("Testing ReLU activation")
+#      time.sleep(1)
+#      test_relu_activation(N)
+#      test_relu_grad(N)
+#
+#      print("Testing ELU activation")
+#      time.sleep(1)
+#      test_elu_activation(N)
+#      test_elu_grad(N)
+#
+#      print("Testing SELU activation")
+#      time.sleep(1)
+#      test_selu_activation(N)
+#      test_selu_grad(N)
+#
+#      print("Testing LeakyRelu activation")
+#      time.sleep(1)
+#      test_leakyrelu_activation(N)
+#      test_leakyrelu_grad(N)
+#
+#      print("Testing SoftPlus activation")
+#      time.sleep(1)
+#      test_softplus_activation(N)
+#      test_softplus_grad(N)
+#
 
 #######################################################################
 #                          Activations                                #
 #######################################################################
 
 
-def test_sigmoid_activation(N=None):
-    from activations import Sigmoid
+def test_sigmoid_activation(N=50):
+    from numpy_ml.neural_nets.activations import Sigmoid
 
     N = np.inf if N is None else N
 
@@ -111,8 +110,8 @@ def test_sigmoid_activation(N=None):
         i += 1
 
 
-def test_softplus_activation(N=None):
-    from activations import SoftPlus
+def test_softplus_activation(N=50):
+    from numpy_ml.neural_nets.activations import SoftPlus
 
     N = np.inf if N is None else N
 
@@ -128,8 +127,8 @@ def test_softplus_activation(N=None):
         i += 1
 
 
-def test_elu_activation(N=None):
-    from activations import ELU
+def test_elu_activation(N=50):
+    from numpy_ml.neural_nets.activations import ELU
 
     N = np.inf if N is None else N
 
@@ -148,8 +147,8 @@ def test_elu_activation(N=None):
         i += 1
 
 
-def test_relu_activation(N=None):
-    from activations import ReLU
+def test_relu_activation(N=50):
+    from numpy_ml.neural_nets.activations import ReLU
 
     N = np.inf if N is None else N
 
@@ -165,8 +164,8 @@ def test_relu_activation(N=None):
         i += 1
 
 
-def test_selu_activation(N=None):
-    from activations import SELU
+def test_selu_activation(N=50):
+    from numpy_ml.neural_nets.activations import SELU
 
     N = np.inf if N is None else N
 
@@ -182,8 +181,8 @@ def test_selu_activation(N=None):
         i += 1
 
 
-def test_leakyrelu_activation(N=None):
-    from activations import LeakyReLU
+def test_leakyrelu_activation(N=50):
+    from numpy_ml.neural_nets.activations import LeakyReLU
 
     N = np.inf if N is None else N
 
@@ -206,8 +205,8 @@ def test_leakyrelu_activation(N=None):
 #######################################################################
 
 
-def test_sigmoid_grad(N=None):
-    from activations import Sigmoid
+def test_sigmoid_grad(N=50):
+    from numpy_ml.neural_nets.activations import Sigmoid
 
     N = np.inf if N is None else N
 
@@ -224,8 +223,8 @@ def test_sigmoid_grad(N=None):
         i += 1
 
 
-def test_elu_grad(N=None):
-    from activations import ELU
+def test_elu_grad(N=50):
+    from numpy_ml.neural_nets.activations import ELU
 
     N = np.inf if N is None else N
 
@@ -243,8 +242,8 @@ def test_elu_grad(N=None):
         i += 1
 
 
-def test_tanh_grad(N=None):
-    from activations import Tanh
+def test_tanh_grad(N=50):
+    from numpy_ml.neural_nets.activations import Tanh
 
     N = np.inf if N is None else N
 
@@ -261,8 +260,8 @@ def test_tanh_grad(N=None):
         i += 1
 
 
-def test_relu_grad(N=None):
-    from activations import ReLU
+def test_relu_grad(N=50):
+    from numpy_ml.neural_nets.activations import ReLU
 
     N = np.inf if N is None else N
 
@@ -279,8 +278,8 @@ def test_relu_grad(N=None):
         i += 1
 
 
-def test_selu_grad(N=None):
-    from activations import SELU
+def test_selu_grad(N=50):
+    from numpy_ml.neural_nets.activations import SELU
 
     N = np.inf if N is None else N
 
@@ -297,8 +296,8 @@ def test_selu_grad(N=None):
         i += 1
 
 
-def test_leakyrelu_grad(N=None):
-    from activations import LeakyReLU
+def test_leakyrelu_grad(N=50):
+    from numpy_ml.neural_nets.activations import LeakyReLU
 
     N = np.inf if N is None else N
 
@@ -316,8 +315,8 @@ def test_leakyrelu_grad(N=None):
         i += 1
 
 
-def test_softplus_grad(N=None):
-    from activations import SoftPlus
+def test_softplus_grad(N=50):
+    from numpy_ml.neural_nets.activations import SoftPlus
 
     N = np.inf if N is None else N
 

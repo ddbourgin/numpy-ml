@@ -1,0 +1,4 @@
+include README.md
+include requirements*.txt
+include docs/*.rst
+include docs/img/*.png

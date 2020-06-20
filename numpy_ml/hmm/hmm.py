@@ -1,9 +1,11 @@
+"""Hidden Markov model module"""
+
 import numpy as np
 
 
 class MultinomialHMM:
     def __init__(self, A=None, B=None, pi=None, eps=None):
-        """
+        r"""
         A simple hidden Markov model with multinomial emission distribution.
 
         Parameters
@@ -68,10 +70,10 @@ class MultinomialHMM:
             self.B[self.B == 0] = self.eps
 
         # set of training sequences
-        self.O = None
+        self.O = None  # noqa: E741
 
         # number of sequences in O
-        self.I = None
+        self.I = None  # noqa: E741
 
         # number of observations in each sequence
         self.T = None
@@ -115,10 +117,10 @@ class MultinomialHMM:
         return np.array(states), np.array(emissions)
 
     def log_likelihood(self, O):
-        """
+        r"""
         Given the HMM parameterized by :math:`(A`, B, \pi)` and an observation
         sequence `O`, compute the marginal likelihood of the observations:
-        :math:`P(O|A,B,\pi)`, summing over latent states.
+        :math:`P(O \mid A,B,\pi)`, summing over latent states.
 
         Notes
         -----
@@ -128,7 +130,9 @@ class MultinomialHMM:
         probability under the HMM of being in latent state `i` after seeing the
         first `j` observations:
 
-        .. math:: \mathtt{forward[i,j]} = P(o_1,\ldots,o_j,q_j=i \mid A,B,\pi)
+        .. math::
+
+            \mathtt{forward[i,j]} = P(o_1, \ldots, o_j, q_j=i \mid A, B, \pi)
 
         Here :math:`q_j = i` indicates that the hidden state at time `j` is of
         type `i`.
@@ -137,12 +141,11 @@ class MultinomialHMM:
 
         .. math::
 
-            \mathtt{forward[i,j]}  &=  \sum_{s'=1}^N \mathtt{forward[s',j-1]}
-            \cdot \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
-
-                                   &=  \sum_{s'=1}^N
-                                   P(o_1,\ldots,o_{j-1},q_{j-1}=s' \mid A,B,\pi)
-                                   P(q_j=i|q_{j-1}=s') P(o_j \mid q_j=i)
+            \mathtt{forward[i,j]}
+               &= \sum_{s'=1}^N \mathtt{forward[s',j-1]} \cdot
+                   \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
+               &= \sum_{s'=1}^N P(o_1, \ldots, o_{j-1}, q_{j-1}=s' \mid A, B, \pi)
+                    P(q_j=i \mid q_{j-1}=s') P(o_j \mid q_j=i)
 
         In words, ``forward[i,j]`` is the weighted sum of the values computed on
         the previous timestep. The weight on each previous state value is the
@@ -160,11 +163,11 @@ class MultinomialHMM:
             The likelihood of the observations `O` under the HMM.
         """
         if O.ndim == 1:
-            O = O.reshape(1, -1)
+            O = O.reshape(1, -1)  # noqa: E741
 
-        I, T = O.shape
+        I, T = O.shape  # noqa: E741
 
-        if I != 1:
+        if I != 1:  # noqa: E741
             raise ValueError("Likelihood only accepts a single sequence")
 
         forward = self._forward(O[0])
@@ -172,7 +175,7 @@ class MultinomialHMM:
         return log_likelihood
 
     def decode(self, O):
-        """
+        r"""
         Given the HMM parameterized by :math:`(A, B, \pi)` and an observation
         sequence :math:`O = o_1, \ldots, o_T`, compute the most probable
         sequence of latent states, :math:`Q = q_1, \ldots, q_T`.
@@ -187,7 +190,8 @@ class MultinomialHMM:
         .. math::
 
             \mathtt{viterbi[i,j]} =
-                \max_{q_1,\ldots,q_{j-1}} P(o_1,\ldots,o_j,q_1,\ldots,q_{j-1},q_j=i \mid A,B,\pi)
+                \max_{q_1, \ldots, q_{j-1}}
+                    P(o_1, \ldots, o_j, q_1, \ldots, q_{j-1}, q_j=i \mid A, B, \pi)
 
         Here :math:`q_j = i` indicates that the hidden state at time `j` is of
         type `i`, and :math:`\max_{q_1,\ldots,q_{j-1}}` represents the maximum over
@@ -197,12 +201,12 @@ class MultinomialHMM:
 
         .. math::
 
-            \mathtt{viterbi[i,j]}  &=  \max_{s'=1}^N \mathtt{viterbi[s',j-1]} \cdot
-            \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
-
-                                   &=  \max_{s'=1}^N
-                                   P(o_1,\ldots,o_j,q_1,\ldots,q_{j-1},q_j=i \mid A,B,\pi)
-                                   P(q_j=i \mid q_{j-1}=s') P(o_j \mid q_j=i)
+            \mathtt{viterbi[i,j]} &=
+                \max_{s'=1}^N \mathtt{viterbi[s',j-1]} \cdot
+                    \mathtt{A[s',i]} \cdot \mathtt{B[i,o_j]} \\
+               &=  \max_{s'=1}^N
+                   P(o_1,\ldots, o_j, q_1, \ldots, q_{j-1}, q_j=i \mid A, B, \pi)
+                   P(q_j=i \mid q_{j-1}=s') P(o_j \mid q_j=i)
 
         In words, ``viterbi[i,j]`` is the weighted sum of the values computed
         on the previous timestep. The weight on each value is the product of
@@ -235,14 +239,14 @@ class MultinomialHMM:
         eps = self.eps
 
         if O.ndim == 1:
-            O = O.reshape(1, -1)
+            O = O.reshape(1, -1)  # noqa: E741
 
         # number of observations in each sequence
         T = O.shape[1]
 
         # number of training sequences
-        I = O.shape[0]
-        if I != 1:
+        I = O.shape[0]  # noqa: E741
+        if I != 1:  # noqa: E741
             raise ValueError("Can only decode a single sequence (O.shape[0] must be 1)")
 
         # initialize the viterbi and back_pointer matrices
@@ -280,7 +284,7 @@ class MultinomialHMM:
         return best_path, best_path_log_prob
 
     def _forward(self, Obs):
-        """
+        r"""
         Computes the forward probability trellis for an HMM parameterized by
         :math:`(A, B, \pi)`.
 
@@ -291,16 +295,22 @@ class MultinomialHMM:
         under the HMM of being in latent state `i` after seeing the first `j`
         observations:
 
-        .. math:: \mathtt{forward[i,j]} = P(o_1,\ldots,o_j,q_j=i|A,B,\pi)
+        .. math::
+
+            \mathtt{forward[i,j]} =
+                P(o_1, \ldots, o_j, q_j=i \mid A, B, \pi)
 
         Here :math:`q_j = i` indicates that the hidden state at time `j` is of
         type `i`.
 
         The DP step is::
 
-            forward[i,j] = sum_{s'=1}^N forward[s',j-1] * A[s',i] * B[i,o_j]
-                         = sum_{s'=1}^N P(o_1,\ldots,o_{j-1},q_{j-1}=s'|A,B,pi) *
-                           P(q_j=i|q_{j-1}=s') * P(o_j|q_j=i)
+        .. math::
+
+            forward[i,j] &=
+                \sum_{s'=1}^N forward[s',j-1] \times A[s',i] \times B[i,o_j] \\
+                &= \sum_{s'=1}^N P(o_1, \ldots, o_{j-1}, q_{j-1}=s' \mid A, B, \pi)
+                    \times P(q_j=i \mid q_{j-1}=s') \times P(o_j \mid q_j=i)
 
         In words, ``forward[i,j]`` is the weighted sum of the values computed
         on the previous timestep. The weight on each previous state value is
@@ -336,12 +346,12 @@ class MultinomialHMM:
                         + np.log(self.A[s_, s] + eps)
                         + np.log(self.B[s, ot] + eps)
                         for s_ in range(self.N)
-                    ]
+                    ]  # noqa: C812
                 )
         return forward
 
     def _backward(self, Obs):
-        """
+        r"""
         Compute the backward probability trellis for an HMM parameterized by
         :math:`(A, B, \pi)`.
 
@@ -352,15 +362,18 @@ class MultinomialHMM:
         of seeing the observations from time `j+1` onward given that the HMM is
         in state `i` at time `j`
 
-        .. math:: \mathtt{backward[i,j]} = P(o_{j+1},o_{j+2},...,o_T|q_j=i,A,B,\pi)
+        .. math::
+
+            \mathtt{backward[i,j]} = P(o_{j+1},o_{j+2},\ldots,o_T \mid q_j=i,A,B,\pi)
 
         Here :math:`q_j = i` indicates that the hidden state at time `j` is of type `i`.
 
         The DP step is::
 
-            backward[i,j] = sum_{s'=1}^N backward[s',j+1] * A[i, s'] * B[s',o_{j+1}]
-                          = sum_{s'=1}^N P(o_{j+1},o_{j+2},...,o_T|q_j=i,A,B,pi) *
-                            P(q_{j+1}=s'|q_{j}=i) * P(o_{j+1}|q_{j+1}=s')
+            backward[i,j] &=
+                \sum_{s'=1}^N backward[s',j+1] \times A[i, s'] \times B[s',o_{j+1}] \\
+                &= \sum_{s'=1}^N P(o_{j+1}, o_{j+2}, \ldots, o_T \mid q_j=i, A, B, pi)
+                    \times P(q_{j+1}=s' \mid q_{j}=i) \times P(o_{j+1} \mid q_{j+1}=s')
 
         In words, ``backward[i,j]`` is the weighted sum of the values computed
         on the following timestep. The weight on each state value from the
@@ -396,12 +409,18 @@ class MultinomialHMM:
                         + np.log(self.B[s_, ot1] + eps)
                         + backward[s_, t + 1]
                         for s_ in range(self.N)
-                    ]
+                    ]  # noqa: C812
                 )
         return backward
 
     def fit(
-        self, O, latent_state_types, observation_types, pi=None, tol=1e-5, verbose=False
+        self,
+        O,
+        latent_state_types,
+        observation_types,
+        pi=None,
+        tol=1e-5,
+        verbose=False,
     ):
         """
         Given an observation sequence `O` and the set of possible latent states,
@@ -446,10 +465,10 @@ class MultinomialHMM:
             The estimated prior probabilities of each latent state.
         """
         if O.ndim == 1:
-            O = O.reshape(1, -1)
+            O = O.reshape(1, -1)  # noqa: E741
 
         # observations
-        self.O = O
+        self.O = O  # noqa: E741
 
         # number of training examples (I) and their lengths (T)
         self.I, self.T = self.O.shape
@@ -492,7 +511,7 @@ class MultinomialHMM:
         return self.A, self.B, self.pi
 
     def _Estep(self):
-        """
+        r"""
         Run a single E-step update for the Baum-Welch/Forward-Backward
         algorithm. This step estimates ``xi`` and ``gamma``, the excepted
         state-state transition counts and the expected state-occupancy counts,
@@ -502,17 +521,22 @@ class MultinomialHMM:
         and state `j` at time `k+1` given the observed sequence `O` and the
         current estimates for transition (`A`) and emission (`B`) matrices::
 
-            xi[i,j,k] = P(q_k=i,q_{k+1}=j|O,A,B,pi)
-                      = P(q_k=i,q_{k+1}=j,O|A,B,pi) / P(O|A,B,pi)
-                      = [
-                            P(o_1,o_2,...,o_k,q_k=i|A,B,pi) *
-                            P(q_{k+1}=j|q_k=i) * P(o_{k+1}|q_{k+1}=j) *
-                            P(o_{k+2},o_{k+3},...,o_T|q_{k+1}=j,A,B,pi)
-                        ] / P(O|A,B,pi)
-                      = [
-                            fwd[j, k] * self.A[j, i] *
-                            self.B[i, o_{k+1}] * bwd[i, k + 1]
-                        ] / fwd[:, T].sum()
+        .. math::
+
+            xi[i,j,k] &= P(q_k=i,q_{k+1}=j \mid O,A,B,pi) \\
+                      &= \frac{
+                            P(q_k=i,q_{k+1}=j,O \mid A,B,pi)
+                         }{P(O \mid A,B,pi)} \\
+                      &= \frac{
+                            P(o_1,o_2,\ldots,o_k,q_k=i \mid A,B,pi) \times
+                            P(q_{k+1}=j \mid q_k=i) \times
+                            P(o_{k+1} \mid q_{k+1}=j) \times
+                            P(o_{k+2},o_{k+3},\ldots,o_T \mid q_{k+1}=j,A,B,pi)
+                         }{P(O \mid A,B,pi)} \\
+                      &= \frac{
+                            \mathtt{fwd[j, k] * self.A[j, i] *
+                            self.B[i, o_{k+1}] * bwd[i, k + 1]}
+                         }{\mathtt{fwd[:, T].sum()}}
 
         The expected number of transitions from state `i` to state `j` across the
         entire sequence is then the sum over all timesteps: ``xi[i,j,:].sum()``.
@@ -614,12 +638,12 @@ class MultinomialHMM:
         for si in range(self.N):
             for vk in range(self.V):
                 B[si, vk] = logsumexp(count_gamma[:, si, vk]) - logsumexp(
-                    count_gamma[:, si, :]
+                    count_gamma[:, si, :]  # noqa: C812
                 )
 
             for sj in range(self.N):
                 A[si, sj] = logsumexp(count_xi[:, si, sj]) - logsumexp(
-                    count_xi[:, si, :]
+                    count_xi[:, si, :]  # noqa: C812
                 )
 
             np.testing.assert_almost_equal(np.exp(A[si, :]).sum(), 1)

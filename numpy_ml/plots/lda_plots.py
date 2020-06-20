@@ -1,8 +1,5 @@
+# flake8: noqa
 import numpy as np
-
-import matplotlib
-
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -13,7 +10,7 @@ sns.set_context("paper", font_scale=1)
 
 np.random.seed(12345)
 
-from .lda import LDA
+from numpy_ml.lda import LDA
 
 
 def generate_corpus():
