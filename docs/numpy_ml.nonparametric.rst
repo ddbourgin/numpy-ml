@@ -1,11 +1,20 @@
-Nonparametric models 
+Nonparametric models
 ####################
 
 .. raw:: html
 
-   <h2>Nearest Neighbors</h2>
+   <h2>K-Nearest Neighbors</h2>
 
-TODO
+The `k-nearest neighbors`_ (KNN) model is a nonparametric supervised learning
+approach that can be applied to classification or regression problems. In a
+classification context, the KNN model assigns a class label for a new datapoint
+by taking a majority vote amongst the labels for the `k` closest points
+("neighbors") in the training data. Similarly, in a regression context, the KNN
+model predicts the target value associated with a new datapoint by taking the
+average of the targets associated with the `k` closes points in the training
+data.
+
+.. _`k-nearest neighbors`: https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm
 
 **Models**
 

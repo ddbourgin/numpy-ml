@@ -1,3 +1,4 @@
+"""Common preprocessing utilities for working with text data"""
 import re
 import heapq
 import os.path as op
@@ -9,328 +10,327 @@ import numpy as np
 # This list of English stop words is taken from the "Glasgow Information
 # Retrieval Group". The original list can be found at
 # http://ir.dcs.gla.ac.uk/resources/linguistic_utils/stop_words
-_STOP_WORDS = set(
-    [
-        "a",
-        "about",
-        "above",
-        "across",
-        "after",
-        "afterwards",
-        "again",
-        "against",
-        "all",
-        "almost",
-        "alone",
-        "along",
-        "already",
-        "also",
-        "although",
-        "always",
-        "am",
-        "among",
-        "amongst",
-        "amoungst",
-        "amount",
-        "an",
-        "and",
-        "another",
-        "any",
-        "anyhow",
-        "anyone",
-        "anything",
-        "anyway",
-        "anywhere",
-        "are",
-        "around",
-        "as",
-        "at",
-        "back",
-        "be",
-        "became",
-        "because",
-        "become",
-        "becomes",
-        "becoming",
-        "been",
-        "before",
-        "beforehand",
-        "behind",
-        "being",
-        "below",
-        "beside",
-        "besides",
-        "between",
-        "beyond",
-        "bill",
-        "both",
-        "bottom",
-        "but",
-        "by",
-        "call",
-        "can",
-        "cannot",
-        "cant",
-        "co",
-        "con",
-        "could",
-        "couldnt",
-        "cry",
-        "de",
-        "describe",
-        "detail",
-        "do",
-        "done",
-        "down",
-        "due",
-        "during",
-        "each",
-        "eg",
-        "eight",
-        "either",
-        "eleven",
-        "else",
-        "elsewhere",
-        "empty",
-        "enough",
-        "etc",
-        "even",
-        "ever",
-        "every",
-        "everyone",
-        "everything",
-        "everywhere",
-        "except",
-        "few",
-        "fifteen",
-        "fifty",
-        "fill",
-        "find",
-        "fire",
-        "first",
-        "five",
-        "for",
-        "former",
-        "formerly",
-        "forty",
-        "found",
-        "four",
-        "from",
-        "front",
-        "full",
-        "further",
-        "get",
-        "give",
-        "go",
-        "had",
-        "has",
-        "hasnt",
-        "have",
-        "he",
-        "hence",
-        "her",
-        "here",
-        "hereafter",
-        "hereby",
-        "herein",
-        "hereupon",
-        "hers",
-        "herself",
-        "him",
-        "himself",
-        "his",
-        "how",
-        "however",
-        "hundred",
-        "i",
-        "ie",
-        "if",
-        "in",
-        "inc",
-        "indeed",
-        "interest",
-        "into",
-        "is",
-        "it",
-        "its",
-        "itself",
-        "keep",
-        "last",
-        "latter",
-        "latterly",
-        "least",
-        "less",
-        "ltd",
-        "made",
-        "many",
-        "may",
-        "me",
-        "meanwhile",
-        "might",
-        "mill",
-        "mine",
-        "more",
-        "moreover",
-        "most",
-        "mostly",
-        "move",
-        "much",
-        "must",
-        "my",
-        "myself",
-        "name",
-        "namely",
-        "neither",
-        "never",
-        "nevertheless",
-        "next",
-        "nine",
-        "no",
-        "nobody",
-        "none",
-        "noone",
-        "nor",
-        "not",
-        "nothing",
-        "now",
-        "nowhere",
-        "of",
-        "off",
-        "often",
-        "on",
-        "once",
-        "one",
-        "only",
-        "onto",
-        "or",
-        "other",
-        "others",
-        "otherwise",
-        "our",
-        "ours",
-        "ourselves",
-        "out",
-        "over",
-        "own",
-        "part",
-        "per",
-        "perhaps",
-        "please",
-        "put",
-        "rather",
-        "re",
-        "same",
-        "see",
-        "seem",
-        "seemed",
-        "seeming",
-        "seems",
-        "serious",
-        "several",
-        "she",
-        "should",
-        "show",
-        "side",
-        "since",
-        "sincere",
-        "six",
-        "sixty",
-        "so",
-        "some",
-        "somehow",
-        "someone",
-        "something",
-        "sometime",
-        "sometimes",
-        "somewhere",
-        "still",
-        "such",
-        "system",
-        "take",
-        "ten",
-        "than",
-        "that",
-        "the",
-        "their",
-        "them",
-        "themselves",
-        "then",
-        "thence",
-        "there",
-        "thereafter",
-        "thereby",
-        "therefore",
-        "therein",
-        "thereupon",
-        "these",
-        "they",
-        "thick",
-        "thin",
-        "third",
-        "this",
-        "those",
-        "though",
-        "three",
-        "through",
-        "throughout",
-        "thru",
-        "thus",
-        "to",
-        "together",
-        "too",
-        "top",
-        "toward",
-        "towards",
-        "twelve",
-        "twenty",
-        "two",
-        "un",
-        "under",
-        "until",
-        "up",
-        "upon",
-        "us",
-        "very",
-        "via",
-        "was",
-        "we",
-        "well",
-        "were",
-        "what",
-        "whatever",
-        "when",
-        "whence",
-        "whenever",
-        "where",
-        "whereafter",
-        "whereas",
-        "whereby",
-        "wherein",
-        "whereupon",
-        "wherever",
-        "whether",
-        "which",
-        "while",
-        "whither",
-        "who",
-        "whoever",
-        "whole",
-        "whom",
-        "whose",
-        "why",
-        "will",
-        "with",
-        "within",
-        "without",
-        "would",
-        "yet",
-        "you",
-        "your",
-        "yours",
-        "yourself",
-        "yourselves",
-    ]
-)
+_STOP_WORDS = {
+    "a",
+    "about",
+    "above",
+    "across",
+    "after",
+    "afterwards",
+    "again",
+    "against",
+    "all",
+    "almost",
+    "alone",
+    "along",
+    "already",
+    "also",
+    "although",
+    "always",
+    "am",
+    "among",
+    "amongst",
+    "amoungst",
+    "amount",
+    "an",
+    "and",
+    "another",
+    "any",
+    "anyhow",
+    "anyone",
+    "anything",
+    "anyway",
+    "anywhere",
+    "are",
+    "around",
+    "as",
+    "at",
+    "back",
+    "be",
+    "became",
+    "because",
+    "become",
+    "becomes",
+    "becoming",
+    "been",
+    "before",
+    "beforehand",
+    "behind",
+    "being",
+    "below",
+    "beside",
+    "besides",
+    "between",
+    "beyond",
+    "bill",
+    "both",
+    "bottom",
+    "but",
+    "by",
+    "call",
+    "can",
+    "cannot",
+    "cant",
+    "co",
+    "con",
+    "could",
+    "couldnt",
+    "cry",
+    "de",
+    "describe",
+    "detail",
+    "do",
+    "done",
+    "down",
+    "due",
+    "during",
+    "each",
+    "eg",
+    "eight",
+    "either",
+    "eleven",
+    "else",
+    "elsewhere",
+    "empty",
+    "enough",
+    "etc",
+    "even",
+    "ever",
+    "every",
+    "everyone",
+    "everything",
+    "everywhere",
+    "except",
+    "few",
+    "fifteen",
+    "fifty",
+    "fill",
+    "find",
+    "fire",
+    "first",
+    "five",
+    "for",
+    "former",
+    "formerly",
+    "forty",
+    "found",
+    "four",
+    "from",
+    "front",
+    "full",
+    "further",
+    "get",
+    "give",
+    "go",
+    "had",
+    "has",
+    "hasnt",
+    "have",
+    "he",
+    "hence",
+    "her",
+    "here",
+    "hereafter",
+    "hereby",
+    "herein",
+    "hereupon",
+    "hers",
+    "herself",
+    "him",
+    "himself",
+    "his",
+    "how",
+    "however",
+    "hundred",
+    "i",
+    "ie",
+    "if",
+    "in",
+    "inc",
+    "indeed",
+    "interest",
+    "into",
+    "is",
+    "it",
+    "its",
+    "itself",
+    "keep",
+    "last",
+    "latter",
+    "latterly",
+    "least",
+    "less",
+    "ltd",
+    "made",
+    "many",
+    "may",
+    "me",
+    "meanwhile",
+    "might",
+    "mill",
+    "mine",
+    "more",
+    "moreover",
+    "most",
+    "mostly",
+    "move",
+    "much",
+    "must",
+    "my",
+    "myself",
+    "name",
+    "namely",
+    "neither",
+    "never",
+    "nevertheless",
+    "next",
+    "nine",
+    "no",
+    "nobody",
+    "none",
+    "noone",
+    "nor",
+    "not",
+    "nothing",
+    "now",
+    "nowhere",
+    "of",
+    "off",
+    "often",
+    "on",
+    "once",
+    "one",
+    "only",
+    "onto",
+    "or",
+    "other",
+    "others",
+    "otherwise",
+    "our",
+    "ours",
+    "ourselves",
+    "out",
+    "over",
+    "own",
+    "part",
+    "per",
+    "perhaps",
+    "please",
+    "put",
+    "rather",
+    "re",
+    "same",
+    "see",
+    "seem",
+    "seemed",
+    "seeming",
+    "seems",
+    "serious",
+    "several",
+    "she",
+    "should",
+    "show",
+    "side",
+    "since",
+    "sincere",
+    "six",
+    "sixty",
+    "so",
+    "some",
+    "somehow",
+    "someone",
+    "something",
+    "sometime",
+    "sometimes",
+    "somewhere",
+    "still",
+    "such",
+    "system",
+    "take",
+    "ten",
+    "than",
+    "that",
+    "the",
+    "their",
+    "them",
+    "themselves",
+    "then",
+    "thence",
+    "there",
+    "thereafter",
+    "thereby",
+    "therefore",
+    "therein",
+    "thereupon",
+    "these",
+    "they",
+    "thick",
+    "thin",
+    "third",
+    "this",
+    "those",
+    "though",
+    "three",
+    "through",
+    "throughout",
+    "thru",
+    "thus",
+    "to",
+    "together",
+    "too",
+    "top",
+    "toward",
+    "towards",
+    "twelve",
+    "twenty",
+    "two",
+    "un",
+    "under",
+    "until",
+    "up",
+    "upon",
+    "us",
+    "very",
+    "via",
+    "was",
+    "we",
+    "well",
+    "were",
+    "what",
+    "whatever",
+    "when",
+    "whence",
+    "whenever",
+    "where",
+    "whereafter",
+    "whereas",
+    "whereby",
+    "wherein",
+    "whereupon",
+    "wherever",
+    "whether",
+    "which",
+    "while",
+    "whither",
+    "who",
+    "whoever",
+    "whole",
+    "whom",
+    "whose",
+    "why",
+    "will",
+    "with",
+    "within",
+    "without",
+    "would",
+    "yet",
+    "you",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+}
+
 _PUNCTUATION = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 
 _WORD_REGEX = re.compile(r"(?u)\b\w\w+\b")  # sklearn default
@@ -386,21 +386,25 @@ class Node(object):
         self.right = None
 
     def __gt__(self, other):
+        """Greater than"""
         if not isinstance(other, Node):
             return -1
         return self.val > other.val
 
     def __ge__(self, other):
+        """Greater than or equal to"""
         if not isinstance(other, Node):
             return -1
         return self.val >= other.val
 
     def __lt__(self, other):
+        """Less than"""
         if not isinstance(other, Node):
             return -1
         return self.val < other.val
 
     def __le__(self, other):
+        """Less than or equal to"""
         if not isinstance(other, Node):
             return -1
         return self.val <= other.val
@@ -482,10 +486,12 @@ class HuffmanEncoder(object):
 
     @property
     def tokens(self):
+        """A list the unique tokens in `text`"""
         return list(self._item2code.keys())
 
     @property
     def codes(self):
+        """A list with the Huffman code for each unique token in `text`"""
         return list(self._code2item.keys())
 
     def _counter(self, text):
@@ -552,6 +558,7 @@ class Token:
         self.word = word
 
     def __repr__(self):
+        """A string representation of the token"""
         return "Token(word='{}', count={})".format(self.word, self.count)
 
 
@@ -566,7 +573,7 @@ class TFIDFEncoder:
         input_type="filename",
         filter_stopwords=True,
     ):
-        """
+        r"""
         An object for compiling and encoding the term-frequency
         inverse-document-frequency (TF-IDF) representation of the tokens in a
         text corpus.
@@ -578,8 +585,8 @@ class TFIDFEncoder:
         corpus, :math:`D = \{d_1, \ldots, d_N\}`, we have:
 
         .. math::
-            \\text{TF}(w, d)  &=  \\text{num. occurences of }`w`\\text{ in document }`d` \\\\
-            \\text{IDF}(w, D)  &=  \log \\frac{|D|}{|\{ d \in D: t \in d \}|}
+            \text{TF}(w, d)  &=  \text{num. occurences of }w \text{ in document }d \\
+            \text{IDF}(w, D)  &=  \log \frac{|D|}{|\{ d \in D: t \in d \}|}
 
         Parameters
         ----------
@@ -694,7 +701,7 @@ class TFIDFEncoder:
             doc_count = {}
             idx2doc[d_ix] = doc if H["input_type"] == "files" else None
             token2idx, idx2token, tokens, doc_count = self._encode_document(
-                doc, token2idx, idx2token, tokens, doc_count, bol_ix, eol_ix
+                doc, token2idx, idx2token, tokens, doc_count, bol_ix, eol_ix,
             )
             term_freq[d_ix] = doc_count
 
@@ -720,11 +727,9 @@ class TFIDFEncoder:
         self._calc_idf()
 
     def _encode_document(
-        self, doc, word2idx, idx2word, tokens, doc_count, bol_ix, eol_ix
+        self, doc, word2idx, idx2word, tokens, doc_count, bol_ix, eol_ix,
     ):
-        """
-        Perform tokenization and compute token counts for a single document
-        """
+        """Perform tokenization and compute token counts for a single document"""
         H = self.hyperparameters
         lowercase = H["lowercase"]
         filter_stop = H["filter_stopwords"]
@@ -816,7 +821,7 @@ class TFIDFEncoder:
         unk_idx = 0
         word2idx = {"<unk>": 0, "<eol>": 1, "<bol>": 2}
         idx2word = {0: "<unk>", 1: "<eol>", 2: "<bol>"}
-        special = set(["<eol>", "<bol>", "<unk>"])
+        special = {"<eol>", "<bol>", "<unk>"}
 
         for tt in self._tokens:
             if tt.word not in special:
@@ -895,7 +900,7 @@ class TFIDFEncoder:
         for word, w_ix in self.token2idx.items():
             d_count = int(smooth_idf)
             d_count += np.sum([1 if w_ix in tf[d_ix] else 0 for d_ix in doc_idxs])
-            inv_doc_freq[w_ix] = np.log(D / d_count) + 1
+            inv_doc_freq[w_ix] = 1 if d_count == 0 else np.log(D / d_count) + 1
         self.inv_doc_freq = inv_doc_freq
 
     def transform(self, ignore_special_chars=True):
@@ -944,7 +949,7 @@ class TFIDFEncoder:
 
 class Vocabulary:
     def __init__(
-        self, lowercase=True, min_count=None, max_tokens=None, filter_stopwords=True
+        self, lowercase=True, min_count=None, max_tokens=None, filter_stopwords=True,
     ):
         """
         An object for compiling and encoding the unique tokens in a text corpus.
@@ -977,15 +982,22 @@ class Vocabulary:
         }
 
     def __len__(self):
+        """Return the number of tokens in the vocabulary"""
         return len(self._tokens)
 
     def __iter__(self):
+        """Return an iterator over the tokens in the vocabulary"""
         return iter(self._tokens)
 
     def __contains__(self, word):
+        """Assert whether `word` is a token in the vocabulary"""
         return word in self.token2idx
 
     def __getitem__(self, key):
+        """
+        Return the token (if key is an integer) or the index (if key is a string)
+        for the key in the vocabulary, if it exists.
+        """
         if isinstance(key, str):
             return self._tokens[self.token2idx[key]]
         if isinstance(key, int):
@@ -1014,7 +1026,7 @@ class Vocabulary:
         """Return all tokens that occur `k` times in the corpus"""
         return [w for w, c in self.counts.items() if c == k]
 
-    def filter(self, words, unk=True):
+    def filter(self, words, unk=True):  # noqa: A003
         """
         Filter or replace any word in `words` that does not occur in
         `Vocabulary`
@@ -1201,7 +1213,7 @@ class Vocabulary:
         tokens = [unk_token, eol_token, bol_token]
         word2idx = {"<unk>": 0, "<eol>": 1, "<bol>": 2}
         idx2word = {0: "<unk>", 1: "<eol>", 2: "<bol>"}
-        special = set(["<eol>", "<bol>", "<unk>"])
+        special = {"<eol>", "<bol>", "<unk>"}
 
         for tt in self._tokens:
             if tt.word not in special:

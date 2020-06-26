@@ -1,4 +1,4 @@
-Loss functions 
+Loss functions
 ==============
 
 ``CrossEntropy``

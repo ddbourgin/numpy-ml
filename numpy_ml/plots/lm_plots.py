@@ -1,3 +1,4 @@
+# flake8: noqa
 import numpy as np
 
 from sklearn.model_selection import train_test_split
@@ -6,9 +7,6 @@ from sklearn.linear_model import LogisticRegression as LogisticRegression_sk
 from sklearn.datasets import make_regression
 from sklearn.metrics import zero_one_loss
 
-import matplotlib
-
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 import seaborn as sns
@@ -19,7 +17,7 @@ sns.set_style("white")
 sns.set_context("paper", font_scale=0.5)
 
 
-from .lm import (
+from numpy_ml.linear_models import (
     RidgeRegression,
     LinearRegression,
     BayesianLinearRegressionKnownVariance,

@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -30,7 +32,7 @@ def torch_gradient_generator(fn, **kwargs):
 def torch_xe_grad(y, z):
     z = torch.autograd.Variable(torch.FloatTensor(z), requires_grad=True)
     y = torch.LongTensor(y.argmax(axis=1))
-    loss = F.cross_entropy(z, y, size_average=False).sum()
+    loss = F.cross_entropy(z, y, reduction="sum")
     loss.backward()
     grad = z.grad.numpy()
     return grad
@@ -40,7 +42,7 @@ def torch_mse_grad(y, z, act_fn):
     y = torch.FloatTensor(y)
     z = torch.autograd.Variable(torch.FloatTensor(z), requires_grad=True)
     y_pred = act_fn(z)
-    loss = F.mse_loss(y_pred, y, size_average=False).sum()
+    loss = F.mse_loss(y_pred, y, reduction="sum")  # size_average=False).sum()
     loss.backward()
     grad = z.grad.numpy()
     return grad
@@ -57,7 +59,7 @@ class TorchVAELoss(nn.Module):
         t_mean = torchify(t_mean)
         t_log_var = torchify(t_log_var)
 
-        BCE = torch.sum(F.binary_cross_entropy(X_recon, X, reduce=False), dim=1)
+        BCE = torch.sum(F.binary_cross_entropy(X_recon, X, reduction="none"), dim=1)
 
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -622,8 +624,8 @@ class TorchWavenetModule(nn.Module):
         self.conv_dilation_out = self.conv_dilation(self.X_main)
         self.conv_dilation_out.retain_grad()
 
-        self.tanh_out = F.tanh(self.conv_dilation_out)
-        self.sigm_out = F.sigmoid(self.conv_dilation_out)
+        self.tanh_out = torch.tanh(self.conv_dilation_out)
+        self.sigm_out = torch.sigmoid(self.conv_dilation_out)
 
         self.tanh_out.retain_grad()
         self.sigm_out.retain_grad()
@@ -1869,7 +1871,7 @@ def LinearLayer(name, n_in, n_out, inputs, w_initialization):
 def Generator(n_samples, X_real, params=None):
     n_feats = 2
     W1 = W2 = W3 = W4 = "he"
-    noise = tf.random_normal([n_samples, 2])
+    noise = tf.random.normal([n_samples, 2])
     if params is not None:
         noise = tf.convert_to_tensor(params["noise"], dtype="float32")
         W1 = params["generator"]["FC1"]["W"]
@@ -1940,6 +1942,8 @@ def Discriminator(inputs, params=None):
 
 
 def WGAN_GP_tf(X, lambda_, params, batch_size):
+    tf.compat.v1.disable_eager_execution()
+
     batch_size = X.shape[0]
 
     # get alpha value
@@ -1947,7 +1951,7 @@ def WGAN_GP_tf(X, lambda_, params, batch_size):
     c_updates_per_epoch = params["c_updates_per_epoch"]
     alpha = tf.convert_to_tensor(params["alpha"], dtype="float32")
 
-    X_real = tf.placeholder(tf.float32, shape=[None, params["n_in"]])
+    X_real = tf.compat.v1.placeholder(tf.float32, shape=[None, params["n_in"]])
     X_fake, G_out_X_fake, G_weights = Generator(batch_size, X_real, params)
 
     Y_real, C_out_Y_real, C_Y_real_weights = Discriminator(X_real, params)
@@ -1966,7 +1970,7 @@ def WGAN_GP_tf(X, lambda_, params, batch_size):
     gradInterp = tf.gradients(Y_interp, [X_interp])[0]
 
     norm_gradInterp = tf.sqrt(
-        tf.reduce_sum(tf.square(gradInterp), reduction_indices=[1])
+        tf.compat.v1.reduce_sum(tf.square(gradInterp), reduction_indices=[1])
     )
     gradient_penalty = tf.reduce_mean((norm_gradInterp - 1) ** 2)
     C_loss += lambda_ * gradient_penalty
@@ -1986,8 +1990,8 @@ def WGAN_GP_tf(X, lambda_, params, batch_size):
     dC_gradInterp = tf.gradients(C_loss, [gradInterp])[0]
     dG_Y_fake = tf.gradients(G_loss, [Y_fake])[0]
 
-    with tf.Session() as session:
-        session.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as session:
+        session.run(tf.compat.v1.global_variables_initializer())
 
         for iteration in range(n_steps):
             # Train critic
@@ -2189,13 +2193,25 @@ def TFNCELoss(X, target_word, L):
     from tensorflow.python.ops.nn_impl import _compute_sampled_logits
     from tensorflow.python.ops.nn_impl import sigmoid_cross_entropy_with_logits
 
-    in_embed = tf.placeholder(tf.float32, shape=X.shape)
-    in_bias = tf.placeholder(tf.float32, shape=L.parameters["b"].flatten().shape)
-    in_weights = tf.placeholder(tf.float32, shape=L.parameters["W"].shape)
-    in_target_word = tf.placeholder(tf.int64)
-    in_neg_samples = tf.placeholder(tf.int32)
-    in_target_prob = tf.placeholder(tf.float32)
-    in_neg_samp_prob = tf.placeholder(tf.float32)
+    tf.compat.v1.disable_eager_execution()
+
+    in_embed = tf.compat.v1.placeholder(tf.float32, shape=X.shape)
+    in_bias = tf.compat.v1.placeholder(
+        tf.float32, shape=L.parameters["b"].flatten().shape
+    )
+    in_weights = tf.compat.v1.placeholder(tf.float32, shape=L.parameters["W"].shape)
+    in_target_word = tf.compat.v1.placeholder(tf.int64)
+    in_neg_samples = tf.compat.v1.placeholder(tf.int32)
+    in_target_prob = tf.compat.v1.placeholder(tf.float32)
+    in_neg_samp_prob = tf.compat.v1.placeholder(tf.float32)
+
+    #  in_embed = tf.keras.Input(dtype=tf.float32, shape=X.shape)
+    #  in_bias = tf.keras.Input(dtype=tf.float32, shape=L.parameters["b"].flatten().shape)
+    #  in_weights = tf.keras.Input(dtype=tf.float32, shape=L.parameters["W"].shape)
+    #  in_target_word = tf.keras.Input(dtype=tf.int64, shape=())
+    #  in_neg_samples = tf.keras.Input(dtype=tf.int32, shape=())
+    #  in_target_prob = tf.keras.Input(dtype=tf.float32, shape=())
+    #  in_neg_samp_prob = tf.keras.Input(dtype=tf.float32, shape=())
 
     feed = {
         in_embed: X,
@@ -2239,8 +2255,8 @@ def TFNCELoss(X, target_word, L):
         labels=sampled_labels, logits=sampled_logits
     )
 
-    with tf.Session() as session:
-        session.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as session:
+        session.run(tf.compat.v1.global_variables_initializer())
         (
             _final_loss,
             _nce_unreduced,
@@ -2263,7 +2279,7 @@ def TFNCELoss(X, target_word, L):
             ],
             feed_dict=feed,
         )
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
     return {
         "final_loss": _final_loss,
         "nce_unreduced": _nce_unreduced,

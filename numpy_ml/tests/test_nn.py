@@ -1,3 +1,4 @@
+# flake8: noqa
 import time
 from copy import deepcopy
 
@@ -13,14 +14,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..utils import calc_pad_dims_2D, conv2D_naive, conv2D, pad2D, pad1D
-from ...utils.testing import (
+import tensorflow.keras.datasets.mnist as mnist
+
+from numpy_ml.neural_nets.utils import (
+    calc_pad_dims_2D,
+    conv2D_naive,
+    conv2D,
+    pad2D,
+    pad1D,
+)
+from numpy_ml.utils.testing import (
     random_one_hot_matrix,
     random_stochastic_matrix,
     random_tensor,
 )
 
-from .torch_models import (
+from .nn_torch_models import (
     TFNCELoss,
     WGAN_GP_tf,
     torch_xe_grad,
@@ -70,170 +79,14 @@ def err_fmt(params, golds, ix, warn_str=""):
 
 
 #######################################################################
-#                            Test Suite                               #
-#######################################################################
-
-
-def test_everything(N=50):
-    test_losses(N=N)
-    test_activations(N=N)
-    test_layers(N=N)
-    test_utils(N=N)
-    test_modules(N=N)
-
-
-def test_losses(N=50):
-    print("Testing SquaredError loss")
-    time.sleep(1)
-    test_squared_error(N)
-    test_squared_error_grad(N)
-
-    print("Testing CrossEntropy loss")
-    time.sleep(1)
-    test_cross_entropy(N)
-    test_cross_entropy_grad(N)
-
-    print("Testing VAELoss")
-    time.sleep(1)
-    test_VAE_loss(N)
-
-    print("Testing WGAN_GPLoss")
-    time.sleep(1)
-    test_WGAN_GP_loss(N)
-
-    print("Testing NCELoss")
-    time.sleep(1)
-    test_NCELoss(N)
-
-
-def test_activations(N=50):
-    print("Testing Sigmoid activation")
-    time.sleep(1)
-    test_sigmoid_activation(N)
-    test_sigmoid_grad(N)
-
-    print("Testing Softmax activation")
-    time.sleep(1)
-    test_softmax_activation(N)
-    test_softmax_grad(N)
-
-    print("Testing Tanh activation")
-    time.sleep(1)
-    test_tanh_grad(N)
-
-    print("Testing ReLU activation")
-    time.sleep(1)
-    test_relu_activation(N)
-    test_relu_grad(N)
-
-    print("Testing ELU activation")
-    time.sleep(1)
-    test_elu_activation(N)
-    test_elu_grad(N)
-
-    print("Testing SoftPlus activation")
-    time.sleep(1)
-    test_softplus_activation(N)
-    test_softplus_grad(N)
-
-
-def test_layers(N=50):
-    print("Testing FullyConnected layer")
-    time.sleep(1)
-    test_FullyConnected(N)
-
-    print("Testing Conv1D layer")
-    time.sleep(1)
-    test_Conv1D(N)
-
-    print("Testing Conv2D layer")
-    time.sleep(1)
-    test_Conv2D(N)
-
-    print("Testing Pool2D layer")
-    time.sleep(1)
-    test_Pool2D(N)
-
-    print("Testing BatchNorm1D layer")
-    time.sleep(1)
-    test_BatchNorm1D(N)
-
-    print("Testing BatchNorm2D layer")
-    time.sleep(1)
-    test_BatchNorm2D(N)
-
-    print("Testing LayerNorm1D layer")
-    time.sleep(1)
-    test_LayerNorm1D(N)
-
-    print("Testing LayerNorm2D layer")
-    time.sleep(1)
-    test_LayerNorm2D(N)
-
-    print("Testing Deconv2D layer")
-    time.sleep(1)
-    test_Deconv2D(N)
-
-    print("Testing Add layer")
-    time.sleep(1)
-    test_AddLayer(N)
-
-    print("Testing Multiply layer")
-    time.sleep(1)
-    test_MultiplyLayer(N)
-
-    print("Testing LSTMCell layer")
-    time.sleep(1)
-    test_LSTMCell(N)
-
-    print("Testing RNNCell layer")
-    time.sleep(1)
-    test_RNNCell(N)
-
-    print("Testing DotProductAttention layer")
-    time.sleep(1)
-    test_DPAttention(N)
-
-
-def test_utils(N=50):
-    print("Testing pad1D util")
-    time.sleep(1)
-    test_pad1D(N)
-
-    print("Testing conv2D util")
-    time.sleep(1)
-    test_conv(N)
-
-
-def test_modules(N=50):
-    print("Testing MultiHeadedAttentionModule")
-    time.sleep(1)
-    test_MultiHeadedAttentionModule(N)
-
-    print("Testing BidirectionalLSTM module")
-    time.sleep(1)
-    test_BidirectionalLSTM(N)
-
-    print("Testing WaveNet module")
-    time.sleep(1)
-    test_WaveNetModule(N)
-
-    print("Testing SkipConnectionIdentity module")
-    time.sleep(1)
-    test_SkipConnectionIdentityModule(N)
-
-    print("Testing SkipConnectionConv module")
-    time.sleep(1)
-    test_SkipConnectionConvModule(N)
-
-
-#######################################################################
 #                         Loss Functions                              #
 #######################################################################
 
 
-def test_squared_error(N=None):
-    from ..losses import SquaredError
+def test_squared_error(N=15):
+    from numpy_ml.neural_nets.losses import SquaredError
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -263,8 +116,10 @@ def test_squared_error(N=None):
         i += 1
 
 
-def test_cross_entropy(N=None):
-    from ..losses import CrossEntropy
+def test_cross_entropy(N=15):
+    from numpy_ml.neural_nets.losses import CrossEntropy
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -291,17 +146,20 @@ def test_cross_entropy(N=None):
         i += 1
 
 
-def test_VAE_loss(N=None):
-    from ..losses import VAELoss
+def test_VAE_loss(N=15):
+    from numpy_ml.neural_nets.losses import VAELoss
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
+    eps = np.finfo(float).eps
 
     i = 1
     while i < N:
         n_ex = np.random.randint(1, 10)
         t_dim = np.random.randint(2, 10)
         t_mean = random_tensor([n_ex, t_dim], standardize=True)
-        t_log_var = np.log(np.abs(random_tensor([n_ex, t_dim], standardize=True)))
+        t_log_var = np.log(np.abs(random_tensor([n_ex, t_dim], standardize=True) + eps))
         im_cols, im_rows = np.random.randint(2, 40), np.random.randint(2, 40)
         X = np.random.rand(n_ex, im_rows * im_cols)
         X_recon = np.random.rand(n_ex, im_rows * im_cols)
@@ -330,8 +188,10 @@ def test_VAE_loss(N=None):
         i += 1
 
 
-def test_WGAN_GP_loss(N=None):
-    from ..losses import WGAN_GPLoss
+def test_WGAN_GP_loss(N=5):
+    from numpy_ml.neural_nets.losses import WGAN_GPLoss
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -380,8 +240,8 @@ def test_WGAN_GP_loss(N=None):
         i += 1
 
 
-def test_NCELoss(N=None):
-    from ..losses import NCELoss
+def test_NCELoss(N=1):
+    from numpy_ml.neural_nets.losses import NCELoss
     from numpy_ml.utils.data_structures import DiscreteSampler
 
     np.random.seed(12345)
@@ -478,9 +338,11 @@ def test_NCELoss(N=None):
 #######################################################################
 
 
-def test_squared_error_grad(N=None):
-    from ..losses import SquaredError
-    from ..activations import Tanh
+def test_squared_error_grad(N=15):
+    from numpy_ml.neural_nets.losses import SquaredError
+    from numpy_ml.neural_nets.activations import Tanh
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -499,15 +361,17 @@ def test_squared_error_grad(N=None):
         y_pred = act.fn(z)
 
         assert_almost_equal(
-            mine.grad(y, y_pred, z, act), 0.5 * gold(y, z, F.tanh), decimal=4
+            mine.grad(y, y_pred, z, act), 0.5 * gold(y, z, torch.tanh), decimal=4
         )
         print("PASSED")
         i += 1
 
 
-def test_cross_entropy_grad(N=None):
-    from ..losses import CrossEntropy
-    from ..activations import Softmax
+def test_cross_entropy_grad(N=15):
+    from numpy_ml.neural_nets.losses import CrossEntropy
+    from numpy_ml.neural_nets.layers import Softmax
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -524,7 +388,7 @@ def test_cross_entropy_grad(N=None):
 
         # the cross_entropy_gradient returns the gradient wrt. z (NOT softmax(z))
         z = random_tensor((n_examples, n_classes))
-        y_pred = sm.fn(z)
+        y_pred = sm.forward(z)
 
         assert_almost_equal(mine.grad(y, y_pred), gold(y, z), decimal=5)
         print("PASSED")
@@ -536,8 +400,10 @@ def test_cross_entropy_grad(N=None):
 #######################################################################
 
 
-def test_sigmoid_activation(N=None):
-    from ..activations import Sigmoid
+def test_sigmoid_activation(N=15):
+    from numpy_ml.neural_nets.activations import Sigmoid
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -553,8 +419,10 @@ def test_sigmoid_activation(N=None):
         i += 1
 
 
-def test_elu_activation(N=None):
-    from ..activations import ELU
+def test_elu_activation(N=15):
+    from numpy_ml.neural_nets.activations import ELU
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -573,8 +441,10 @@ def test_elu_activation(N=None):
         i += 1
 
 
-def test_softmax_activation(N=None):
-    from ..layers import Softmax
+def test_softmax_activation(N=15):
+    from numpy_ml.neural_nets.layers import Softmax
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -590,8 +460,10 @@ def test_softmax_activation(N=None):
         i += 1
 
 
-def test_relu_activation(N=None):
-    from ..activations import ReLU
+def test_relu_activation(N=15):
+    from numpy_ml.neural_nets.activations import ReLU
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -607,8 +479,10 @@ def test_relu_activation(N=None):
         i += 1
 
 
-def test_softplus_activation(N=None):
-    from ..activations import SoftPlus
+def test_softplus_activation(N=15):
+    from numpy_ml.neural_nets.activations import SoftPlus
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -624,35 +498,20 @@ def test_softplus_activation(N=None):
         i += 1
 
 
-def test_softsign_activation(N=None):
-    from ..activations import SoftSign
-
-    N = np.inf if N is None else N
-
-    mine = SoftSign()
-    gold = lambda z: F.softsign(torch.FloatTensor(z)).numpy()
-
-    i = 0
-    while i < N:
-        n_dims = np.random.randint(1, 100)
-        z = random_stochastic_matrix(1, n_dims)
-        assert_almost_equal(mine.fn(z), gold(z))
-        print("PASSED")
-        i += 1
-
-
 #######################################################################
 #                      Activation Gradients                           #
 #######################################################################
 
 
-def test_sigmoid_grad(N=None):
-    from ..activations import Sigmoid
+def test_sigmoid_grad(N=15):
+    from numpy_ml.neural_nets.activations import Sigmoid
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
     mine = Sigmoid()
-    gold = torch_gradient_generator(F.sigmoid)
+    gold = torch_gradient_generator(torch.sigmoid)
 
     i = 0
     while i < N:
@@ -664,8 +523,10 @@ def test_sigmoid_grad(N=None):
         i += 1
 
 
-def test_elu_grad(N=None):
-    from ..activations import ELU
+def test_elu_grad(N=15):
+    from numpy_ml.neural_nets.activations import ELU
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -678,18 +539,20 @@ def test_elu_grad(N=None):
 
         mine = ELU(alpha)
         gold = torch_gradient_generator(F.elu, alpha=alpha)
-        assert_almost_equal(mine.grad(z), gold(z))
+        assert_almost_equal(mine.grad(z), gold(z), decimal=5)
         print("PASSED")
         i += 1
 
 
-def test_tanh_grad(N=None):
-    from ..activations import Tanh
+def test_tanh_grad(N=15):
+    from numpy_ml.neural_nets.activations import Tanh
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
     mine = Tanh()
-    gold = torch_gradient_generator(F.tanh)
+    gold = torch_gradient_generator(torch.tanh)
 
     i = 0
     while i < N:
@@ -701,8 +564,10 @@ def test_tanh_grad(N=None):
         i += 1
 
 
-def test_relu_grad(N=None):
-    from ..activations import ReLU
+def test_relu_grad(N=15):
+    from numpy_ml.neural_nets.activations import ReLU
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -719,8 +584,8 @@ def test_relu_grad(N=None):
         i += 1
 
 
-def test_softmax_grad(N=None):
-    from ..layers import Softmax
+def test_softmax_grad(N=15):
+    from numpy_ml.neural_nets.layers import Softmax
     from functools import partial
 
     np.random.seed(12345)
@@ -749,8 +614,10 @@ def test_softmax_grad(N=None):
         i += 1
 
 
-def test_softplus_grad(N=None):
-    from ..activations import SoftPlus
+def test_softplus_grad(N=15):
+    from numpy_ml.neural_nets.activations import SoftPlus
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -767,32 +634,16 @@ def test_softplus_grad(N=None):
         i += 1
 
 
-def test_softsign_grad(N=None):
-    from ..activations import SoftSign
-
-    N = np.inf if N is None else N
-
-    mine = SoftSign()
-    gold = torch_gradient_generator(F.softsign)
-
-    i = 0
-    while i < N:
-        n_ex = np.random.randint(1, 100)
-        n_dims = np.random.randint(1, 100)
-        z = random_tensor((n_ex, n_dims), standardize=True)
-        assert_almost_equal(mine.grad(z), gold(z))
-        print("PASSED")
-        i += 1
-
-
 #######################################################################
 #                          Layers                                     #
 #######################################################################
 
 
-def test_FullyConnected(N=None):
-    from ..layers import FullyConnected
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_FullyConnected(N=15):
+    from numpy_ml.neural_nets.layers import FullyConnected
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -847,8 +698,10 @@ def test_FullyConnected(N=None):
         i += 1
 
 
-def test_Embedding(N=None):
-    from ..layers import Embedding
+def test_Embedding(N=15):
+    from numpy_ml.neural_nets.layers import Embedding
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -894,8 +747,10 @@ def test_Embedding(N=None):
         i += 1
 
 
-def test_BatchNorm1D(N=None):
-    from ..layers import BatchNorm1D
+def test_BatchNorm1D(N=15):
+    from numpy_ml.neural_nets.layers import BatchNorm1D
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -944,8 +799,8 @@ def test_BatchNorm1D(N=None):
         i += 1
 
 
-def test_LayerNorm1D(N=None):
-    from ..layers import LayerNorm1D
+def test_LayerNorm1D(N=15):
+    from numpy_ml.neural_nets.layers import LayerNorm1D
 
     N = np.inf if N is None else N
 
@@ -990,8 +845,8 @@ def test_LayerNorm1D(N=None):
         i += 1
 
 
-def test_LayerNorm2D(N=None):
-    from ..layers import LayerNorm2D
+def test_LayerNorm2D(N=15):
+    from numpy_ml.neural_nets.layers import LayerNorm2D
 
     N = np.inf if N is None else N
 
@@ -1043,9 +898,9 @@ def test_LayerNorm2D(N=None):
         i += 1
 
 
-def test_MultiplyLayer(N=None):
-    from ..layers import Multiply
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_MultiplyLayer(N=15):
+    from numpy_ml.neural_nets.layers import Multiply
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
 
     N = np.inf if N is None else N
 
@@ -1099,9 +954,9 @@ def test_MultiplyLayer(N=None):
         i += 1
 
 
-def test_AddLayer(N=None):
-    from ..layers import Add
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_AddLayer(N=15):
+    from numpy_ml.neural_nets.layers import Add
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
 
     N = np.inf if N is None else N
 
@@ -1155,8 +1010,8 @@ def test_AddLayer(N=None):
         i += 1
 
 
-def test_BatchNorm2D(N=None):
-    from ..layers import BatchNorm2D
+def test_BatchNorm2D(N=15):
+    from numpy_ml.neural_nets.layers import BatchNorm2D
 
     N = np.inf if N is None else N
 
@@ -1211,8 +1066,8 @@ def test_BatchNorm2D(N=None):
         i += 1
 
 
-def test_RNNCell(N=None):
-    from ..layers import RNNCell
+def test_RNNCell(N=15):
+    from numpy_ml.neural_nets.layers import RNNCell
 
     N = np.inf if N is None else N
 
@@ -1274,9 +1129,9 @@ def test_RNNCell(N=None):
         i += 1
 
 
-def test_Conv2D(N=None):
-    from ..layers import Conv2D
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_Conv2D(N=15):
+    from numpy_ml.neural_nets.layers import Conv2D
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
 
     N = np.inf if N is None else N
 
@@ -1360,8 +1215,8 @@ def test_Conv2D(N=None):
         i += 1
 
 
-def test_DPAttention(N=None):
-    from ..layers import DotProductAttention
+def test_DPAttention(N=15):
+    from numpy_ml.neural_nets.layers import DotProductAttention
 
     N = np.inf if N is None else N
 
@@ -1411,9 +1266,9 @@ def test_DPAttention(N=None):
         i += 1
 
 
-def test_Conv1D(N=None):
-    from ..layers import Conv1D
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_Conv1D(N=15):
+    from numpy_ml.neural_nets.layers import Conv1D
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
 
     N = np.inf if N is None else N
 
@@ -1492,9 +1347,9 @@ def test_Conv1D(N=None):
         i += 1
 
 
-def test_Deconv2D(N=None):
-    from ..layers import Deconv2D
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_Deconv2D(N=15):
+    from numpy_ml.neural_nets.layers import Deconv2D
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
 
     N = np.inf if N is None else N
 
@@ -1574,8 +1429,8 @@ def test_Deconv2D(N=None):
         i += 1
 
 
-def test_Pool2D(N=None):
-    from ..layers import Pool2D
+def test_Pool2D(N=15):
+    from numpy_ml.neural_nets.layers import Pool2D
 
     N = np.inf if N is None else N
 
@@ -1626,8 +1481,8 @@ def test_Pool2D(N=None):
         i += 1
 
 
-def test_LSTMCell(N=None):
-    from ..layers import LSTMCell
+def test_LSTMCell(N=15):
+    from numpy_ml.neural_nets.layers import LSTMCell
 
     N = np.inf if N is None else N
 
@@ -1750,8 +1605,8 @@ def grad_check_RNN(model, loss_func, param_name, n_t, X, epsilon=1e-7):
 #######################################################################
 
 
-def test_MultiHeadedAttentionModule(N=None):
-    from ..modules import MultiHeadedAttentionModule
+def test_MultiHeadedAttentionModule(N=15):
+    from numpy_ml.neural_nets.modules import MultiHeadedAttentionModule
 
     N = np.inf if N is None else N
     np.random.seed(12345)
@@ -1836,9 +1691,9 @@ def test_MultiHeadedAttentionModule(N=None):
         i += 1
 
 
-def test_SkipConnectionIdentityModule(N=None):
-    from ..modules import SkipConnectionIdentityModule
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_SkipConnectionIdentityModule(N=15):
+    from numpy_ml.neural_nets.modules import SkipConnectionIdentityModule
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
 
     N = np.inf if N is None else N
 
@@ -1966,9 +1821,9 @@ def test_SkipConnectionIdentityModule(N=None):
         i += 1
 
 
-def test_SkipConnectionConvModule(N=None):
-    from ..modules import SkipConnectionConvModule
-    from ..activations import Tanh, ReLU, Sigmoid, Affine
+def test_SkipConnectionConvModule(N=15):
+    from numpy_ml.neural_nets.modules import SkipConnectionConvModule
+    from numpy_ml.neural_nets.activations import Tanh, ReLU, Sigmoid, Affine
 
     N = np.inf if N is None else N
 
@@ -2134,8 +1989,8 @@ def test_SkipConnectionConvModule(N=None):
         i += 1
 
 
-def test_BidirectionalLSTM(N=None):
-    from ..modules import BidirectionalLSTM
+def test_BidirectionalLSTM(N=15):
+    from numpy_ml.neural_nets.modules import BidirectionalLSTM
 
     N = np.inf if N is None else N
 
@@ -2216,8 +2071,8 @@ def test_BidirectionalLSTM(N=None):
         i += 1
 
 
-def test_WaveNetModule(N=None):
-    from ..modules import WavenetResidualModule
+def test_WaveNetModule(N=10):
+    from numpy_ml.neural_nets.modules import WavenetResidualModule
 
     N = np.inf if N is None else N
 
@@ -2318,9 +2173,11 @@ def test_WaveNetModule(N=None):
 #######################################################################
 
 
-def test_pad1D(N=None):
-    from ..layers import Conv1D
-    from .torch_models import TorchCausalConv1d, torchify
+def test_pad1D(N=15):
+    from numpy_ml.neural_nets.layers import Conv1D
+    from .nn_torch_models import TorchCausalConv1d, torchify
+
+    np.random.seed(12345)
 
     N = np.inf if N is None else N
 
@@ -2415,7 +2272,8 @@ def test_pad1D(N=None):
         i += 1
 
 
-def test_conv(N=None):
+def test_conv(N=15):
+    np.random.seed(12345)
     N = np.inf if N is None else N
     i = 0
     while i < N:
@@ -2448,10 +2306,11 @@ def test_conv(N=None):
 #######################################################################
 
 
-def test_VAE():
+def fit_VAE():
     # for testing
-    from keras.datasets import mnist
-    from ..models.vae import BernoulliVAE
+    from numpy_ml.neural_nets.models.vae import BernoulliVAE
+
+    np.random.seed(12345)
 
     (X_train, y_train), (X_test, y_test) = mnist.load_data()
 
@@ -2459,14 +2318,16 @@ def test_VAE():
     X_train = np.expand_dims(X_train.astype("float32") / 255.0, 3)
     X_test = np.expand_dims(X_test.astype("float32") / 255.0, 3)
 
-    X_train = X_train[: 128 * 10]
+    X_train = X_train[: 128 * 1]  # 1 batch
 
     BV = BernoulliVAE()
-    BV.fit(X_train, verbose=True)
+    BV.fit(X_train, n_epochs=1, verbose=False)
 
 
 def test_WGAN_GP(N=1):
-    from ..models.wgan_gp import WGAN_GP
+    from numpy_ml.neural_nets.models.wgan_gp import WGAN_GP
+
+    np.random.seed(12345)
 
     ss = np.random.randint(0, 1000)
     np.random.seed(ss)

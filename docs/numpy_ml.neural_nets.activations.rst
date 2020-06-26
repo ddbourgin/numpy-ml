@@ -1,4 +1,4 @@
-Activations 
+Activations
 ===========
 
 Popular (and some not-so-popular) activation functions for use within arbitrary
@@ -80,4 +80,3 @@ neural networks.
     :members:
     :undoc-members:
     :inherited-members:
-

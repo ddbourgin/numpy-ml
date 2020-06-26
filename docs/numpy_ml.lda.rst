@@ -1,9 +1,9 @@
 ###########################
-Latent Dirichlet allocation 
+Latent Dirichlet allocation
 ###########################
 
 `Latent Dirichlet allocation`_ (LDA, commonly known as a topic model) is a
-generative model for `bags of words`_.  
+generative model for `bags of words`_.
 
 .. _`Latent Dirichlet allocation` : https://en.wikipedia.org/wiki/Latent_Dirichlet_allocation
 .. _bags of words : https://en.wikipedia.org/wiki/Bag-of-words_model
@@ -47,7 +47,7 @@ The smoothed/fully-Bayesian LDA model [2]_ adds an additional `Dirichlet`_ prior
 
 To generate a document with the smoothed LDA model, we:
 
-    1. Sample the parameters for the distribution over topics, 
+    1. Sample the parameters for the distribution over topics,
        :math:`\theta \sim \text{Dir}(\alpha)`.
 
     2. Sample a topic, :math:`z \sim \text{Cat}(\theta)`.
@@ -63,11 +63,11 @@ The joint distribution over words, topics, :math:`\theta`, and :math:`\phi`
 under the smoothed LDA model is:
 
 .. math::
-    
-    P(w, z, \phi, \theta \mid \alpha, \beta) = \left( \prod_{t=1}^T \text{Dir}(\phi^{(t)}; \beta) \right) \prod_{d=1}^D \text{Dir}(\theta^{(d)}; \alpha) \prod_{n=1}^{N_d} P(z_n \mid \theta^{(d)}) P(w_n \mid \phi^{(z_n)}) 
+
+    P(w, z, \phi, \theta \mid \alpha, \beta) = \left( \prod_{t=1}^T \text{Dir}(\phi^{(t)}; \beta) \right) \prod_{d=1}^D \text{Dir}(\theta^{(d)}; \alpha) \prod_{n=1}^{N_d} P(z_n \mid \theta^{(d)}) P(w_n \mid \phi^{(z_n)})
 
 The parameters of the LDA model can be learned using `variational expectation
-maximization`_ or Markov chain Monte Carlo (e.g., `collapsed Gibbs sampling`_). 
+maximization`_ or Markov chain Monte Carlo (e.g., `collapsed Gibbs sampling`_).
 
 .. _`variational expectation maximization`: https://en.wikipedia.org/wiki/Variational_Bayesian_methods
 .. _`collapsed Gibbs sampling`: https://en.wikipedia.org/wiki/Gibbs_sampling#Collapsed_Gibbs_sampler

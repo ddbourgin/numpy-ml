@@ -1,7 +1,7 @@
 Welcome to numpy-ml
 ===================
 `numpy-ml`_ is a growing collection of machine learning models, algorithms, and
-tools written exclusively in `NumPy`_ and the Python `standard library`_. 
+tools written exclusively in `NumPy`_ and the Python `standard library`_.
 
 The purpose of the project is to provide reference implementations of common
 machine learning components for rapid prototyping and experimentation. With
@@ -15,7 +15,7 @@ that in mind, don't just read the docs -- read the source!
 
     We're working to expand our coverage. During this time there are likely to
     be typos, bugs, and poorly-worded sections. If you encounter any of the
-    above, please file an `issue`_ or submit a `pull request`_! 
+    above, please file an `issue`_ or submit a `pull request`_!
 
 .. _issue: https://github.com/ddbourgin/numpy-ml/issues
 .. _pull request: https://github.com/ddbourgin/numpy-ml/pulls
@@ -38,6 +38,8 @@ that in mind, don't just read the docs -- read the source!
 
    numpy_ml.nonparametric
 
+   numpy_ml.factorization
+
    numpy_ml.trees
 
    numpy_ml.neural_nets
@@ -49,8 +51,8 @@ that in mind, don't just read the docs -- read the source!
    numpy_ml.utils
 
 ##########
-Disclaimer	
-##########	
-	
+Disclaimer
+##########
+
 This software is provided as-is: there are no guarantees that it fits your
 purposes or that it is bug-free. Use it at your own risk!

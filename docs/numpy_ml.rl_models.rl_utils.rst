@@ -1,4 +1,4 @@
-Utilities 
+Utilities
 =========
 
 .. automodule:: numpy_ml.rl_models.rl_utils

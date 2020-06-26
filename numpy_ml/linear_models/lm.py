@@ -1,11 +1,23 @@
+"""A collection of common linear models."""
+
 import numpy as np
 from ..utils.testing import is_symmetric_positive_definite, is_number
 
 
 class LinearRegression:
     def __init__(self, fit_intercept=True):
-        """
+        r"""
         An ordinary least squares regression model fit via the normal equation.
+
+        Notes
+        -----
+        Given data matrix *X* and target vector *y*, the maximum-likelihood estimate
+        for the regression coefficients, :math:`\\beta`, is:
+
+        .. math::
+
+            \hat{\beta} =
+                \left(\mathbf{X}^\top \mathbf{X}\right)^{-1} \mathbf{X}^\top \mathbf{y}
 
         Parameters
         ----------
@@ -32,12 +44,12 @@ class LinearRegression:
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
 
-        pseudo_inverse = np.dot(np.linalg.inv(np.dot(X.T, X)), X.T)
+        pseudo_inverse = np.linalg.inv(X.T @ X) @ X.T
         self.beta = np.dot(pseudo_inverse, y)
 
     def predict(self, X):
         """
-        Used the trained model to generate predictions on a new collection of
+        Use the trained model to generate predictions on a new collection of
         data points.
 
         Parameters
@@ -58,8 +70,30 @@ class LinearRegression:
 
 class RidgeRegression:
     def __init__(self, alpha=1, fit_intercept=True):
-        """
+        r"""
         A ridge regression model fit via the normal equation.
+
+        Notes
+        -----
+        Given data matrix **X** and target vector **y**, the maximum-likelihood
+        estimate for the ridge coefficients, :math:`\\beta`, is:
+
+        .. math::
+
+            \hat{\beta} =
+                \left(\mathbf{X}^\top \mathbf{X} + \alpha \mathbf{I} \right)^{-1}
+                    \mathbf{X}^\top \mathbf{y}
+
+        It turns out that this estimate for :math:`\beta` also corresponds to
+        the MAP estimate if we assume a multivariate Gaussian prior on the model
+        coefficients:
+
+        .. math::
+
+            \beta \sim \mathcal{N}(\mathbf{0}, \frac{1}{2M} \mathbf{I})
+
+        Note that this assumes that the data matrix **X** has been standardized
+        and the target values **y** centered at 0.
 
         Parameters
         ----------
@@ -91,7 +125,7 @@ class RidgeRegression:
             X = np.c_[np.ones(X.shape[0]), X]
 
         A = self.alpha * np.eye(X.shape[1])
-        pseudo_inverse = np.dot(np.linalg.inv(X.T @ X + A), X.T)
+        pseudo_inverse = np.linalg.inv(X.T @ X + A) @ X.T
         self.beta = pseudo_inverse @ y
 
     def predict(self, X):
@@ -117,9 +151,26 @@ class RidgeRegression:
 
 class LogisticRegression:
     def __init__(self, penalty="l2", gamma=0, fit_intercept=True):
-        """
+        r"""
         A simple logistic regression model fit via gradient descent on the
         penalized negative log likelihood.
+
+        Notes
+        -----
+        For logistic regression, the penalized negative log likelihood of the
+        targets **y** under the current model is
+
+        .. math::
+
+            - \log \mathcal{L}(\mathbf{b}, \mathbf{y}) = -\frac{1}{N} \left[
+                \left(
+                    \sum_{i=0}^N y_i \log(\hat{y}_i) +
+                      (1-y_i) \log(1-\hat{y}_i)
+                \right) - \frac{\gamma}{2} ||\mathbf{b}||_2
+            \right]
+
+        where :math:`\gamma` is a regularization weight, `N` is the number of
+        examples in **y**, and **b** is the vector of model coefficients.
 
         Parameters
         ----------
@@ -175,16 +226,17 @@ class LogisticRegression:
             self.beta -= lr * self._NLL_grad(X, y, y_pred)
 
     def _NLL(self, X, y, y_pred):
-        """
+        r"""
         Penalized negative log likelihood of the targets under the current
         model.
 
         .. math::
 
-            \\text{NLL} = -\\frac{1}{N} \left[
-                \left(\sum_{i=0}^N y_i \log(\hat{y}_i) + (1-y_i) log(1-\hat{y}_i) \\right) -
-                \\frac{\gamma}{2} ||\mathbf{b}||_2 \\right]
-
+            \text{NLL} = -\frac{1}{N} \left[
+                \left(
+                    \sum_{i=0}^N y_i \log(\hat{y}_i) + (1-y_i) \log(1-\hat{y}_i)
+                \right) - \frac{\gamma}{2} ||\mathbf{b}||_2
+            \right]
         """
         N, M = X.shape
         order = 2 if self.penalty == "l2" else 1
@@ -193,12 +245,10 @@ class LogisticRegression:
         return (penalty + nll) / N
 
     def _NLL_grad(self, X, y, y_pred):
-        """ Gradient of the penalized negative log likelihood wrt beta """
+        """Gradient of the penalized negative log likelihood wrt beta"""
         N, M = X.shape
-        p = self.penalty
-        beta = self.beta
-        gamma = self.gamma
-        l1norm = lambda x: np.linalg.norm(x, 1)
+        l1norm = lambda x: np.linalg.norm(x, 1)  # noqa: E731
+        p, beta, gamma = self.penalty, self.beta, self.gamma
         d_penalty = gamma * beta if p == "l2" else gamma * l1norm(beta) * np.sign(beta)
         return -(np.dot(y - y_pred, X) + d_penalty) / N
 
@@ -225,7 +275,7 @@ class LogisticRegression:
 
 class BayesianLinearRegressionUnknownVariance:
     def __init__(self, alpha=1, beta=2, b_mean=0, b_V=None, fit_intercept=True):
-        """
+        r"""
         Bayesian linear regression model with unknown variance and conjugate
         Normal-Gamma prior on `b` and :math:`\sigma^2`.
 
@@ -237,9 +287,9 @@ class BayesianLinearRegressionUnknownVariance:
 
         .. math::
 
-            b, \sigma^2  &\sim  \\text{NG}(b_{mean}, b_{V}, \\alpha, \\beta) \\\\
-            \sigma^2  &\sim  \\text{InverseGamma}(\\alpha, \\beta) \\\\
-            b  &\sim  \mathcal{N}(b_{mean}, \sigma^2 * b_V)
+            b, \sigma^2 &\sim \text{NG}(b_{mean}, b_{V}, \alpha, \beta) \\
+            \sigma^2 &\sim \text{InverseGamma}(\alpha, \beta) \\
+            b &\sim \mathcal{N}(b_{mean}, \sigma^2 \cdot b_V)
 
         Parameters
         ----------
@@ -273,9 +323,8 @@ class BayesianLinearRegressionUnknownVariance:
             if b_V.ndim == 1:
                 b_V = np.diag(b_V)
             elif b_V.ndim == 2:
-                assert is_symmetric_positive_definite(
-                    b_V
-                ), "b_V must be symmetric positive definite"
+                fstr = "b_V must be symmetric positive definite"
+                assert is_symmetric_positive_definite(b_V), fstr
 
         self.b_V = b_V
         self.beta = beta
@@ -313,7 +362,7 @@ class BayesianLinearRegressionUnknownVariance:
             self.b_mean *= np.ones(M)
 
         # sigma
-        I = np.eye(N)
+        I = np.eye(N)  # noqa: E741
         a = y - np.dot(X, self.b_mean)
         b = np.linalg.inv(np.dot(X, self.b_V).dot(X.T) + I)
         c = y - np.dot(X, self.b_mean)
@@ -327,10 +376,11 @@ class BayesianLinearRegressionUnknownVariance:
 
         # mean
         b_V_inv = np.linalg.inv(self.b_V)
-        l = np.linalg.inv(b_V_inv + np.dot(X.T, X))
-        r = np.dot(b_V_inv, self.b_mean) + np.dot(X.T, y)
-        mu = np.dot(l, r)
-        cov = l * b_sigma
+        L = np.linalg.inv(b_V_inv + X.T @ X)
+        R = b_V_inv @ self.b_mean + X.T @ y
+
+        mu = L @ R
+        cov = L * b_sigma
 
         # posterior distribution for sigma^2 and c
         self.posterior = {
@@ -356,7 +406,7 @@ class BayesianLinearRegressionUnknownVariance:
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
 
-        I = np.eye(X.shape[0])
+        I = np.eye(X.shape[0])  # noqa: E741
         mu = np.dot(X, self.posterior["b | sigma**2"]["mu"])
         cov = np.dot(X, self.posterior["b | sigma**2"]["cov"]).dot(X.T) + I
 
@@ -369,7 +419,7 @@ class BayesianLinearRegressionUnknownVariance:
 
 class BayesianLinearRegressionKnownVariance:
     def __init__(self, b_mean=0, b_sigma=1, b_V=None, fit_intercept=True):
-        """
+        r"""
         Bayesian linear regression model with known error variance and
         conjugate Gaussian prior on model parameters.
 
@@ -414,9 +464,8 @@ class BayesianLinearRegressionKnownVariance:
             if b_V.ndim == 1:
                 b_V = np.diag(b_V)
             elif b_V.ndim == 2:
-                assert is_symmetric_positive_definite(
-                    b_V
-                ), "b_V must be symmetric positive definite"
+                fstr = "b_V must be symmetric positive definite"
+                assert is_symmetric_positive_definite(b_V), fstr
 
         self.posterior = {}
         self.posterior_predictive = {}
@@ -457,10 +506,11 @@ class BayesianLinearRegressionKnownVariance:
         b_sigma = self.b_sigma
 
         b_V_inv = np.linalg.inv(b_V)
-        l = np.linalg.inv(b_V_inv + np.dot(X.T, X))
-        r = np.dot(b_V_inv, b_mean) + np.dot(X.T, y)
-        mu = np.dot(l, r)
-        cov = l * b_sigma ** 2
+        L = np.linalg.inv(b_V_inv + X.T @ X)
+        R = b_V_inv @ b_mean + X.T @ y
+
+        mu = L @ R
+        cov = L * b_sigma ** 2
 
         # posterior distribution over b conditioned on b_sigma
         self.posterior["b"] = {"dist": "Gaussian", "mu": mu, "cov": cov}
@@ -484,7 +534,7 @@ class BayesianLinearRegressionKnownVariance:
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
 
-        I = np.eye(X.shape[0])
+        I = np.eye(X.shape[0])  # noqa: E741
         mu = np.dot(X, self.posterior["b"]["mu"])
         cov = np.dot(X, self.posterior["b"]["cov"]).dot(X.T) + I
 
@@ -500,4 +550,5 @@ class BayesianLinearRegressionKnownVariance:
 
 
 def sigmoid(x):
+    """The logistic sigmoid function"""
     return 1 / (1 + np.exp(-x))

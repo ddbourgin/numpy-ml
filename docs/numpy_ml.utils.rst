@@ -1,4 +1,4 @@
-Utilities 
+Utilities
 #########
 
 .. toctree::
@@ -15,4 +15,3 @@ Utilities
    numpy_ml.utils.windows
 
    numpy_ml.utils.testing
-

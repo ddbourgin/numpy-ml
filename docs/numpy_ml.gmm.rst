@@ -16,7 +16,7 @@ unsupervised clustering.
 A GMM assumes that:
 
     1. The observed data are generated from a `mixture distribution`_, `P`,
-       made up of `K` mixture components. 
+       made up of `K` mixture components.
 
     2. Each mixture component is a multivariate Gaussian with its own mean
        :math:`\mu`, covariance matrix, :math:`\Sigma`, and mixture weight,
@@ -35,15 +35,15 @@ The parameters of a GMM model are:
       \Sigma_k, \pi_k \}`.
 
 Under a GMM, the joint probability of a sequence of cluster assignments `Z` and an observed
-dataset :math:`X = \{x_1, \ldots, x_N \}`, is: 
+dataset :math:`X = \{x_1, \ldots, x_N \}`, is:
 
 .. math::
-    p(Z, X \mid \theta) = 
-        \prod_{i=1}^N p(z_i, x_i \mid \theta) = 
-            \prod_{i=1}^N \prod_{k=1}^K 
+    p(Z, X \mid \theta) =
+        \prod_{i=1}^N p(z_i, x_i \mid \theta) =
+            \prod_{i=1}^N \prod_{k=1}^K
                 [\mathcal{N}(x_i \mid \mu_k, \Sigma_k) \pi_k ]^{\mathbb{1}_{[z_{i} = k]}}
 
-where 
+where
 
     - :math:`\theta` is the set of GMM parameters: :math:`\theta = \{ \mu_1,
       \Sigma_1, \pi_i, \ldots, \mu_k, \Sigma_k, \pi_k \}`.
@@ -56,7 +56,7 @@ where
       and 0 otherwise.
 
 As with other latent-variable models, we use the `expectation-maximization (EM)
-algorithm`_ to learn the GMM parameters. 
+algorithm`_ to learn the GMM parameters.
 
 .. _expectation-maximization (EM) algorithm : https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm
 
@@ -65,7 +65,7 @@ algorithm`_ to learn the GMM parameters.
 - :class:`~numpy_ml.gmm.GMM`
 
 **References**
-    
+
 .. [1] Bilmes, J. A. (1998). "A gentle tutorial of the EM algorithm and its
    application to parameter estimation for Gaussian mixture and hidden
    Markov models" *International Computer Science Institute, 4(510)*

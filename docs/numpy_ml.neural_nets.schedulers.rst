@@ -1,4 +1,4 @@
-Learning rate schedulers 
+Learning rate schedulers
 =========================
 
 ``ConstantScheduler``

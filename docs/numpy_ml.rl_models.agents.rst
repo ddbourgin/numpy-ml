@@ -1,4 +1,4 @@
-Agents 
+Agents
 ======
 
 ``CrossEntropyAgent``

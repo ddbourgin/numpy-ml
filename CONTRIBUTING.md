@@ -10,7 +10,7 @@ Thank you for contributing to numpy-ml!
 2. For pull requests, please make sure all commits are [*atomic*](https://en.wikipedia.org/wiki/Atomic_commit) (i.e., one feature per commit)
 3. If you're submitting a new model / feature / module, **please include proper documentation and unit tests.**
     - See the `test.py` file in one of the existing modules for examples of unit tests.
-    - Documentation is loosely based on the [NumPy docstring style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html). When in doubt, refer to existing examples 
+    - Documentation is loosely based on the [NumPy docstring style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html). When in doubt, refer to existing examples
 4. Please format your code using the [black](https://github.com/python/black) defaults. You can use this [online formatter](https://black.now.sh/).
 
 ### Specific guidelines

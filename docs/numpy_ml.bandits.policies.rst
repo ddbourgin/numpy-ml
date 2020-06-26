@@ -28,3 +28,10 @@ Policies
     :members:
     :undoc-members:
     :show-inheritance:
+
+``LinUCB``
+--------------------------------
+.. autoclass:: numpy_ml.bandits.policies.LinUCB
+    :members:
+    :undoc-members:
+    :show-inheritance:

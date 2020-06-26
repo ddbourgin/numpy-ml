@@ -1,3 +1,8 @@
+"""
+A collection of objects thats can wrap / otherwise modify arbitrary neural
+network layers.
+"""
+
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -204,7 +209,7 @@ class Dropout(WrapperBase):
 
         return scaler * self._base_layer.forward(X, retain_derived)
 
-    def backward(self, dLdy, retain_grads):
+    def backward(self, dLdy, retain_grads=True):
         """
         Backprop from the base layer's outputs to inputs.
 
@@ -221,13 +226,30 @@ class Dropout(WrapperBase):
         -------
         dLdX : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, n_in)` or list of arrays
             The gradient of the loss wrt. the layer input(s) `X`.
-        """
+        """  # noqa: E501
         assert self.trainable, "Layer is frozen"
         dLdy *= 1.0 / (1.0 - self.p)
         return self._base_layer.backward(dLdy, retain_grads)
 
 
 def init_wrappers(layer, wrappers_list):
+    """
+    Initialize the layer wrappers in `wrapper_list` and return a wrapped
+    `layer` object.
+
+    Parameters
+    ----------
+    layer : :doc:`Layer <numpy_ml.neural_nets.layers>` instance
+        The base layer object to apply the wrappers to.
+    wrappers : list of dicts
+        A list of parameter dictionaries for a the wrapper objects. The
+        wrappers are initialized and applied to the the layer sequentially.
+
+    Returns
+    -------
+    wrapped_layer : :class:`WrapperBase` instance
+        The wrapped layer object
+    """
     for wr in wrappers_list:
         if wr["wrapper"] == "Dropout":
             layer = Dropout(layer, 1)._set_wrapper_params(wr)

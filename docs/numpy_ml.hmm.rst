@@ -2,7 +2,7 @@
 Hidden Markov models
 ####################
 
-A `hidden Markov model`_ (HMM) is a generative model for sequences of observations. 
+A `hidden Markov model`_ (HMM) is a generative model for sequences of observations.
 
 .. _`hidden Markov model` : https://en.wikipedia.org/wiki/Hidden_Markov_model
 
@@ -58,7 +58,7 @@ the EM algorithm is known as the `forward-backward`_ / `Baum-Welch algorithm`_.
 - :class:`~numpy_ml.hmm.MultinomialHMM`
 
 **References**
-    
+
 .. [1] Ghahramani, Z. (2001). "An Intro to HMMs and Bayesian networks".
        *International Journal of Pattern Recognition and AI, 15(1)*: 9-42.
 
@@ -67,4 +67,3 @@ the EM algorithm is known as the `forward-backward`_ / `Baum-Welch algorithm`_.
    :hidden:
 
    numpy_ml.hmm.MultinomialHMM
-

@@ -9,4 +9,3 @@ Multi-armed bandits
    numpy_ml.bandits.policies
 
    numpy_ml.bandits.trainer
-

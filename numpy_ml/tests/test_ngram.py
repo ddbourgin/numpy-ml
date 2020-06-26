@@ -1,8 +1,12 @@
+# flake8: noqa
+import tempfile
+
 import nltk
 import numpy as np
 
 from ..preprocessing.nlp import tokenize_words
-from .ngram import AdditiveNGram, MLENGram
+from ..ngram import AdditiveNGram, MLENGram
+from ..utils.testing import random_paragraph
 
 
 class MLEGold:
@@ -22,8 +26,6 @@ class MLEGold:
             "filter_stopwords": filter_stopwords,
             "filter_punctuation": filter_punctuation,
         }
-
-        super().__init__()
 
     def train(self, corpus_fp, vocab=None, encoding=None):
         N = self.N
@@ -120,8 +122,6 @@ class AdditiveGold:
             "filter_punctuation": filter_punctuation,
         }
 
-        super().__init__()
-
     def train(self, corpus_fp, vocab=None, encoding=None):
         N = self.N
         H = self.hyperparameters
@@ -204,8 +204,10 @@ def test_mle():
     gold = MLEGold(N, unk=True, filter_stopwords=False, filter_punctuation=False)
     mine = MLENGram(N, unk=True, filter_stopwords=False, filter_punctuation=False)
 
-    gold.train("russell.txt", encoding="utf-8-sig")
-    mine.train("russell.txt", encoding="utf-8-sig")
+    with tempfile.NamedTemporaryFile() as temp:
+        temp.write(bytes(" ".join(random_paragraph(1000)), encoding="utf-8-sig"))
+        gold.train(temp.name, encoding="utf-8-sig")
+        mine.train(temp.name, encoding="utf-8-sig")
 
     for k in mine.counts[N].keys():
         if k[0] == k[1] and k[0] in ("<bol>", "<eol>"):
@@ -232,8 +234,10 @@ def test_additive():
         N, K, unk=True, filter_stopwords=False, filter_punctuation=False
     )
 
-    gold.train("russell.txt", encoding="utf-8-sig")
-    mine.train("russell.txt", encoding="utf-8-sig")
+    with tempfile.NamedTemporaryFile() as temp:
+        temp.write(bytes(" ".join(random_paragraph(1000)), encoding="utf-8-sig"))
+        gold.train(temp.name, encoding="utf-8-sig")
+        mine.train(temp.name, encoding="utf-8-sig")
 
     for k in mine.counts[N].keys():
         if k[0] == k[1] and k[0] in ("<bol>", "<eol>"):

@@ -1,7 +1,7 @@
-Neural networks 
+Neural networks
 ###############
 The neural network module includes common building blocks for implementing
-modern `deep learning`_ models. 
+modern `deep learning`_ models.
 
 .. _`deep learning`: https://en.wikipedia.org/wiki/Deep_learning
 
@@ -225,5 +225,3 @@ arithmetic, padding, and minibatching.
    numpy_ml.neural_nets.models
 
    numpy_ml.neural_nets.utils
-
-

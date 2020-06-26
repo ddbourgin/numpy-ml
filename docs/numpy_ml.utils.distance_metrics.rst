@@ -1,4 +1,4 @@
-Distance metrics 
+Distance metrics
 ================
 
 Common distance functions.

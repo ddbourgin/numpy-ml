@@ -1,4 +1,4 @@
-Digital signal processing 
+Digital signal processing
 #########################
 
 ``DCT``
