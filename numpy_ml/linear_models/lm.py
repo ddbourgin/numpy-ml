@@ -166,18 +166,30 @@ class LogisticRegression:
                 \left(
                     \sum_{i=0}^N y_i \log(\hat{y}_i) +
                       (1-y_i) \log(1-\hat{y}_i)
-                \right) - \frac{\gamma}{2} ||\mathbf{b}||_2
+                \right) - R(\mathbf{b}, \gamma) 
             \right]
-
-        where :math:`\gamma` is a regularization weight, `N` is the number of
-        examples in **y**, and **b** is the vector of model coefficients.
+        
+        where
+        
+        .. math::
+        
+            R(\mathbf{b}, \gamma) = \left\{
+                \begin{array}{lr}
+                    \frac{\gamma}{2} ||\mathbf{beta}||_2^2 & :\texttt{ penalty = 'l2'}\\
+                    \gamma ||\beta||_1 & :\texttt{ penalty = 'l1'}
+                \end{array}
+                \right.
+                
+        is a regularization penalty, :math:`\gamma` is a regularization weight, 
+        `N` is the number of examples in **y**, and **b** is the vector of model 
+        coefficients.
 
         Parameters
         ----------
         penalty : {'l1', 'l2'}
             The type of regularization penalty to apply on the coefficients
             `beta`. Default is 'l2'.
-        gamma : float in [0, 1]
+        gamma : float
             The regularization weight. Larger values correspond to larger
             regularization penalties, and a value of 0 indicates no penalty.
             Default is 0.
@@ -235,13 +247,16 @@ class LogisticRegression:
             \text{NLL} = -\frac{1}{N} \left[
                 \left(
                     \sum_{i=0}^N y_i \log(\hat{y}_i) + (1-y_i) \log(1-\hat{y}_i)
-                \right) - \frac{\gamma}{2} ||\mathbf{b}||_2
+                \right) - R(\mathbf{b}, \gamma)
             \right]
         """
         N, M = X.shape
+        beta, gamma = self.beta, self.gamma 
         order = 2 if self.penalty == "l2" else 1
+        norm_beta = np.linalg.norm(beta, ord=order)
+        
         nll = -np.log(y_pred[y == 1]).sum() - np.log(1 - y_pred[y == 0]).sum()
-        penalty = 0.5 * self.gamma * np.linalg.norm(self.beta, ord=order) ** 2
+        penalty = (gamma / 2) * norm_beta ** 2 if order == 2 else gamma * norm_beta
         return (penalty + nll) / N
 
     def _NLL_grad(self, X, y, y_pred):
@@ -249,7 +264,7 @@ class LogisticRegression:
         N, M = X.shape
         l1norm = lambda x: np.linalg.norm(x, 1)  # noqa: E731
         p, beta, gamma = self.penalty, self.beta, self.gamma
-        d_penalty = gamma * beta if p == "l2" else gamma * l1norm(beta) * np.sign(beta)
+        d_penalty = gamma * beta if p == "l2" else gamma * np.sign(beta)
         return -(np.dot(y - y_pred, X) + d_penalty) / N
 
     def predict(self, X):
