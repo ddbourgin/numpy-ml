@@ -122,13 +122,14 @@ class SchedulerInitializer(object):
             raise ValueError("Must have `hyperparameters` key: {}".format(S))
 
         if sc and sc["id"] == "ConstantScheduler":
-            scheduler = ConstantScheduler().set_params(sc)
+            scheduler = ConstantScheduler()
         elif sc and sc["id"] == "ExponentialScheduler":
-            scheduler = ExponentialScheduler().set_params(sc)
+            scheduler = ExponentialScheduler()
         elif sc and sc["id"] == "NoamScheduler":
-            scheduler = NoamScheduler().set_params(sc)
+            scheduler = NoamScheduler()
         elif sc:
             raise NotImplementedError("{}".format(sc["id"]))
+        scheduler.set_params(sc)
         return scheduler
 
 
@@ -182,15 +183,16 @@ class OptimizerInitializer(object):
             raise ValueError("Must have `hyperparemeters` key: {}".format(O))
 
         if op and op["id"] == "SGD":
-            optimizer = SGD().set_params(op, cc)
+            optimizer = SGD()
         elif op and op["id"] == "RMSProp":
-            optimizer = RMSProp().set_params(op, cc)
+            optimizer = RMSProp()
         elif op and op["id"] == "AdaGrad":
-            optimizer = AdaGrad().set_params(op, cc)
+            optimizer = AdaGrad()
         elif op and op["id"] == "Adam":
-            optimizer = Adam().set_params(op, cc)
+            optimizer = Adam()
         elif op:
             raise NotImplementedError("{}".format(op["id"]))
+        optimizer.set_params(op, cc)
         return optimizer
 
 
