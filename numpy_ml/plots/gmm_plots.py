@@ -84,7 +84,7 @@ def plot():
         # take best fit over 10 runs
         best_elbo = -np.inf
         for k in range(10):
-            _G = GMM(C=n_classes, seed=i * 3)
+            _G = GMM(C=n_classes, seed=k * 3)
             ret = _G.fit(X, max_iter=100, verbose=False)
             while ret != 0:
                 print("Components collapsed; Refitting")
