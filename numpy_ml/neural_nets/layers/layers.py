@@ -119,12 +119,12 @@ class LayerBase(ABC):
             if k in self.hyperparameters:
                 if k == "act_fn":
                     layer.act_fn = ActivationInitializer(v)()
-                if k == "optimizer":
+                elif k == "optimizer":
                     layer.optimizer = OptimizerInitializer(sd[k])()
-                if k not in ["wrappers", "optimizer"]:
-                    setattr(layer, k, v)
-                if k == "wrappers":
+                elif k == "wrappers":
                     layer = init_wrappers(layer, sd[k])
+                elif k not in ["wrappers", "optimizer"]:
+                    setattr(layer, k, v)
         return layer
 
     def summary(self):
