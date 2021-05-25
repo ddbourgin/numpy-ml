@@ -7,7 +7,7 @@ tensorflow
 keras
 gym
 huffman
-librosa
+librosa>=0.8.0
 nltk
 hmmlearn
 tox
