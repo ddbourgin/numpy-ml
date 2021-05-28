@@ -27,6 +27,41 @@ class LinearRegression:
         """
         self.beta = None
         self.fit_intercept = fit_intercept
+        self.inverse_cov = None
+
+    def update(self, x, y):
+        """
+        Incrementally update the regression coefficients using Matrix Inversion Lemma RLS, version 1 ( https://github.com/ddbourgin/numpy-ml/files/6536069/rls.pdf ).
+
+        Parameters
+        ----------
+        x : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)` on first attempt and shape (1, M) on subsequent updates
+            A dataset consisting of `N` examples, each of dimension `M`.
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)` on first attempt and shape (1, K) on subsequent updates
+            The targets for each of the `N` examples in `X`, where each target
+            has dimension `K`.
+        """
+        xm = np.mat(x)
+        ym = np.mat(y)
+
+        if self.fit_intercept:
+            xm = np.c_[np.ones(xm.shape[0]), xm]
+
+        all_zeros_or_empty_inverse_cov = not np.any(self.inverse_cov)
+        all_zeros_or_empty_beta = not np.any(self.beta)
+
+        if all_zeros_or_empty_inverse_cov or all_zeros_or_empty_beta: # first run of the algorithm
+            # Allow a batch of data in a matrix form as input
+            self.inverse_cov = np.linalg.pinv(np.dot(xm.T, xm)) # avoid non-invertible cases
+            pseudo_inverse =  np.dot(self.inverse_cov, xm.T)
+            self.beta = np.dot(pseudo_inverse, ym.T)
+        else:
+            # Allow only single row vectors or column vectors as input
+            theta_xm = np.mat (xm * self.beta)
+            error = ym - theta_xm
+            Im = np.mat(np.eye (xm.shape[1]))
+            self.inverse_cov = self.inverse_cov * np.mat(Im - ((xm.T * xm * self.inverse_cov) / (1 + (xm * self.inverse_cov * xm.T))))
+            self.beta = self.beta + (self.inverse_cov * xm.T * error)
 
     def fit(self, X, y):
         """
