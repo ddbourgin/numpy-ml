@@ -506,7 +506,7 @@ class GoodTuringNGram(NGramBase):
             Specifies the text encoding for corpus. Common entries are 'utf-8',
             'utf-8-sig', 'utf-16'. Default is None.
         """
-        self._train(corpus_fp, vocab=None, encoding=None)
+        self._train(corpus_fp, vocab=vocab, encoding=encoding)
         self._calc_smoothed_counts()
 
     def log_prob(self, words, N):
