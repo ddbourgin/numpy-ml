@@ -51,10 +51,7 @@ class LinearRegression:
         all_zeros_or_empty_beta = not np.any(self.beta)
 
         if all_zeros_or_empty_inverse_cov or all_zeros_or_empty_beta: # first run of the algorithm
-            # Allow a batch of data in a matrix form as input
-            self.inverse_cov = np.linalg.pinv(np.dot(xm.T, xm)) # avoid non-invertible cases
-            pseudo_inverse =  np.dot(self.inverse_cov, xm.T)
-            self.beta = np.dot(pseudo_inverse, ym.T)
+            raise RuntimeError("You must call the `fit` method before calling `update`")
         else:
             # Allow only single row vectors or column vectors as input
             theta_xm = np.mat (xm * self.beta)
