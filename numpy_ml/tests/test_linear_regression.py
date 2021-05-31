@@ -1,41 +1,51 @@
 import numpy as np
+
+from sklearn.linear_model import LinearRegression as LinearRegressionGold
+
 from numpy_ml.linear_models.lm import LinearRegression
-from sklearn import datasets
-from sklearn.datasets.samples_generator import make_blobs
-from sklearn.linear_model import LinearRegression as OriginalLinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score
+from numpy_ml.utils.testing import random_tensor
 
-def test_linear_model(N=1):
-    seed = 12345
-    np.random.seed(seed)
-    n_clusters=4
-    # loading the dataset
-    orig_num_of_samples, orig_num_of_features = 3000, 300
-    X, y = make_blobs(n_samples=orig_num_of_samples, centers=n_clusters, n_features = orig_num_of_features, cluster_std=0.50, random_state=seed)
-    X_train, X_update, y_train, y_update = train_test_split(X, y, test_size=0.2, random_state=seed)
 
-    # Ground truth
-    orig_lreg_model = OriginalLinearRegression()
-    orig_lreg_model.fit(X, y)
+def test_linear_regression(N=10):
+    np.random.seed(12345)
+    N = np.inf if N is None else N
 
-    # Our model
-    olr = LinearRegression()
-    olr.fit(X_train, y_train)
+    i = 1
+    while i < N + 1:
+        train_samples = np.random.randint(1, 30)
+        update_samples = np.random.randint(1, 30)
+        n_samples = train_samples + update_samples
 
-    ## update our model
-    for x_new, y_new in zip(X_update, y_update):
-        x_new = x_new.reshape((1, orig_num_of_features))
-        y_new = y_new
-        olr.update(x_new, y_new)
+        # ensure n_feats < train_samples, otherwise multiple solutions are
+        # possible
+        n_feats = np.random.randint(1, train_samples)
+        target_dim = np.random.randint(1, 10)
 
-    # Evaluating
-    X_test, y_test = make_blobs(n_samples=orig_num_of_samples, centers=n_clusters, n_features = orig_num_of_features, cluster_std=0.50, random_state=seed+2)
+        fit_intercept = np.random.choice([True, False])
 
-    y_pred_orig = orig_lreg_model.predict (X_test)
-    y_pred_online = olr.predict (X_test)
+        X = random_tensor((n_samples, n_feats), standardize=True)
+        y = random_tensor((n_samples, target_dim), standardize=True)
 
-    r2score_orig = r2_score(y_test, y_pred_orig) 
-    r2score_online = r2_score(y_test, y_pred_online) 
-    print ("Both score must be similar between scikit: {} and our own online implementation: {}".format(r2score_orig, r2score_online))
+        X_train, X_update = X[:train_samples], X[train_samples:]
+        y_train, y_update = y[:train_samples], y[train_samples:]
 
+        # Fit gold standard model on the entire dataset
+        lr_gold = LinearRegressionGold(fit_intercept=fit_intercept, normalize=False)
+        lr_gold.fit(X, y)
+
+        # Fit our model on just (X_train, y_train)...
+        lr = LinearRegression(fit_intercept=fit_intercept)
+        lr.fit(X_train, y_train)
+
+        # ...then update our model on the examples (X_update, y_update)
+        for x_new, y_new in zip(X_update, y_update):
+            lr.update(x_new, y_new)
+
+        # check that model predictions match
+        np.testing.assert_almost_equal(lr.predict(X), lr_gold.predict(X))
+
+        # check that model coefficients match
+        beta = lr.beta.T[:, 1:] if fit_intercept else lr.beta.T
+        np.testing.assert_almost_equal(beta, lr_gold.coef_)
+        print("\tPASSED")
+        i += 1
