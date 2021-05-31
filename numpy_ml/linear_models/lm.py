@@ -11,22 +11,87 @@ class LinearRegression:
 
         Notes
         -----
-        Given data matrix *X* and target vector *y*, the maximum-likelihood estimate
-        for the regression coefficients, :math:`\\beta`, is:
+        Given data matrix **X** and target vector **y**, the maximum-likelihood
+        estimate for the regression coefficients, :math:`\beta`, is:
 
         .. math::
 
-            \hat{\beta} =
-                \left(\mathbf{X}^\top \mathbf{X}\right)^{-1} \mathbf{X}^\top \mathbf{y}
+            \hat{\beta} = \Sigma^{-1} \mathbf{X}^\top \mathbf{y}
+
+        where :math:`\Sigma^{-1} = (\mathbf{X}^\top \mathbf{X})^{-1}`.
 
         Parameters
         ----------
         fit_intercept : bool
-            Whether to fit an additional intercept term in addition to the
-            model coefficients. Default is True.
+            Whether to fit an intercept term in addition to the model
+            coefficients. Default is True.
         """
         self.beta = None
+        self.sigma_inv = None
         self.fit_intercept = fit_intercept
+
+        self._is_fit = False
+
+    def update(self, x, y):
+        r"""
+        Incrementally update the least-squares coefficients on a new example
+        via recursive least-squares (RLS) [1]_ .
+
+        Notes
+        -----
+        The RLS algorithm [2]_ is used to efficiently update the regression
+        parameters as new examples become available. For a new example
+        :math:`(\mathbf{x}_{t+1}, \mathbf{y}_{t+1})`, the parameter updates are
+
+        .. math::
+
+            \beta_{t+1} = \left(
+                \mathbf{X}_{1:t}^\top \mathbf{X}_{1:t} +
+                    \mathbf{x}_{t+1}\mathbf{x}_{t+1}^\top \right)^{-1}
+                        \mathbf{X}_{1:t}^\top \mathbf{Y}_{1:t} +
+                            \mathbf{x}_{t+1}^\top \mathbf{y}_{t+1}
+
+        where :math:`\beta_{t+1}` are the updated regression coefficients,
+        :math:`\mathbf{X}_{1:t}` and :math:`\mathbf{Y}_{1:t}` are the set of
+        examples observed from timestep 1 to *t*.
+
+        To perform the above update efficiently, the RLS algorithm makes use of
+        the Sherman-Morrison formula [3]_ to avoid re-inverting the covariance
+        matrix on each new update.
+
+        References
+        ----------
+        .. [1] Gauss, C. F. (1821) _Theoria combinationis observationum
+           erroribus minimis obnoxiae_, Werke, 4. Gottinge
+        .. [2] https://en.wikipedia.org/wiki/Recursive_least_squares_filter
+        .. [3] https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
+
+        Parameters
+        ----------
+        x : :py:class:`ndarray <numpy.ndarray>` of shape `(1, M)`
+            A single example of rank `M`
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(1, K)`
+            A `K`-dimensional target vector for the current example
+        """
+        if not self._is_fit:
+            raise RuntimeError("You must call the `fit` method before calling `update`")
+
+        x, y = np.atleast_2d(x), np.atleast_2d(y)
+        beta, S_inv = self.beta, self.sigma_inv
+
+        X1, Y1 = x.shape[0], y.shape[0]
+        err_str = f"First dimension of x and y must be 1, but got {X1} and {Y1}"
+        assert X1 == Y1 == 1, err_str
+
+        # convert x to a design vector if we're fitting an intercept
+        if self.fit_intercept:
+            x = np.c_[1, x]
+
+        # update the inverse of the covariance matrix via Sherman-Morrison
+        S_inv -= (S_inv @ x.T @ x @ S_inv) / (1 + x @ S_inv @ x.T)
+
+        # update the model coefficients
+        beta += S_inv @ x.T @ (y - x @ beta)
 
     def fit(self, X, y):
         """
@@ -44,8 +109,10 @@ class LinearRegression:
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
 
-        pseudo_inverse = np.linalg.inv(X.T @ X) @ X.T
-        self.beta = np.dot(pseudo_inverse, y)
+        self.sigma_inv = np.linalg.pinv(X.T @ X)
+        self.beta = np.atleast_2d(self.sigma_inv @ X.T @ y)
+
+        self._is_fit = True
 
     def predict(self, X):
         """
@@ -166,22 +233,22 @@ class LogisticRegression:
                 \left(
                     \sum_{i=0}^N y_i \log(\hat{y}_i) +
                       (1-y_i) \log(1-\hat{y}_i)
-                \right) - R(\mathbf{b}, \gamma) 
+                \right) - R(\mathbf{b}, \gamma)
             \right]
-        
+
         where
-        
+
         .. math::
-        
+
             R(\mathbf{b}, \gamma) = \left\{
                 \begin{array}{lr}
                     \frac{\gamma}{2} ||\mathbf{beta}||_2^2 & :\texttt{ penalty = 'l2'}\\
                     \gamma ||\beta||_1 & :\texttt{ penalty = 'l1'}
                 \end{array}
                 \right.
-                
-        is a regularization penalty, :math:`\gamma` is a regularization weight, 
-        `N` is the number of examples in **y**, and **b** is the vector of model 
+
+        is a regularization penalty, :math:`\gamma` is a regularization weight,
+        `N` is the number of examples in **y**, and **b** is the vector of model
         coefficients.
 
         Parameters
@@ -251,10 +318,10 @@ class LogisticRegression:
             \right]
         """
         N, M = X.shape
-        beta, gamma = self.beta, self.gamma 
+        beta, gamma = self.beta, self.gamma
         order = 2 if self.penalty == "l2" else 1
         norm_beta = np.linalg.norm(beta, ord=order)
-        
+
         nll = -np.log(y_pred[y == 1]).sum() - np.log(1 - y_pred[y == 0]).sum()
         penalty = (gamma / 2) * norm_beta ** 2 if order == 2 else gamma * norm_beta
         return (penalty + nll) / N
