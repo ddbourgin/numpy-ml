@@ -53,5 +53,6 @@ def test_linear_regression(N=10):
         # check that model coefficients match
         beta = lr.beta.T[:, 1:] if fit_intercept else lr.beta.T
         np.testing.assert_almost_equal(beta, lr_gold.coef_, decimal=6)
+
         print("\tPASSED")
         i += 1
