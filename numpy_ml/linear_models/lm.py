@@ -11,22 +11,112 @@ class LinearRegression:
 
         Notes
         -----
-        Given data matrix *X* and target vector *y*, the maximum-likelihood estimate
-        for the regression coefficients, :math:`\\beta`, is:
+        Given data matrix **X** and target vector **y**, the maximum-likelihood
+        estimate for the regression coefficients, :math:`\beta`, is:
 
         .. math::
 
-            \hat{\beta} =
-                \left(\mathbf{X}^\top \mathbf{X}\right)^{-1} \mathbf{X}^\top \mathbf{y}
+            \hat{\beta} = \Sigma^{-1} \mathbf{X}^\top \mathbf{y}
+
+        where :math:`\Sigma^{-1} = (\mathbf{X}^\top \mathbf{X})^{-1}`.
 
         Parameters
         ----------
         fit_intercept : bool
-            Whether to fit an additional intercept term in addition to the
-            model coefficients. Default is True.
+            Whether to fit an intercept term in addition to the model
+            coefficients. Default is True.
         """
         self.beta = None
+        self.sigma_inv = None
         self.fit_intercept = fit_intercept
+
+        self._is_fit = False
+
+    def update(self, X, y):
+        r"""
+        Incrementally update the least-squares coefficients for a set of new
+        examples.
+
+        Notes
+        -----
+        The recursive least-squares algorithm [1]_ [2]_ is used to efficiently
+        update the regression parameters as new examples become available. For
+        a single new example :math:`(\mathbf{x}_{t+1}, \mathbf{y}_{t+1})`, the
+        parameter updates are
+
+        .. math::
+
+            \beta_{t+1} = \left(
+                \mathbf{X}_{1:t}^\top \mathbf{X}_{1:t} +
+                    \mathbf{x}_{t+1}\mathbf{x}_{t+1}^\top \right)^{-1}
+                        \mathbf{X}_{1:t}^\top \mathbf{Y}_{1:t} +
+                            \mathbf{x}_{t+1}^\top \mathbf{y}_{t+1}
+
+        where :math:`\beta_{t+1}` are the updated regression coefficients,
+        :math:`\mathbf{X}_{1:t}` and :math:`\mathbf{Y}_{1:t}` are the set of
+        examples observed from timestep 1 to *t*.
+
+        In the single-example case, the RLS algorithm uses the Sherman-Morrison
+        formula [3]_ to avoid re-inverting the covariance matrix on each new
+        update. In the multi-example case (i.e., where :math:`\mathbf{X}_{t+1}`
+        and :math:`\mathbf{y}_{t+1}` are matrices of `N` examples each), we use
+        the generalized Woodbury matrix identity [4]_ to update the inverse
+        covariance. This comes at a performance cost, but is still more
+        performant than doing multiple single-example updates if *N* is large.
+
+        References
+        ----------
+        .. [1] Gauss, C. F. (1821) _Theoria combinationis observationum
+           erroribus minimis obnoxiae_, Werke, 4. Gottinge
+        .. [2] https://en.wikipedia.org/wiki/Recursive_least_squares_filter
+        .. [3] https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
+        .. [4] https://en.wikipedia.org/wiki/Woodbury_matrix_identity
+
+        Parameters
+        ----------
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A dataset consisting of `N` examples, each of dimension `M`
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
+            The targets for each of the `N` examples in `X`, where each target
+            has dimension `K`
+        """
+        if not self._is_fit:
+            raise RuntimeError("You must call the `fit` method before calling `update`")
+
+        X, y = np.atleast_2d(X), np.atleast_2d(y)
+
+        X1, Y1 = X.shape[0], y.shape[0]
+        self._update1D(X, y) if X1 == Y1 == 1 else self._update2D(X, y)
+
+    def _update1D(self, x, y):
+        """Sherman-Morrison update for a single example"""
+        beta, S_inv = self.beta, self.sigma_inv
+
+        # convert x to a design vector if we're fitting an intercept
+        if self.fit_intercept:
+            x = np.c_[1, x]
+
+        # update the inverse of the covariance matrix via Sherman-Morrison
+        S_inv -= (S_inv @ x.T @ x @ S_inv) / (1 + x @ S_inv @ x.T)
+
+        # update the model coefficients
+        beta += S_inv @ x.T @ (y - x @ beta)
+
+    def _update2D(self, X, y):
+        """Woodbury update for multiple examples"""
+        beta, S_inv = self.beta, self.sigma_inv
+
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+
+        I = np.eye(X.shape[0])
+
+        # update the inverse of the covariance matrix via Woodbury identity
+        S_inv -= S_inv @ X.T @ np.linalg.pinv(I + X @ S_inv @ X.T) @ X @ S_inv
+
+        # update the model coefficients
+        beta += S_inv @ X.T @ (y - X @ beta)
 
     def fit(self, X, y):
         """
@@ -44,8 +134,10 @@ class LinearRegression:
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
 
-        pseudo_inverse = np.linalg.inv(X.T @ X) @ X.T
-        self.beta = np.dot(pseudo_inverse, y)
+        self.sigma_inv = np.linalg.pinv(X.T @ X)
+        self.beta = np.atleast_2d(self.sigma_inv @ X.T @ y)
+
+        self._is_fit = True
 
     def predict(self, X):
         """
@@ -166,22 +258,22 @@ class LogisticRegression:
                 \left(
                     \sum_{i=0}^N y_i \log(\hat{y}_i) +
                       (1-y_i) \log(1-\hat{y}_i)
-                \right) - R(\mathbf{b}, \gamma) 
+                \right) - R(\mathbf{b}, \gamma)
             \right]
-        
+
         where
-        
+
         .. math::
-        
+
             R(\mathbf{b}, \gamma) = \left\{
                 \begin{array}{lr}
                     \frac{\gamma}{2} ||\mathbf{beta}||_2^2 & :\texttt{ penalty = 'l2'}\\
                     \gamma ||\beta||_1 & :\texttt{ penalty = 'l1'}
                 \end{array}
                 \right.
-                
-        is a regularization penalty, :math:`\gamma` is a regularization weight, 
-        `N` is the number of examples in **y**, and **b** is the vector of model 
+
+        is a regularization penalty, :math:`\gamma` is a regularization weight,
+        `N` is the number of examples in **y**, and **b** is the vector of model
         coefficients.
 
         Parameters
@@ -251,10 +343,10 @@ class LogisticRegression:
             \right]
         """
         N, M = X.shape
-        beta, gamma = self.beta, self.gamma 
+        beta, gamma = self.beta, self.gamma
         order = 2 if self.penalty == "l2" else 1
         norm_beta = np.linalg.norm(beta, ord=order)
-        
+
         nll = -np.log(y_pred[y == 1]).sum() - np.log(1 - y_pred[y == 0]).sum()
         penalty = (gamma / 2) * norm_beta ** 2 if order == 2 else gamma * norm_beta
         return (penalty + nll) / N
