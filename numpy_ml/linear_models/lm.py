@@ -32,16 +32,17 @@ class LinearRegression:
 
         self._is_fit = False
 
-    def update(self, x, y):
+    def update(self, X, y):
         r"""
-        Incrementally update the least-squares coefficients on a new example
-        via recursive least-squares (RLS) [1]_ .
+        Incrementally update the least-squares coefficients for a set of new
+        examples.
 
         Notes
         -----
-        The RLS algorithm [2]_ is used to efficiently update the regression
-        parameters as new examples become available. For a new example
-        :math:`(\mathbf{x}_{t+1}, \mathbf{y}_{t+1})`, the parameter updates are
+        The recursive least-squares algorithm [1]_ [2]_ is used to efficiently
+        update the regression parameters as new examples become available. For
+        a single new example :math:`(\mathbf{x}_{t+1}, \mathbf{y}_{t+1})`, the
+        parameter updates are
 
         .. math::
 
@@ -55,9 +56,13 @@ class LinearRegression:
         :math:`\mathbf{X}_{1:t}` and :math:`\mathbf{Y}_{1:t}` are the set of
         examples observed from timestep 1 to *t*.
 
-        To perform the above update efficiently, the RLS algorithm makes use of
-        the Sherman-Morrison formula [3]_ to avoid re-inverting the covariance
-        matrix on each new update.
+        In the single-example case, the RLS algorithm uses the Sherman-Morrison
+        formula [3]_ to avoid re-inverting the covariance matrix on each new
+        update. In the multi-example case (i.e., where :math:`\mathbf{X}_{t+1}`
+        and :math:`\mathbf{y}_{t+1}` are matrices of `N` examples each), we use
+        the generalized Woodbury matrix identity [4]_ to update the inverse
+        covariance. This comes at a performance cost, but is still more
+        performant than doing multiple single-example updates if *N* is large.
 
         References
         ----------
@@ -65,23 +70,27 @@ class LinearRegression:
            erroribus minimis obnoxiae_, Werke, 4. Gottinge
         .. [2] https://en.wikipedia.org/wiki/Recursive_least_squares_filter
         .. [3] https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
+        .. [4] https://en.wikipedia.org/wiki/Woodbury_matrix_identity
 
         Parameters
         ----------
-        x : :py:class:`ndarray <numpy.ndarray>` of shape `(1, M)`
-            A single example of rank `M`
-        y : :py:class:`ndarray <numpy.ndarray>` of shape `(1, K)`
-            A `K`-dimensional target vector for the current example
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            A dataset consisting of `N` examples, each of dimension `M`
+        y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
+            The targets for each of the `N` examples in `X`, where each target
+            has dimension `K`
         """
         if not self._is_fit:
             raise RuntimeError("You must call the `fit` method before calling `update`")
 
-        x, y = np.atleast_2d(x), np.atleast_2d(y)
-        beta, S_inv = self.beta, self.sigma_inv
+        X, y = np.atleast_2d(X), np.atleast_2d(y)
 
-        X1, Y1 = x.shape[0], y.shape[0]
-        err_str = f"First dimension of x and y must be 1, but got {X1} and {Y1}"
-        assert X1 == Y1 == 1, err_str
+        X1, Y1 = X.shape[0], y.shape[0]
+        self._update1D(X, y) if X1 == Y1 == 1 else self._update2D(X, y)
+
+    def _update1D(self, x, y):
+        """Sherman-Morrison update for a single example"""
+        beta, S_inv = self.beta, self.sigma_inv
 
         # convert x to a design vector if we're fitting an intercept
         if self.fit_intercept:
@@ -92,6 +101,22 @@ class LinearRegression:
 
         # update the model coefficients
         beta += S_inv @ x.T @ (y - x @ beta)
+
+    def _update2D(self, X, y):
+        """Woodbury update for multiple examples"""
+        beta, S_inv = self.beta, self.sigma_inv
+
+        # convert X to a design matrix if we're fitting an intercept
+        if self.fit_intercept:
+            X = np.c_[np.ones(X.shape[0]), X]
+
+        I = np.eye(X.shape[0])
+
+        # update the inverse of the covariance matrix via Woodbury identity
+        S_inv -= S_inv @ X.T @ np.linalg.pinv(I + X @ S_inv @ X.T) @ X @ S_inv
+
+        # update the model coefficients
+        beta += S_inv @ X.T @ (y - X @ beta)
 
     def fit(self, X, y):
         """
