@@ -8,6 +8,7 @@ The `lm.py` module implements:
 3. [Bayesian linear regression](https://en.wikipedia.org/wiki/Bayesian_linear_regression) with maximum a posteriori parameter estimates via [conjugacy](https://en.wikipedia.org/wiki/Conjugate_prior#Table_of_conjugate_distributions)
     - Known coefficient prior mean and known error variance
     - Known coefficient prior mean and unknown error variance
+4. [Naive Bayes classifier](https://en.wikipedia.org/wiki/Naive_Bayes_classifier) with Gaussian feature likelihoods.
 
 ## Plots
 <p align="center">
