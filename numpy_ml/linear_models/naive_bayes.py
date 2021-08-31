@@ -2,8 +2,8 @@ import numpy as np
 
 
 class GaussianNBClassifier:
-    def __init__(self, eps=1e-6):
-        r"""
+    def __init__(self):
+        """
         A naive Bayes classifier for real-valued data.
 
         Notes
@@ -46,33 +46,46 @@ class GaussianNBClassifier:
         associated with class :math:`c`, :math:`\mu_c` and :math:`\Sigma_c`
         (where :math:`1 \leq c \leq K`), are estimated via MLE from the set of
         training examples with label :math:`c`.
-
-        Parameters
-        ----------
-        eps : float
-            A value added to the variance to prevent numerical error. Default
-            is 1e-6.
-
-        Attributes
-        ----------
-        parameters : dict
-            Dictionary of model parameters: "mean", the `(K, M)` array of
-            feature means under each class, "sigma", the `(K, M)` array of
-            feature variances under each class, and "prior", the `(K,)` array of
-            empirical prior probabilities for each class label.
-        hyperparameters : dict
-            Dictionary of model hyperparameters
-        labels : :py:class:`ndarray <numpy.ndarray>` of shape `(K,)`
-            An array containing the unique class labels for the training
-            examples.
         """
-        self.labels = None
-        self.hyperparameters = {"eps": eps}
-        self.parameters = {
-            "mean": None,  # shape: (K, M)
-            "sigma": None,  # shape: (K, M)
-            "prior": None,  # shape: (K,)
-        }
+        pass
+
+    # Separate the dataset into a subset of data for each class
+
+    def separate_classes(self, X, y):
+        """
+        Separates the dataset in to a subset of data for each class.
+        Parameters:
+        ------------
+        X- array, list of features
+        y- list, target
+        Returns:
+        A dictionary with y as keys and assigned X as values.
+        """
+        separated_classes = {}
+        for i in range(len(X)):
+            feature_values = X[i]
+            class_name = y[i]
+            if class_name not in separated_classes:
+                separated_classes[class_name] = []
+            separated_classes[class_name].append(feature_values)
+        return separated_classes
+
+    # Standard deviation and mean are required for the (Gaussian) distribution function
+
+    def stat_info(self, X):
+        """
+        Calculates standard deviation and mean of features.
+        Parameters:
+        ------------
+        X- array , list of features
+        Returns:
+        A dictionary with STD and Mean as keys and assigned features STD and Mean as values.
+        """
+        for feature in zip(*X):
+            yield {
+                'std' : np.std(feature),
+                'mean' : np.mean(feature)
+            }
 
     def fit(self, X, y):
         """
@@ -80,47 +93,61 @@ class GaussianNBClassifier:
 
         Notes
         -----
-        The model parameters are stored in the :py:attr:`parameters` attribute.
+        The model parameters are stored in the :py:attr:`class_summary` attribute.
         The following keys are present:
 
-        mean: :py:class:`ndarray <numpy.ndarray>` of shape `(K, M)`
-            Feature means for each of the `K` label classes
-        sigma: :py:class:`ndarray <numpy.ndarray>` of shape `(K, M)`
-            Feature variances for each of the `K` label classes
-        prior :  :py:class:`ndarray <numpy.ndarray>` of shape `(K,)`
+        prior_proba :py:class:`ndarray <numpy.ndarray>` of shape `(K,)`
             Prior probability of each of the `K` label classes, estimated
             empirically from the training data
+        summary : Dictionary having both the keys and the values of 
+            py:class:`ndarray <numpy.ndarray>` of shape `(K, M)`
+            Feature means for each of the `K` label classes along with the
+            Feature STDs for each of the `K` label classes
 
         Parameters
         ----------
-        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+        X :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
             A dataset consisting of `N` examples, each of dimension `M`
-        y: :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
+        y :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The class label for each of the `N` examples in `X`
 
         Returns
         -------
-        self: object
+        Dictionary with the prior probability, mean, and standard deviation of each class
         """
-        P = self.parameters
-        H = self.hyperparameters
 
-        self.labels = np.unique(y)
+        separated_classes = self.separate_classes(X, y)
+        self.class_summary = {}
 
-        K = len(self.labels)
-        N, M = X.shape
+        for class_name, feature_values in separated_classes.items():
+            self.class_summary[class_name] = {
+                'prior_proba': len(feature_values)/len(X),
+                'summary': [i for i in self.stat_info(feature_values)],
+            }
+        return self.class_summary
 
-        P["mean"] = np.zeros((K, M))
-        P["sigma"] = np.zeros((K, M))
-        P["prior"] = np.zeros((K,))
+    # Gaussian distribution function
 
-        for i, c in enumerate(self.labels):
-            X_c = X[y == c, :]
+    def distribution(self, x, mean, std):
+        """
+        Holds the computation for the Gaussian Distribution Function
 
-            P["mean"][i, :] = np.mean(X_c, axis=0)
-            P["sigma"][i, :] = np.var(X_c, axis=0) + H["eps"]
-            P["prior"][i] = X_c.shape[0] / N
-        return self
+        Parameters
+        ----------
+        x:  type: float, value of feature 'x'
+        mean:   type: float, the mean value of feature 'x'
+        stdev:  type: float, the standard deviation of feature 'x'
+
+        Returns
+        --------
+        f:  A float value of Normal Probability
+        """
+
+        exponent = np.exp(-((x-mean)**2 / (2*std**2)))
+        f = exponent / (np.sqrt(2*np.pi)*std)
+        return f
+
+    # Required predict method, to predict the class
 
     def predict(self, X):
         """
@@ -134,78 +161,57 @@ class GaussianNBClassifier:
 
         Returns
         -------
-        labels : :py:class:`ndarray <numpy.ndarray>` of shape `(N)`
+        MAPs : :py:class:`ndarray <numpy.ndarray>` of shape `(N)`
             The predicted class labels for each example in `X`
         """
-        return self.labels[self._log_posterior(X).argmax(axis=1)]
 
-    def _log_posterior(self, X):
-        r"""
-        Compute the (unnormalized) log posterior for each class.
+        # Using Maximum a posteriori (MAP) probability
+
+        MAPs = []
+
+        for row in X:
+            joint_proba = {}
+            
+            for class_name, features in self.class_summary.items():
+                total_features =  len(features['summary'])
+                likelihood = 1
+
+                for idx in range(total_features):
+                    feature = row[idx]
+                    mean = features['summary'][idx]['mean']
+                    stdev = features['summary'][idx]['std']
+                    normal_proba = self.distribution(feature, mean, stdev)
+                    likelihood *= normal_proba
+                prior_proba = features['prior_proba']
+                joint_proba[class_name] = prior_proba * likelihood
+
+            MAP = max(joint_proba, key= joint_proba.get)
+            MAPs.append(MAP)
+
+        return MAPs
+
+    # Calculate the model's accuracy
+
+    def accuracy(self, y_test, y_pred):
+        """
+        Calculates model's accuracy using label comparison
 
         Parameters
-        ----------
-        X: :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
-            A dataset of `N` examples, each of dimension `M`
+        ------------
+        y_test: :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
+            The true class label for each of the `N` examples in `X`
+        y_pred: :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
+            The predicted class label for each of the `N` examples in `X`
 
         Returns
-        -------
-        log_posterior : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
-            Unnormalized log posterior probability of each class for each
-            example in `X`
+        --------
+        acc:    A number between 0-1, representing the percentage of correct predictions.
+            The accuracy of the GaussianNB model using numpy-ml environment
         """
-        K = len(self.labels)
-        log_posterior = np.zeros((X.shape[0], K))
-        for i in range(K):
-            log_posterior[:, i] = self._log_class_posterior(X, i)
-        return log_posterior
 
-    def _log_class_posterior(self, X, class_idx):
-        r"""
-        Compute the (unnormalized) log posterior for the label at index
-        `class_idx` in :py:attr:`labels`.
-
-        Notes
-        -----
-        Unnormalized log posterior for example :math:`\mathbf{x}_i` and class
-        :math:`c` is::
-
-        .. math::
-
-            \log P(y_i = c \mid \mathbf{x}_i, \theta)
-                &\propto \log P(y=c \mid \theta) +
-                    \log P(\mathbf{x}_i \mid y_i = c, \theta) \\
-                &\propto \log P(y=c \mid \theta)
-                    \sum{j=1}^M \log P(x_j \mid y_i = c, \theta)
-
-        In the Gaussian naive Bayes model, the feature likelihood for class
-        :math:`c`, :math:`P(\mathbf{x}_i \mid y_i = c, \theta)` is assumed to
-        be normally distributed
-
-        .. math::
-
-            \mathbf{x}_i \mid y_i = c, \theta \sim \mathcal{N}(\mu_c, \Sigma_c)
-
-
-        Parameters
-        ----------
-        X: :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
-            A dataset of `N` examples, each of dimension `M`
-        class_idx : int
-            The index of the current class in :py:attr:`labels`
-
-        Returns
-        -------
-        log_class_posterior : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
-            Unnormalized log probability of the label at index `class_idx`
-            in :py:attr:`labels` for each example in `X`
-        """
-        P = self.parameters
-        mu = P["mean"][class_idx]
-        prior = P["prior"][class_idx]
-        sigsq = P["sigma"][class_idx]
-
-        # log likelihood = log X | N(mu, sigsq)
-        log_likelihood = -0.5 * np.sum(np.log(2 * np.pi * sigsq))
-        log_likelihood -= 0.5 * np.sum(((X - mu) ** 2) / sigsq, axis=1)
-        return log_likelihood + np.log(prior)
+        true_true = 0
+        for y_t, y_p in zip(y_test, y_pred):
+            if y_t == y_p:
+                true_true += 1 
+        acc = true_true / len(y_test)
+        return acc
