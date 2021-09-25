@@ -1,6 +1,7 @@
 """An implementation of kmeans clustering (hard, soft)"""
 
 import numpy as np
+from sklearn.preprocessing import normalize
 
 class KMeans:
     def __init__(self, X_train, cluster_method="hard", n_clusters=5, beta = 1.0):
@@ -140,27 +141,19 @@ class KMeans:
                     weight = np.exp(-dist / self.beta)
                     assignments[i][k] = weight
             # normalize assignment matrix
-            row_sums = assignments.sum(axis=1)
-            assignments = (assignments + tol) / (row_sums[:, np.newaxis] + tol)
+            assignments = normalize(assignments, axis=1, norm='l1')
 
             # update centroids
             set_labels = range(self.n_clusters)
-            # filter by labels
             for label in set_labels:
-                filter_indices = np.where(np.array(assignments) == label)[0]
-                count_per_label = len(filter_indices)
-                if count_per_label > 0:
-                    filter_xdata = np.take(self.X_train, filter_indices, axis=0)
-                    # weight by the strength of membership
-                    weight_by_label = np.take(assignments[:,label], filter_indices, axis=0)
-                    weight_by_label_matrix = weight_by_label.reshape((count_per_label, 1))
-                    weighted_filtered_xdata = np.multiply(filter_xdata, weight_by_label_matrix)
+                numerator = np.zeros((1, n_dims))
+                denominator = 0
+                for k, x_val in enumerate(self.X_train):
+                    numerator += x_val * assignments[k][label] # weight contribution across data input
+                    denominator += assignments[k][label]
+                curr = (numerator + tol) / (denominator + tol)
+                centroids[label, :] = curr
 
-                    # estimate centroid
-                    numerator = np.mean(weighted_filtered_xdata, axis=0) # sum the weighted inputs
-                    denominator = np.sum(weight_by_label) # weight contribution across data input
-
-                    centroids[label, :] = (numerator + tol) / (denominator + tol)
             weight_list.append(centroids)
             weight_list.pop(0)
             iteration = iteration + 1
