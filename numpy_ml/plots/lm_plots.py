@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.datasets.samples_generator import make_blobs
 from sklearn.linear_model import LogisticRegression as LogisticRegression_sk
 from sklearn.datasets import make_regression
-from sklearn.metrics import zero_one_loss
+from sklearn.metrics import zero_one_loss, r2_score
 
 import matplotlib.pyplot as plt
 
@@ -138,17 +138,14 @@ def plot_bayes():
     loss_ridge = np.mean((y_test - y_pred) ** 2)
 
     LR_var = BayesianLinearRegressionKnownVariance(
-        b_mean=np.c_[intercept, coefs][0],
-        b_sigma=np.sqrt(std),
-        b_V=None,
-        fit_intercept=True,
+        mu=np.c_[intercept, coefs][0], sigma=np.sqrt(std), V=None, fit_intercept=True,
     )
     LR_var.fit(X_train, y_train)
     y_pred_var = LR_var.predict(X_test)
     loss_var = np.mean((y_test - y_pred_var) ** 2)
 
     LR_novar = BayesianLinearRegressionUnknownVariance(
-        alpha=1, beta=2, b_mean=np.c_[intercept, coefs][0], b_V=None, fit_intercept=True
+        alpha=1, beta=2, mu=np.c_[intercept, coefs][0], V=None, fit_intercept=True
     )
     LR_novar.fit(X_train, y_train)
     y_pred_novar = LR_novar.predict(X_test)
@@ -180,14 +177,13 @@ def plot_bayes():
         "Ridge Regression (alpha=1)\nMLE Test MSE: {:.2f}".format(loss_ridge)
     )
     axes[1].legend()
-    print("plotted ridge.. {:.2f} MSE".format(loss_ridge))
 
     axes[2].plot(X_plot, y_plot_var, label="MAP")
-    mu, cov = LR_var.posterior["b"]["mu"], LR_var.posterior["b"]["cov"]
+    mu, cov = LR_var.posterior["b"].mean, LR_var.posterior["b"].cov
     for k in range(200):
         b_samp = np.random.multivariate_normal(mu, cov)
         y_samp = [np.dot(x, b_samp[1]) + b_samp[0] for x in X_plot]
-        axes[2].plot(X_plot, y_samp, c="green", alpha=0.05)
+        axes[2].plot(X_plot, y_samp, alpha=0.05)
     axes[2].scatter(X_test, y_test)
     axes[2].plot(X_plot, y_true, label="True fn")
     axes[2].legend()
@@ -196,12 +192,12 @@ def plot_bayes():
     )
 
     axes[3].plot(X_plot, y_plot_novar, label="MAP")
-    mu = LR_novar.posterior["b | sigma**2"]["mu"]
-    cov = LR_novar.posterior["b | sigma**2"]["cov"]
+    mu = LR_novar.posterior["b | sigma**2"].mean
+    cov = LR_novar.posterior["b | sigma**2"].cov
     for k in range(200):
         b_samp = np.random.multivariate_normal(mu, cov)
         y_samp = [np.dot(x, b_samp[1]) + b_samp[0] for x in X_plot]
-        axes[3].plot(X_plot, y_samp, c="green", alpha=0.05)
+        axes[3].plot(X_plot, y_samp, alpha=0.05)
     axes[3].scatter(X_test, y_test)
     axes[3].plot(X_plot, y_true, label="True fn")
     axes[3].legend()
@@ -215,8 +211,7 @@ def plot_bayes():
         ax.xaxis.set_ticklabels([])
         ax.yaxis.set_ticklabels([])
 
-    #  plt.tight_layout()
-    fig.set_size_inches(10, 2.5)
+    fig.set_size_inches(7.5, 1.875)
     plt.savefig("plot_bayes.png", dpi=300)
     plt.close("all")
 
@@ -239,27 +234,26 @@ def plot_regression():
         LR.fit(X_train, y_train)
         y_pred = LR.predict(X_test)
         loss = np.mean((y_test - y_pred) ** 2)
+        r2 = r2_score(y_test, y_pred)
 
         LR_var = BayesianLinearRegressionKnownVariance(
-            b_mean=np.c_[intercept, coefs][0],
-            b_sigma=np.sqrt(std),
-            b_V=None,
+            mu=np.c_[intercept, coefs][0],
+            sigma=np.sqrt(std),
+            V=None,
             fit_intercept=True,
         )
         LR_var.fit(X_train, y_train)
         y_pred_var = LR_var.predict(X_test)
         loss_var = np.mean((y_test - y_pred_var) ** 2)
+        r2_var = r2_score(y_test, y_pred_var)
 
         LR_novar = BayesianLinearRegressionUnknownVariance(
-            alpha=1,
-            beta=2,
-            b_mean=np.c_[intercept, coefs][0],
-            b_V=None,
-            fit_intercept=True,
+            alpha=1, beta=2, mu=np.c_[intercept, coefs][0], V=None, fit_intercept=True,
         )
         LR_novar.fit(X_train, y_train)
         y_pred_novar = LR_novar.predict(X_test)
         loss_novar = np.mean((y_test - y_pred_novar) ** 2)
+        r2_novar = r2_score(y_test, y_pred_novar)
 
         xmin = min(X_test) - 0.1 * (max(X_test) - min(X_test))
         xmax = max(X_test) + 0.1 * (max(X_test) - min(X_test))
@@ -268,7 +262,7 @@ def plot_regression():
         y_plot_var = LR_var.predict(X_plot)
         y_plot_novar = LR_novar.predict(X_plot)
 
-        ax.scatter(X_test, y_test, alpha=0.5)
+        ax.scatter(X_test, y_test, marker="x", alpha=0.5)
         ax.plot(X_plot, y_plot, label="linear regression", alpha=0.5)
         ax.plot(X_plot, y_plot_var, label="Bayes (w var)", alpha=0.5)
         ax.plot(X_plot, y_plot_novar, label="Bayes (no var)", alpha=0.5)

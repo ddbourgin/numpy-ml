@@ -12,6 +12,7 @@ huffman
 librosa
 nltk
 hmmlearn
+statsmodels
 pre-commit
 tox
 pytest

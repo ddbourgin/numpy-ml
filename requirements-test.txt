@@ -10,5 +10,6 @@ huffman
 librosa>=0.8.0
 nltk
 hmmlearn
+statsmodels
 tox
 pytest
