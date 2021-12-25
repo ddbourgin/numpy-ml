@@ -66,7 +66,7 @@ class LinearRegression:
 
         Notes
         -----
-        The recursive least-squares algorithm [1]_ [2]_ is used to efficiently
+        The recursive least-squares algorithm [3]_ [4]_ is used to efficiently
         update the regression parameters as new examples become available. For
         a single new example :math:`(\mathbf{x}_{t+1}, \mathbf{y}_{t+1})`, the
         parameter updates are
@@ -84,20 +84,20 @@ class LinearRegression:
         examples observed from timestep 1 to *t*.
 
         In the single-example case, the RLS algorithm uses the Sherman-Morrison
-        formula [3]_ to avoid re-inverting the covariance matrix on each new
+        formula [5]_ to avoid re-inverting the covariance matrix on each new
         update. In the multi-example case (i.e., where :math:`\mathbf{X}_{t+1}`
         and :math:`\mathbf{y}_{t+1}` are matrices of `N` examples each), we use
-        the generalized Woodbury matrix identity [4]_ to update the inverse
+        the generalized Woodbury matrix identity [6]_ to update the inverse
         covariance. This comes at a performance cost, but is still more
         performant than doing multiple single-example updates if *N* is large.
 
         References
         ----------
-        .. [1] Gauss, C. F. (1821) _Theoria combinationis observationum
-           erroribus minimis obnoxiae_, Werke, 4. Gottinge
-        .. [2] https://en.wikipedia.org/wiki/Recursive_least_squares_filter
-        .. [3] https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
-        .. [4] https://en.wikipedia.org/wiki/Woodbury_matrix_identity
+        .. [3] Gauss, C. F. (1821) *Theoria combinationis observationum
+           erroribus minimis obnoxiae*, Werke, 4. Gottinge
+        .. [4] https://en.wikipedia.org/wiki/Recursive_least_squares_filter
+        .. [5] https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
+        .. [6] https://en.wikipedia.org/wiki/Woodbury_matrix_identity
 
         Parameters
         ----------

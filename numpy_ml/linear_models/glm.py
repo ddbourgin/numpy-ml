@@ -1,7 +1,7 @@
 """A module for the generalized linear model."""
 import numpy as np
 
-from numpy_ml.linear_models import LinearRegression
+from numpy_ml.linear_models.linear_regression import LinearRegression
 
 eps = np.finfo(float).eps
 
@@ -48,20 +48,20 @@ _GLM_LINKS = {
 class GeneralizedLinearModel:
     def __init__(self, link, fit_intercept=True, tol=1e-5, max_iter=100):
         r"""
-        A generalized linear model [1]_ [2]_ with maximum likelihood fit via
-        iteratively reweighted least squares (IRLS) [3]_.
+        A generalized linear model with maximum likelihood fit via
+        iteratively reweighted least squares (IRLS).
 
         Notes
         -----
-        The generalized linear model (GLM) assumes that each target/dependent
+        The generalized linear model (GLM) [a]_ [b]_ assumes that each target/dependent
         variable :math:`y_i` in target vector :math:`\mathbf{y} = (y_1, \ldots,
         y_n)`, has been drawn independently from a pre-specified distribution
-        in the exponential family [5]_ with unknown mean :math:`\mu_i`. The GLM
+        in the exponential family [e]_ with unknown mean :math:`\mu_i`. The GLM
         models a (one-to-one, continuous, differentiable) function, *g*, of
         this mean value as a linear combination of the model parameters
         :math:`\mathbf{b}` and observed covariates, :math:`\mathbf{x}_i`:
 
-        .. math:
+        .. math::
 
             g(\mathbb{E}[y_i \mid \mathbf{x}_i]) =
                 g(\mu_i) = \mathbf{b}^\top \mathbf{x}_i
@@ -70,31 +70,31 @@ class GeneralizedLinearModel:
         choice of link function is informed by the instance of the exponential
         family the target is drawn from. Common examples:
 
-        .. csv-table:: Distributions and their canonical link functions
-           :header: "Distribution", "Link Name", "Description"
-           :widths: auto
+        .. csv-table::
+           :header: "Distribution", "Link", "Formula"
+           :widths: 25, 20, 30
 
            "Normal", "Identity", ":math:`g(x) = x`"
            "Bernoulli", "Logit", ":math:`g(x) = \log(x) - \log(1 - x)`"
            "Binomial", "Logit", ":math:`g(x) = \log(x) - \log(n - x)`"
            "Poisson", "Log", ":math:`g(x) = \log(x)`"
 
-        An iteratively re-weighted least squares (IRLS) algorithm [3]_ can be
+        An iteratively re-weighted least squares (IRLS) algorithm [c]_ can be
         employed to find the maximum likelihood estimate for the model
         parameters :math:`\beta` in any instance of the generalized linear
-        model. IRLS is equivalent to Fisher scoring [1]_ [4]_, which itself is
+        model. IRLS is equivalent to Fisher scoring [d]_, which itself is
         a slight modification of classic Newton-Raphson for finding the zeros
         of the first derivative of the model log-likelihood.
 
         References
         ----------
-        .. [1] Nelder, J., & Wedderburn, R. (1972). "Generalized linear
-               models," _Journal of the Royal Statistical Society, Series A
-               (General),_ 135(3): 370–384.
-        .. [2] https://en.wikipedia.org/wiki/Generalized_linear_model
-        .. [3] https://en.wikipedia.org/wiki/Iteratively_reweighted_least_squares
-        .. [4] https://en.wikipedia.org/wiki/Scoring_algorithm
-        .. [5] https://en.wikipedia.org/wiki/Exponential_family
+        .. [a] Nelder, J., & Wedderburn, R. (1972). Generalized linear
+               models. *Journal of the Royal Statistical Society, Series A
+               (General), 135(3)*: 370–384.
+        .. [b] https://en.wikipedia.org/wiki/Generalized_linear_model
+        .. [c] https://en.wikipedia.org/wiki/Iteratively_reweighted_least_squares
+        .. [d] https://en.wikipedia.org/wiki/Scoring_algorithm
+        .. [e] https://en.wikipedia.org/wiki/Exponential_family
 
         Parameters
         ----------
