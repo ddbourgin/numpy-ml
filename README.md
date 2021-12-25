@@ -116,6 +116,9 @@ For more details on the available models, see the [project documentation](https:
     - Ridge regression
     - Logistic regression
     - Ordinary least squares
+    - Weighted linear regression
+    - Generalized linear model (log, logit, and identity link)
+    - Gaussian naive Bayes classifier
     - Bayesian linear regression w/ conjugate priors
         - Unknown mean, known variance (Gaussian prior)
         - Unknown mean, unknown variance (Normal-Gamma / Normal-Inverse-Wishart prior)
