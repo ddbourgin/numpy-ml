@@ -27,6 +27,7 @@ For more details on the available models, see the [project documentation](https:
 ## Available models
 <details>
   <summary>Click to expand!</summary>
+  
 1. **Gaussian mixture model**
     - EM training
 
