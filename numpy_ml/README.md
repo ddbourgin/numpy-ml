@@ -92,6 +92,8 @@ This repo includes code for the following models:
     - Ridge regression
     - Logistic regression
     - Ordinary least squares
+    - Gaussian naive Bayes classifier
+    - Generalized linear model (identity, log, and logit links)
     - Bayesian linear regression w/ conjugate priors
         - Unknown mean, known variance (Gaussian prior)
         - Unknown mean, unknown variance (Normal-Gamma / Normal-Inverse-Wishart prior)
