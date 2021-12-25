@@ -25,6 +25,8 @@ can use `pip3 install -u 'numpy_ml[rl]'`.
 For more details on the available models, see the [project documentation](https://numpy-ml.readthedocs.io/).
 
 ## Available models
+<details>
+  <summary>Click to expand!</summary>
 1. **Gaussian mixture model**
     - EM training
 
@@ -175,6 +177,7 @@ For more details on the available models, see the [project documentation](https:
     - Ball tree
     - Discrete sampler
     - Graph processing and generators
+</details>
 
 ## Contributing
 
