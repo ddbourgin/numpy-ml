@@ -7,7 +7,9 @@ tensorflow
 keras
 gym
 huffman
-librosa>=0.8.0
+librosa==0.7.2
+llvmlite==0.32.1
+numba==0.45.0
 nltk
 hmmlearn
 statsmodels
