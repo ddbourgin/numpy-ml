@@ -14,8 +14,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import tensorflow.keras.datasets.mnist as mnist
-
 from numpy_ml.neural_nets.utils import (
     calc_pad_dims_2D,
     conv2D_naive,
@@ -2308,6 +2306,7 @@ def test_conv(N=15):
 
 def fit_VAE():
     # for testing
+    import tensorflow.keras.datasets.mnist as mnist
     from numpy_ml.neural_nets.models.vae import BernoulliVAE
 
     np.random.seed(12345)

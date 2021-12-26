@@ -1,7 +1,6 @@
 # flake8: noqa
 import numpy as np
 
-import statsmodels.api as sm
 from sklearn.linear_model import LinearRegression as LinearRegressionGold
 
 from numpy_ml.linear_models import LinearRegression

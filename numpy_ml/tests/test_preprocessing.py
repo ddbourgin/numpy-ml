@@ -248,7 +248,7 @@ def test_mel_filterbank(N=15):
             n_fft=window_len,
             n_mels=n_filters,
             htk=True,
-            norm=norm if norm == 1 else None,
+            norm="slaney" if norm == 1 else None,
         )
 
         np.testing.assert_almost_equal(mine, theirs)

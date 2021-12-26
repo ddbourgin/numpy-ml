@@ -1,3 +1,4 @@
+# flake8: noqa
 import numpy as np
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
@@ -13,6 +14,7 @@ def test_GaussianNB(N=10):
     N = np.inf if N is None else N
 
     i = 1
+    eps = np.finfo(float).eps
     while i < N + 1:
         n_ex = np.random.randint(1, 300)
         n_feats = np.random.randint(1, 100)
@@ -33,29 +35,29 @@ def test_GaussianNB(N=10):
 
         sk_preds = sklearn_NB.predict(X_test)
 
-        for i in range(len(NB.labels)):
+        for j in range(len(NB.labels)):
             P = NB.parameters
-            jointi = np.log(sklearn_NB.class_prior_[i])
-            jointi_mine = np.log(P["prior"][i])
+            jointi = np.log(sklearn_NB.class_prior_[j])
+            jointi_mine = np.log(P["prior"][j])
 
             np.testing.assert_almost_equal(jointi, jointi_mine)
 
-            n_ij = -0.5 * np.sum(np.log(2.0 * np.pi * sklearn_NB.sigma_[i, :]))
-            n_ij_mine = -0.5 * np.sum(np.log(2.0 * np.pi * P["sigma"][i]))
+            n_jk = -0.5 * np.sum(np.log(2.0 * np.pi * sklearn_NB.sigma_[j, :] + eps))
+            n_jk_mine = -0.5 * np.sum(np.log(2.0 * np.pi * P["sigma"][j] + eps))
 
-            np.testing.assert_almost_equal(n_ij_mine, n_ij)
+            np.testing.assert_almost_equal(n_jk_mine, n_jk)
 
-            n_ij2 = n_ij - 0.5 * np.sum(
-                ((X_test - sklearn_NB.theta_[i, :]) ** 2) / (sklearn_NB.sigma_[i, :]), 1
+            n_jk2 = n_jk - 0.5 * np.sum(
+                ((X_test - sklearn_NB.theta_[j, :]) ** 2) / (sklearn_NB.sigma_[j, :]), 1
             )
 
-            n_ij2_mine = n_ij_mine - 0.5 * np.sum(
-                ((X_test - P["mean"][i]) ** 2) / (P["sigma"][i]), 1
+            n_jk2_mine = n_jk_mine - 0.5 * np.sum(
+                ((X_test - P["mean"][j]) ** 2) / (P["sigma"][j]), 1
             )
-            np.testing.assert_almost_equal(n_ij2_mine, n_ij2, decimal=4)
+            np.testing.assert_almost_equal(n_jk2_mine, n_jk2, decimal=4)
 
-            llh = jointi + n_ij2
-            llh_mine = jointi_mine + n_ij2_mine
+            llh = jointi + n_jk2
+            llh_mine = jointi_mine + n_jk2_mine
 
             np.testing.assert_almost_equal(llh_mine, llh, decimal=4)
 

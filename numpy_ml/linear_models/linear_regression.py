@@ -122,7 +122,8 @@ class LinearRegression:
         X, y = np.atleast_2d(X), np.atleast_2d(y)
 
         X1, Y1 = X.shape[0], y.shape[0]
-        weights = np.ones(X1) if weights is None else np.squeeze(np.atleast_1d(weights))
+        weights = np.ones(X1) if weights is None else np.atleast_1d(weights)
+        weights = np.squeeze(weights) if weights.size > 1 else weights
 
         err_str = f"weights must have shape ({X1},) but got {weights.shape}"
         assert weights.shape == (X1,), err_str
@@ -187,7 +188,8 @@ class LinearRegression:
         """
         N = X.shape[0]
 
-        weights = np.ones(N) if weights is None else np.squeeze(np.atleast_1d(weights))
+        weights = np.ones(N) if weights is None else np.atleast_1d(weights)
+        weights = np.squeeze(weights) if weights.size > 1 else weights
         err_str = f"weights must have shape ({N},) but got {weights.shape}"
         assert weights.shape == (N,), err_str
 
@@ -200,7 +202,7 @@ class LinearRegression:
             X = np.c_[np.sqrt(weights), X]
 
         self.sigma_inv = np.linalg.pinv(X.T @ X)
-        self.beta = np.atleast_2d(self.sigma_inv @ X.T @ y).T
+        self.beta = np.atleast_2d(self.sigma_inv @ X.T @ y)
 
         self._is_fit = True
         return self
@@ -223,4 +225,5 @@ class LinearRegression:
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
-        return np.dot(X, self.beta)
+        return X @ self.beta
+        #  return np.dot(X, self.beta)

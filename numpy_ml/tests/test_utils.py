@@ -10,15 +10,21 @@ from sklearn.metrics.pairwise import linear_kernel as sk_linear
 from sklearn.metrics.pairwise import polynomial_kernel as sk_poly
 
 
-from numpy_ml.utils.distance_metrics import euclidean
+from numpy_ml.utils.distance_metrics import (
+    hamming,
+    euclidean,
+    chebyshev,
+    manhattan,
+    minkowski,
+)
 from numpy_ml.utils.kernels import LinearKernel, PolynomialKernel, RBFKernel
 from numpy_ml.utils.data_structures import BallTree
 from numpy_ml.utils.graphs import (
+    Edge,
     DiGraph,
     UndirectedGraph,
-    Edge,
-    random_unweighted_graph,
     random_DAG,
+    random_unweighted_graph,
 )
 
 #######################################################################
@@ -105,6 +111,63 @@ def test_euclidean(N=1):
         y = np.random.rand(N)
         mine = euclidean(x, y)
         theirs = scipy.spatial.distance.euclidean(x, y)
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+        i += 1
+
+
+def test_hamming(N=1):
+    np.random.seed(12345)
+    i = 0
+    while i < N:
+        N = np.random.randint(1, 100)
+        x = (np.random.rand(N) * 100).round().astype(int)
+        y = (np.random.rand(N) * 100).round().astype(int)
+        mine = hamming(x, y)
+        theirs = scipy.spatial.distance.hamming(x, y)
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+        i += 1
+
+
+def test_minkowski(N=1):
+    np.random.seed(12345)
+    i = 0
+    while i < N:
+        N = np.random.randint(1, 100)
+        p = 1 + np.random.rand() * 10
+        x = np.random.rand(N)
+        y = np.random.rand(N)
+        mine = minkowski(x, y, p)
+        theirs = scipy.spatial.distance.minkowski(x, y, p)
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+        i += 1
+
+
+def test_chebyshev(N=1):
+    np.random.seed(12345)
+    i = 0
+    while i < N:
+        N = np.random.randint(1, 100)
+        x = np.random.rand(N)
+        y = np.random.rand(N)
+        mine = chebyshev(x, y)
+        theirs = scipy.spatial.distance.chebyshev(x, y)
+        np.testing.assert_almost_equal(mine, theirs)
+        print("PASSED")
+        i += 1
+
+
+def test_manhattan(N=1):
+    np.random.seed(12345)
+    i = 0
+    while i < N:
+        N = np.random.randint(1, 100)
+        x = np.random.rand(N)
+        y = np.random.rand(N)
+        mine = manhattan(x, y)
+        theirs = scipy.spatial.distance.cityblock(x, y)
         np.testing.assert_almost_equal(mine, theirs)
         print("PASSED")
         i += 1
