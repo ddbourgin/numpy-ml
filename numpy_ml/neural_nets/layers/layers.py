@@ -169,6 +169,20 @@ class DotProductAttention(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None. Unused.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Unused
+        parameters : dict
+            Unused
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -180,6 +194,9 @@ class DotProductAttention(LayerBase):
     def _init_params(self):
         self.softmax = Dropout(Softmax(), self.dropout_p)
         smdv = self.softmax.derived_variables
+
+        self.gradients = {}
+        self.parameters = {}
         self.derived_variables = {
             "attention_weights": [],
             "dropout_mask": smdv["wrappers"][0]["dropout_mask"],
@@ -364,6 +381,20 @@ class RBM(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Unused
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -616,12 +647,28 @@ class Add(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Unused
+        parameters : dict
+            Unused
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
         self.act_fn = ActivationInitializer(act_fn)()
         self._init_params()
 
     def _init_params(self):
+        self.gradients = {}
+        self.parameters = {}
         self.derived_variables = {"sum": []}
 
     @property
@@ -712,12 +759,28 @@ class Multiply(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Unused
+        parameters : dict
+            Unused
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
         self.act_fn = ActivationInitializer(act_fn)()
         self._init_params()
 
     def _init_params(self):
+        self.gradients = {}
+        self.parameters = {}
         self.derived_variables = {"product": []}
 
     @property
@@ -809,6 +872,20 @@ class Flatten(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Unused
+        gradients : dict
+            Unused
+        parameters : dict
+            Unused
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -816,7 +893,6 @@ class Flatten(LayerBase):
         self._init_params()
 
     def _init_params(self):
-        self.X = []
         self.gradients = {}
         self.parameters = {}
         self.derived_variables = {"in_dims": []}
@@ -943,6 +1019,20 @@ class BatchNorm2D(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -1028,7 +1118,7 @@ class BatchNorm2D(LayerBase):
             features for a minibatch of `n_ex` examples.
         retain_derived : bool
             Whether to use the current intput to adjust the running mean and
-            running_var computations. Setting this to True is the same as
+            running_var computations. Setting this to False is the same as
             freezing the layer for the current input. Default is True.
 
         Returns
@@ -1177,6 +1267,20 @@ class BatchNorm1D(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -1368,6 +1472,20 @@ class LayerNorm2D(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -1543,6 +1661,20 @@ class LayerNorm1D(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -1710,6 +1842,20 @@ class Embedding(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
         fstr = "'pool' must be either 'sum', 'mean', or None but got '{}'"
@@ -1891,6 +2037,20 @@ class FullyConnected(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -2060,6 +2220,20 @@ class Softmax(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None. Unused for this layer.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -2218,6 +2392,20 @@ class SparseEvolution(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with default
             parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -2465,6 +2653,20 @@ class Conv1D(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -2742,6 +2944,20 @@ class Conv2D(LayerBase):
             within the :meth:`update` method.  If None, use the :class:`SGD
             <numpy_ml.neural_nets.optimizers.SGD>` optimizer with
             default parameters. Default is None.
+
+        Attributes
+        ----------
+        X : list
+            Running list of inputs to the :meth:`forward <numpy_ml.neural_nets.LayerBase.forward>` method since the last call to :meth:`update <numpy_ml.neural_nets.LayerBase.update>`. Only updated if the `retain_derived` argument was set to True.
+        gradients : dict
+            Dictionary of loss gradients with regard to the layer parameters
+        parameters : dict
+            Dictionary of layer parameters
+        hyperparameters : dict
+            Dictionary of layer hyperparameters
+        derived_variables : dict
+            Dictionary of any intermediate values computed during
+            forward/backward propagation.
         """  # noqa: E501
         super().__init__(optimizer)
 
@@ -2770,7 +2986,7 @@ class Conv2D(LayerBase):
 
     @property
     def hyperparameters(self):
-        """Return a dictionary containing the layer hyperparameters."""
+        """A dictionary containing the layer hyperparameters."""
         return {
             "layer": "Conv2D",
             "pad": self.pad,
@@ -2844,8 +3060,7 @@ class Conv2D(LayerBase):
 
         Parameters
         ----------
-        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows,
-        out_cols, out_ch)` or list of arrays
+        dLdy : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, out_rows, out_cols, out_ch)` or list of arrays
             The gradient(s) of the loss with respect to the layer output(s).
         retain_grads : bool
             Whether to include the intermediate parameter gradients computed
