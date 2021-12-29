@@ -17,10 +17,10 @@ class RidgeRegression:
 
         .. math::
 
-            \mathcal{L}_{Ridge} = (\mathbf{y} - \mathbf{X} \beta})^\top
-                (\mathbf{y} - \mathbf{X} \beta}) + \alpha ||\beta||_2^2
+            \mathcal{L}_{Ridge} = (\mathbf{y} - \mathbf{X} \beta)^\top
+                (\mathbf{y} - \mathbf{X} \beta) + \alpha ||\beta||_2^2
 
-        where :math:`alpha` is a weight controlling the severity of the
+        where :math:`\alpha` is a weight controlling the severity of the
         penalty.
 
         Given data matrix **X** and target vector **y**, the maximum-likelihood
@@ -39,7 +39,7 @@ class RidgeRegression:
 
         .. math::
 
-            \beta \sim \mathcal{N}(\mathbf{0}, \frac{1}{2M} \mathbf{I})
+            \beta \sim \mathcal{N}\left(\mathbf{0}, \frac{1}{2M} \mathbf{I}\right)
 
         Parameters
         ----------
@@ -69,7 +69,11 @@ class RidgeRegression:
         y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
             The targets for each of the `N` examples in `X`, where each target
             has dimension `K`.
-        """
+
+        Returns
+        -------
+        self : :class:`RidgeRegression <numpy_ml.linear_models.RidgeRegression>` instance
+        """  # noqa: E501
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -77,6 +81,7 @@ class RidgeRegression:
         A = self.alpha * np.eye(X.shape[1])
         pseudo_inverse = np.linalg.inv(X.T @ X + A) @ X.T
         self.beta = pseudo_inverse @ y
+        return self
 
     def predict(self, X):
         """

@@ -53,8 +53,8 @@ In particular, the ridge model is the same as the OLS model:
 
     \mathbf{y} = \mathbf{bX} + \mathbf{\epsilon}
 
-where :math:`\epsilon \sim \mathcal{N}(0, \sigma^2 I)`, except now the error
-for the model is calculated as
+where :math:`\epsilon \sim \mathcal{N}(\mathbf{0}, \sigma^2 \mathbf{I})`,
+except now the error for the model is calculated as
 
 .. math::
 
@@ -66,9 +66,9 @@ the adjusted normal equation:
 .. math::
 
     \hat{\mathbf{b}}_{Ridge} =
-        (\mathbf{X}^\top \mathbf{X} + \alpha I)^{-1} \mathbf{X}^\top \mathbf{y}
+        (\mathbf{X}^\top \mathbf{X} + \alpha \mathbf{I})^{-1} \mathbf{X}^\top \mathbf{y}
 
-where :math:`(\mathbf{X}^\top \mathbf{X} + \alpha I)^{-1}
+where :math:`(\mathbf{X}^\top \mathbf{X} + \alpha \mathbf{I})^{-1}
 \mathbf{X}^\top` is the pseudoinverse / Moore-Penrose inverse adjusted for
 the `L2` penalty on the model coefficients.
 
@@ -81,7 +81,7 @@ the `L2` penalty on the model coefficients.
    <h2>Bayesian Linear Regression</h2>
 
 In its general form, Bayesian linear regression extends the simple linear
-regression model by introducing priors on model parameters b and/or the
+regression model by introducing priors on model parameters *b* and/or the
 error variance :math:`\sigma^2`.
 
 The introduction of a prior allows us to quantify the uncertainty in our
@@ -98,7 +98,7 @@ data :math:`X^*` with the posterior predictive distribution:
 
 .. math::
 
-    p(y^* \mid X^*, X, Y) = \int_{b} p(y^* \mid X^*, b) p(b \mid X, y) db
+    p(y^* \mid X^*, X, Y) = \int_{b} p(y^* \mid X^*, b) p(b \mid X, y) \ \text{d}b
 
 Depending on the choice of prior it may be impossible to compute an
 analytic form for the posterior / posterior predictive distribution. In
@@ -116,11 +116,11 @@ prior on `b` is Gaussian. A common parameterization is:
 
 .. math::
 
-    b | \sigma, b_V  \sim  \mathcal{N}(b_{mean}, \sigma^2 b_V)
+    b | \sigma, V  \sim  \mathcal{N}(\mu, \sigma^2 V)
 
-where :math:`b_{mean}`, :math:`\sigma` and :math:`b_V` are hyperparameters. Ridge
-regression is a special case of this model where :math:`b_{mean}` = 0,
-:math:`\sigma` = 1 and :math:`b_V = I` (ie., the prior on `b` is a zero-mean,
+where :math:`\mu`, :math:`\sigma` and :math:`V` are hyperparameters. Ridge
+regression is a special case of this model where :math:`\mu = 0`,
+:math:`\sigma = 1` and :math:`V = I` (i.e., the prior on *b* is a zero-mean,
 unit covariance Gaussian).
 
 Due to the conjugacy of the above prior with the Gaussian likelihood, there
@@ -129,22 +129,22 @@ parameters:
 
 .. math::
 
-    A  &=  (b_V^{-1} + X^\top X)^{-1} \\
-    \mu_b  &=  A b_V^{-1} b_{mean} + A X^\top y \\
-    \text{cov}_b  &=  \sigma^2 A \\
+    A  &=  (V^{-1} + X^\top X)^{-1} \\
+    \mu_b  &=  A V^{-1} \mu + A X^\top y \\
+    \Sigma_b  &=  \sigma^2 A \\
 
 The model posterior is then
 
 .. math::
 
-    b \mid X, y  \sim  \mathcal{N}(\mu_b, \text{cov}_b)
+    b \mid X, y  \sim  \mathcal{N}(\mu_b, \Sigma_b)
 
 We can also compute a closed-form solution for the posterior predictive distribution as
 well:
 
 .. math::
 
-    y^* \mid X^*, X, Y \sim \mathcal{N}(X^* \mu_b, \ \ X^* \text{cov}_b X^{* \top} + I)
+    y^* \mid X^*, X, Y \sim \mathcal{N}(X^* \mu_b, \ \ X^* \Sigma X^{* \top} + I)
 
 where :math:`X^*` is the matrix of new data we wish to predict, and :math:`y^*`
 are the predicted targets for those data.
@@ -160,7 +160,7 @@ are the predicted targets for those data.
 
 --------------------------------
 
-If *both* b and the error variance :math:`\sigma^2` are unknown, the
+If *both* *b* and the error variance :math:`\sigma^2` are unknown, the
 conjugate prior for the Gaussian likelihood is the Normal-Gamma
 distribution (univariate likelihood) or the Normal-Inverse-Wishart
 distribution (multivariate likelihood).
@@ -169,22 +169,22 @@ distribution (multivariate likelihood).
 
     .. math::
 
-        b, \sigma^2  &\sim  \text{NG}(b_{mean}, b_{V}, \alpha, \beta) \\
+        b, \sigma^2  &\sim  \text{NG}(\mu, V, \alpha, \beta) \\
         \sigma^2  &\sim  \text{InverseGamma}(\alpha, \beta) \\
-        b \mid \sigma^2  &\sim  \mathcal{N}(b_{mean}, \sigma^2 b_{V})
+        b \mid \sigma^2  &\sim  \mathcal{N}(\mu, \sigma^2 V)
 
-    where :math:`\alpha, \beta, b_{V}`, and :math:`b_{mean}` are
-    parameters of the prior.
+    where :math:`\alpha, \beta, V`, and :math:`\mu` are parameters of the
+    prior.
 
     **Multivariate**
 
     .. math::
 
-        b, \Sigma  &\sim  \mathcal{NIW}(b_{mean}, \lambda, \Psi, \rho) \\
+        b, \Sigma  &\sim  \mathcal{NIW}(\mu, \lambda, \Psi, \rho) \\
         \Sigma  &\sim  \mathcal{W}^{-1}(\Psi, \rho) \\
-        b \mid \Sigma  &\sim  \mathcal{N}(b_{mean}, \frac{1}{\lambda} \Sigma)
+        b \mid \Sigma  &\sim  \mathcal{N}(\mu, \frac{1}{\lambda} \Sigma)
 
-    where :math:`b_{mean}, \lambda, \Psi`, and :math:`\rho` are
+    where :math:`\mu, \lambda, \Psi`, and :math:`\rho` are
     parameters of the prior.
 
 
@@ -194,30 +194,30 @@ parameters:
 
 .. math::
 
-    B  &=  y - X b_{mean} \\
+    B  &=  y - X \mu \\
     \text{shape}  &=  N + \alpha \\
-    \text{scale}  &=  \frac{1}{\text{shape}} (\alpha \beta + B^\top (X b_V X^\top + I)^{-1} B) \\
+    \text{scale}  &=  \frac{1}{\text{shape}} (\alpha \beta + B^\top (X V X^\top + I)^{-1} B) \\
 
 where
 
 .. math::
 
     \sigma^2 \mid X, y  &\sim  \text{InverseGamma}(\text{shape}, \text{scale}) \\
-    A  &=  (b_V^{-1} + X^\top X)^{-1} \\
-    \mu_b  &=  A b_V^{-1} b_{mean} + A X^\top y \\
-    \text{cov}_b  &=  \sigma^2 A
+    A  &=  (V^{-1} + X^\top X)^{-1} \\
+    \mu_b  &=  A V^{-1} \mu + A X^\top y \\
+    \Sigma_b  &=  \sigma^2 A
 
 The model posterior is then
 
 .. math::
 
-    b | X, y, \sigma^2 \sim \mathcal{N}(\mu_b, \text{cov}_b)
+    b | X, y, \sigma^2 \sim \mathcal{N}(\mu_b, \Sigma_b)
 
 We can also compute a closed-form solution for the posterior predictive distribution:
 
 .. math::
 
-    y^* \mid X^*, X, Y \sim \mathcal{N}(X^* \mu_b, \ X^* \text{cov}_b X^{* \top} + I)
+    y^* \mid X^*, X, Y \sim \mathcal{N}(X^* \mu_b, \ X^* \Sigma_b X^{* \top} + I)
 
 **Models**
 

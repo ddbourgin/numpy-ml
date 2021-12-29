@@ -82,16 +82,17 @@ class GaussianNBClassifier:
 
         Notes
         -----
-        The model parameters are stored in the :py:attr:`parameters` attribute.
+        The model parameters are stored in the :py:attr:`parameters
+        <numpy_ml.linear_models.GaussianNBClassifier.parameters>` attribute.
         The following keys are present:
 
-        mean: :py:class:`ndarray <numpy.ndarray>` of shape `(K, M)`
-            Feature means for each of the `K` label classes
-        sigma: :py:class:`ndarray <numpy.ndarray>` of shape `(K, M)`
-            Feature variances for each of the `K` label classes
-        prior :  :py:class:`ndarray <numpy.ndarray>` of shape `(K,)`
-            Prior probability of each of the `K` label classes, estimated
-            empirically from the training data
+            "mean": :py:class:`ndarray <numpy.ndarray>` of shape `(K, M)`
+                Feature means for each of the `K` label classes
+            "sigma": :py:class:`ndarray <numpy.ndarray>` of shape `(K, M)`
+                Feature variances for each of the `K` label classes
+            "prior": :py:class:`ndarray <numpy.ndarray>` of shape `(K,)`
+                Prior probability of each of the `K` label classes, estimated
+                empirically from the training data
 
         Parameters
         ----------
@@ -102,8 +103,8 @@ class GaussianNBClassifier:
 
         Returns
         -------
-        self: object
-        """
+        self : :class:`GaussianNBClassifier <numpy_ml.linear_models.GaussianNBClassifier>` instance
+        """  # noqa: E501
         P = self.parameters
         H = self.hyperparameters
 
@@ -165,7 +166,7 @@ class GaussianNBClassifier:
     def _log_class_posterior(self, X, class_idx):
         r"""
         Compute the (unnormalized) log posterior for the label at index
-        `class_idx` in :py:attr:`labels`.
+        `class_idx` in :py:attr:`labels <numpy_ml.linear_models.GaussianNBClassifier.labels>`.
 
         Notes
         -----
@@ -199,8 +200,9 @@ class GaussianNBClassifier:
         -------
         log_class_posterior : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             Unnormalized log probability of the label at index `class_idx`
-            in :py:attr:`labels` for each example in `X`
-        """
+            in :py:attr:`labels <numpy_ml.linear_models.GaussianNBClassifier.labels>`
+            for each example in `X`
+        """  # noqa: E501
         P = self.parameters
         mu = P["mean"][class_idx]
         prior = P["prior"][class_idx]

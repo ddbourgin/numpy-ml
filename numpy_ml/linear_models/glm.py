@@ -53,10 +53,10 @@ class GeneralizedLinearModel:
 
         Notes
         -----
-        The generalized linear model (GLM) [a]_ [b]_ assumes that each target/dependent
+        The generalized linear model (GLM) [7]_ [8]_ assumes that each target/dependent
         variable :math:`y_i` in target vector :math:`\mathbf{y} = (y_1, \ldots,
         y_n)`, has been drawn independently from a pre-specified distribution
-        in the exponential family [e]_ with unknown mean :math:`\mu_i`. The GLM
+        in the exponential family [11]_ with unknown mean :math:`\mu_i`. The GLM
         models a (one-to-one, continuous, differentiable) function, *g*, of
         this mean value as a linear combination of the model parameters
         :math:`\mathbf{b}` and observed covariates, :math:`\mathbf{x}_i`:
@@ -79,22 +79,22 @@ class GeneralizedLinearModel:
            "Binomial", "Logit", ":math:`g(x) = \log(x) - \log(n - x)`"
            "Poisson", "Log", ":math:`g(x) = \log(x)`"
 
-        An iteratively re-weighted least squares (IRLS) algorithm [c]_ can be
+        An iteratively re-weighted least squares (IRLS) algorithm [9]_ can be
         employed to find the maximum likelihood estimate for the model
         parameters :math:`\beta` in any instance of the generalized linear
-        model. IRLS is equivalent to Fisher scoring [d]_, which itself is
+        model. IRLS is equivalent to Fisher scoring [10]_, which itself is
         a slight modification of classic Newton-Raphson for finding the zeros
         of the first derivative of the model log-likelihood.
 
         References
         ----------
-        .. [a] Nelder, J., & Wedderburn, R. (1972). Generalized linear
+        .. [7] Nelder, J., & Wedderburn, R. (1972). Generalized linear
                models. *Journal of the Royal Statistical Society, Series A
                (General), 135(3)*: 370–384.
-        .. [b] https://en.wikipedia.org/wiki/Generalized_linear_model
-        .. [c] https://en.wikipedia.org/wiki/Iteratively_reweighted_least_squares
-        .. [d] https://en.wikipedia.org/wiki/Scoring_algorithm
-        .. [e] https://en.wikipedia.org/wiki/Exponential_family
+        .. [8] https://en.wikipedia.org/wiki/Generalized_linear_model
+        .. [9] https://en.wikipedia.org/wiki/Iteratively_reweighted_least_squares
+        .. [10] https://en.wikipedia.org/wiki/Scoring_algorithm
+        .. [11] https://en.wikipedia.org/wiki/Exponential_family
 
         Parameters
         ----------
@@ -136,7 +136,11 @@ class GeneralizedLinearModel:
             A dataset consisting of `N` examples, each of dimension `M`.
         y : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The targets for each of the `N` examples in `X`.
-        """
+
+        Returns
+        -------
+        self : :class:`GeneralizedLinearModel <numpy_ml.linear_models.GeneralizedLinearModel>` instance
+        """  # noqa: E501
         y = np.squeeze(y)
         assert y.ndim == 1
 

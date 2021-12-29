@@ -54,7 +54,7 @@ class BayesianLinearRegressionUnknownVariance:
         posterior_predictive : dict or None
             Frozen random variable for the posterior predictive distribution,
             :math:`P(y \mid X)`. This value is only set following a call to
-            :meth:`numpy_ml.linear_models.BayesianLinearRegressionUnknownVariance.predict`.
+            :meth:`predict <numpy_ml.linear_models.BayesianLinearRegressionUnknownVariance.predict>`.
         """  # noqa: E501
         # this is a placeholder until we know the dimensions of X
         V = 1.0 if V is None else V
@@ -90,7 +90,11 @@ class BayesianLinearRegressionUnknownVariance:
         y : :py:class:`ndarray <numpy.ndarray>` of shape `(N, K)`
             The targets for each of the `N` examples in `X`, where each target
             has dimension `K`.
-        """
+
+        Returns
+        -------
+        self : :class:`BayesianLinearRegressionUnknownVariance<numpy_ml.linear_models.BayesianLinearRegressionUnknownVariance>` instance
+        """  # noqa: E501
         # convert X to a design matrix if we're fitting an intercept
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
@@ -130,6 +134,7 @@ class BayesianLinearRegressionUnknownVariance:
             "sigma**2": stats.distributions.invgamma(a=shape, scale=scale),
             "b | sigma**2": stats.multivariate_normal(mean=mu, cov=cov),
         }
+        return self
 
     def predict(self, X):
         """
@@ -206,7 +211,7 @@ class BayesianLinearRegressionKnownVariance:
         posterior_predictive : dict or None
             Frozen random variable for the posterior predictive distribution,
             :math:`P(y \mid X)`. This value is only set following a call to
-            :meth:`numpy_ml.linear_models.BayesianLinearRegressionKnownVariance.predict`.
+            :meth:`predict <numpy_ml.linear_models.BayesianLinearRegressionKnownVariance.predict>`.
         """  # noqa: E501
         # this is a placeholder until we know the dimensions of X
         V = 1.0 if V is None else V

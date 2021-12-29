@@ -18,7 +18,7 @@ class LinearRegression:
 
             y_i = \beta^\top \mathbf{x}_i + \epsilon_i
 
-        In this equation :math:`epsilon_i \sim \mathcal{N}(0, \sigma^2_i)` is
+        In this equation :math:`\epsilon_i \sim \mathcal{N}(0, \sigma^2_i)` is
         the error term associated with example :math:`i`, and
         :math:`\sigma^2_i` is the variance of the corresponding example.
 
@@ -111,11 +111,15 @@ class LinearRegression:
             with larger weights exert greater influence on model fit.  When
             `y` is a vector (i.e., `K = 1`), weights should be set to the
             reciporical of the variance for each measurement (i.e., :math:`w_i
-            = 1/sigma^2_i`). When `K > 1`, it is assumed that all columns of
+            = 1/\sigma^2_i`). When `K > 1`, it is assumed that all columns of
             `y` share the same weight :math:`w_i`. If None, examples are
             weighted equally, resulting in the standard linear least squares
             update.  Default is None.
-        """
+
+        Returns
+        -------
+        self : :class:`LinearRegression <numpy_ml.linear_models.LinearRegression>` instance
+        """  # noqa: E501
         if not self._is_fit:
             raise RuntimeError("You must call the `fit` method before calling `update`")
 
@@ -166,7 +170,7 @@ class LinearRegression:
         beta += S_inv @ X.T @ (y - X @ beta)
 
     def fit(self, X, y, weights=None):
-        """
+        r"""
         Fit regression coefficients via maximum likelihood.
 
         Parameters
@@ -181,11 +185,15 @@ class LinearRegression:
             with larger weights exert greater influence on model fit.  When
             `y` is a vector (i.e., `K = 1`), weights should be set to the
             reciporical of the variance for each measurement (i.e., :math:`w_i
-            = 1/sigma^2_i`). When `K > 1`, it is assumed that all columns of
+            = 1/\sigma^2_i`). When `K > 1`, it is assumed that all columns of
             `y` share the same weight :math:`w_i`. If None, examples are
             weighted equally, resulting in the standard linear least squares
             update.  Default is None.
-        """
+
+        Returns
+        -------
+        self : :class:`LinearRegression <numpy_ml.linear_models.LinearRegression>` instance
+        """  # noqa: E501
         N = X.shape[0]
 
         weights = np.ones(N) if weights is None else np.atleast_1d(weights)
@@ -226,4 +234,3 @@ class LinearRegression:
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
         return X @ self.beta
-        #  return np.dot(X, self.beta)
