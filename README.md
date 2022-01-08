@@ -95,6 +95,7 @@ For more details on the available models, see the [project documentation](https:
         - Leaky ReLU
         - ELU
         - SELU
+        - GELU
         - Exponential
         - Hard Sigmoid
         - Softplus
