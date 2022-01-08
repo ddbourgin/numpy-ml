@@ -60,6 +60,13 @@ neural networks.
     :undoc-members:
     :inherited-members:
 
+``GELU``
+-----------
+.. autoclass:: numpy_ml.neural_nets.activations.GELU
+    :members:
+    :undoc-members:
+    :inherited-members:
+
 ``Sigmoid``
 ------------
 .. autoclass:: numpy_ml.neural_nets.activations.Sigmoid
