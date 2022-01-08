@@ -1,6 +1,14 @@
 Natural language processing
 ###########################
 
+``BytePairEncoder``
+-------------------
+
+.. autoclass:: numpy_ml.preprocessing.nlp.BytePairEncoder
+	:members:
+	:undoc-members:
+	:inherited-members:
+
 ``HuffmanEncoder``
 ------------------
 
@@ -48,12 +56,27 @@ Natural language processing
 
 .. autofunction:: numpy_ml.preprocessing.nlp.strip_punctuation
 
+``tokenize_words``
+-------------------
+
+.. autofunction:: numpy_ml.preprocessing.nlp.tokenize_words
+
+``tokenize_whitespace``
+------------------------
+
+.. autofunction:: numpy_ml.preprocessing.nlp.tokenize_whitespace
+
 ``tokenize_chars``
 -------------------
 
 .. autofunction:: numpy_ml.preprocessing.nlp.tokenize_chars
 
-``tokenize_words``
--------------------
+``tokenize_bytes_raw``
+-----------------------
 
-.. autofunction:: numpy_ml.preprocessing.nlp.tokenize_words
+.. autofunction:: numpy_ml.preprocessing.nlp.tokenize_bytes_raw
+
+``bytes_to_chars``
+-----------------------
+
+.. autofunction:: numpy_ml.preprocessing.nlp.bytes_to_chars

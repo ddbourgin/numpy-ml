@@ -2,7 +2,7 @@
 import re
 import heapq
 import os.path as op
-from collections import Counter
+from collections import Counter, OrderedDict, defaultdict
 
 import numpy as np
 
@@ -10,330 +10,48 @@ import numpy as np
 # This list of English stop words is taken from the "Glasgow Information
 # Retrieval Group". The original list can be found at
 # http://ir.dcs.gla.ac.uk/resources/linguistic_utils/stop_words
-_STOP_WORDS = {
-    "a",
-    "about",
-    "above",
-    "across",
-    "after",
-    "afterwards",
-    "again",
-    "against",
-    "all",
-    "almost",
-    "alone",
-    "along",
-    "already",
-    "also",
-    "although",
-    "always",
-    "am",
-    "among",
-    "amongst",
-    "amoungst",
-    "amount",
-    "an",
-    "and",
-    "another",
-    "any",
-    "anyhow",
-    "anyone",
-    "anything",
-    "anyway",
-    "anywhere",
-    "are",
-    "around",
-    "as",
-    "at",
-    "back",
-    "be",
-    "became",
-    "because",
-    "become",
-    "becomes",
-    "becoming",
-    "been",
-    "before",
-    "beforehand",
-    "behind",
-    "being",
-    "below",
-    "beside",
-    "besides",
-    "between",
-    "beyond",
-    "bill",
-    "both",
-    "bottom",
-    "but",
-    "by",
-    "call",
-    "can",
-    "cannot",
-    "cant",
-    "co",
-    "con",
-    "could",
-    "couldnt",
-    "cry",
-    "de",
-    "describe",
-    "detail",
-    "do",
-    "done",
-    "down",
-    "due",
-    "during",
-    "each",
-    "eg",
-    "eight",
-    "either",
-    "eleven",
-    "else",
-    "elsewhere",
-    "empty",
-    "enough",
-    "etc",
-    "even",
-    "ever",
-    "every",
-    "everyone",
-    "everything",
-    "everywhere",
-    "except",
-    "few",
-    "fifteen",
-    "fifty",
-    "fill",
-    "find",
-    "fire",
-    "first",
-    "five",
-    "for",
-    "former",
-    "formerly",
-    "forty",
-    "found",
-    "four",
-    "from",
-    "front",
-    "full",
-    "further",
-    "get",
-    "give",
-    "go",
-    "had",
-    "has",
-    "hasnt",
-    "have",
-    "he",
-    "hence",
-    "her",
-    "here",
-    "hereafter",
-    "hereby",
-    "herein",
-    "hereupon",
-    "hers",
-    "herself",
-    "him",
-    "himself",
-    "his",
-    "how",
-    "however",
-    "hundred",
-    "i",
-    "ie",
-    "if",
-    "in",
-    "inc",
-    "indeed",
-    "interest",
-    "into",
-    "is",
-    "it",
-    "its",
-    "itself",
-    "keep",
-    "last",
-    "latter",
-    "latterly",
-    "least",
-    "less",
-    "ltd",
-    "made",
-    "many",
-    "may",
-    "me",
-    "meanwhile",
-    "might",
-    "mill",
-    "mine",
-    "more",
-    "moreover",
-    "most",
-    "mostly",
-    "move",
-    "much",
-    "must",
-    "my",
-    "myself",
-    "name",
-    "namely",
-    "neither",
-    "never",
-    "nevertheless",
-    "next",
-    "nine",
-    "no",
-    "nobody",
-    "none",
-    "noone",
-    "nor",
-    "not",
-    "nothing",
-    "now",
-    "nowhere",
-    "of",
-    "off",
-    "often",
-    "on",
-    "once",
-    "one",
-    "only",
-    "onto",
-    "or",
-    "other",
-    "others",
-    "otherwise",
-    "our",
-    "ours",
-    "ourselves",
-    "out",
-    "over",
-    "own",
-    "part",
-    "per",
-    "perhaps",
-    "please",
-    "put",
-    "rather",
-    "re",
-    "same",
-    "see",
-    "seem",
-    "seemed",
-    "seeming",
-    "seems",
-    "serious",
-    "several",
-    "she",
-    "should",
-    "show",
-    "side",
-    "since",
-    "sincere",
-    "six",
-    "sixty",
-    "so",
-    "some",
-    "somehow",
-    "someone",
-    "something",
-    "sometime",
-    "sometimes",
-    "somewhere",
-    "still",
-    "such",
-    "system",
-    "take",
-    "ten",
-    "than",
-    "that",
-    "the",
-    "their",
-    "them",
-    "themselves",
-    "then",
-    "thence",
-    "there",
-    "thereafter",
-    "thereby",
-    "therefore",
-    "therein",
-    "thereupon",
-    "these",
-    "they",
-    "thick",
-    "thin",
-    "third",
-    "this",
-    "those",
-    "though",
-    "three",
-    "through",
-    "throughout",
-    "thru",
-    "thus",
-    "to",
-    "together",
-    "too",
-    "top",
-    "toward",
-    "towards",
-    "twelve",
-    "twenty",
-    "two",
-    "un",
-    "under",
-    "until",
-    "up",
-    "upon",
-    "us",
-    "very",
-    "via",
-    "was",
-    "we",
-    "well",
-    "were",
-    "what",
-    "whatever",
-    "when",
-    "whence",
-    "whenever",
-    "where",
-    "whereafter",
-    "whereas",
-    "whereby",
-    "wherein",
-    "whereupon",
-    "wherever",
-    "whether",
-    "which",
-    "while",
-    "whither",
-    "who",
-    "whoever",
-    "whole",
-    "whom",
-    "whose",
-    "why",
-    "will",
-    "with",
-    "within",
-    "without",
-    "would",
-    "yet",
-    "you",
-    "your",
-    "yours",
-    "yourself",
-    "yourselves",
-}
-
-_PUNCTUATION = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+_STOP_WORDS = set(
+    (
+        "a about above across after afterwards again against all almost alone "
+        "along already also although always am among amongst amoungst amount an "
+        "and another any anyhow anyone anything anyway anywhere are around as at "
+        "back be became because become becomes becoming been before beforehand "
+        "behind being below beside besides between beyond bill both bottom but by "
+        "call can cannot cant co con could couldnt cry de describe detail do done "
+        "down due during each eg eight either eleven else elsewhere empty enough "
+        "etc even ever every everyone everything everywhere except few fifteen "
+        "fifty fill find fire first five for former formerly forty found four from "
+        "front full further get give go had has hasnt have he hence her here "
+        "hereafter hereby herein hereupon hers herself him himself his how however "
+        "hundred i ie if in inc indeed interest into is it its itself keep last "
+        "latter latterly least less ltd made many may me meanwhile might mill mine "
+        "more moreover most mostly move much must my myself name namely neither "
+        "never nevertheless next nine no nobody none noone nor not nothing now "
+        "nowhere of off often on once one only onto or other others otherwise our "
+        "ours ourselves out over own part per perhaps please put rather re same see "
+        "seem seemed seeming seems serious several she should show side since "
+        "sincere six sixty so some somehow someone something sometime sometimes "
+        "somewhere still such system take ten than that the their them themselves "
+        "then thence there thereafter thereby therefore therein thereupon these "
+        "they thick thin third this those though three through throughout thru thus "
+        "to together too top toward towards twelve twenty two un under until up "
+        "upon us very via was we well were what whatever when whence whenever where "
+        "whereafter whereas whereby wherein whereupon wherever whether which while "
+        "whither who whoever whole whom whose why will with within without would "
+        "yet you your yours yourself yourselves"
+    ).split(" "),
+)
 
 _WORD_REGEX = re.compile(r"(?u)\b\w\w+\b")  # sklearn default
+_WORD_REGEX_W_PUNC = re.compile(r"(?u)\w+|[^a-zA-Z0-9\s]")
+_WORD_REGEX_W_PUNC_AND_WHITESPACE = re.compile(r"(?u)s?\w+\s?|\s?[^a-zA-Z0-9\s]\s?")
+
+_PUNC_BYTE_REGEX = re.compile(
+    r"(33|34|35|36|37|38|39|40|41|42|43|44|45|"
+    r"46|47|58|59|60|61|62|63|64|91|92|93|94|"
+    r"95|96|123|124|125|126)",
+)
+_PUNCTUATION = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 _PUNC_TABLE = str.maketrans("", "", _PUNCTUATION)
 
 
@@ -343,19 +61,97 @@ def ngrams(sequence, N):
     return list(zip(*[sequence[i:] for i in range(N)]))
 
 
-def tokenize_words(line, lowercase=True, filter_stopwords=True):
+def tokenize_whitespace(
+    line, lowercase=True, filter_stopwords=True, filter_punctuation=True, **kwargs,
+):
     """
-    Split a string into individual lower-case words, optionally removing
-    punctuation and stop-words in the process
+    Split a string at any whitespace characters, optionally removing
+    punctuation and stop-words in the process.
     """
-    words = _WORD_REGEX.findall(line.lower() if lowercase else line)
+    line = line.lower() if lowercase else line
+    words = line.split()
+    line = [strip_punctuation(w) for w in words] if filter_punctuation else line
     return remove_stop_words(words) if filter_stopwords else words
 
 
-def tokenize_chars(line, lowercase=True, filter_punctuation=True):
+def tokenize_words(
+    line, lowercase=True, filter_stopwords=True, filter_punctuation=True, **kwargs,
+):
     """
-    Split a string into individual lower-case words, optionally removing
-    punctuation and stop-words in the process
+    Split a string into individual words, optionally removing punctuation and
+    stop-words in the process.
+    """
+    REGEX = _WORD_REGEX if filter_punctuation else _WORD_REGEX_W_PUNC
+    words = REGEX.findall(line.lower() if lowercase else line)
+    return remove_stop_words(words) if filter_stopwords else words
+
+
+def tokenize_words_bytes(
+    line,
+    lowercase=True,
+    filter_stopwords=True,
+    filter_punctuation=True,
+    encoding="utf-8",
+    **kwargs,
+):
+    """
+    Split a string into individual words, optionally removing punctuation and
+    stop-words in the process. Translate each word into a list of bytes.
+    """
+    words = tokenize_words(
+        line,
+        lowercase=lowercase,
+        filter_stopwords=filter_stopwords,
+        filter_punctuation=filter_punctuation,
+        **kwargs,
+    )
+    words = [" ".join([str(i) for i in w.encode(encoding)]) for w in words]
+    return words
+
+
+def tokenize_bytes_raw(line, encoding="utf-8", splitter=None, **kwargs):
+    """
+    Convert the characters in `line` to a collection of bytes. Each byte is
+    represented in decimal as an integer between 0 and 255.
+
+    Parameters
+    ----------
+    line : str
+        The string to tokenize.
+    encoding : str
+        The encoding scheme for the characters in `line`. Default is `'utf-8'`.
+    splitter : {'punctuation', None}
+        If `'punctuation'`, split the string at any punctuation character
+        before encoding into bytes. If None, do not split `line` at all.
+        Default is None.
+
+    Returns
+    -------
+    bytes : list
+        A list of the byte-encoded characters in `line`. Each item in the list
+        is a string of space-separated integers between 0 and 255 representing
+        the bytes encoding the characters in `line`.
+    """
+    byte_str = [" ".join([str(i) for i in line.encode(encoding)])]
+    if splitter == "punctuation":
+        byte_str = _PUNC_BYTE_REGEX.sub(r"-\1-", byte_str[0]).split("-")
+    return byte_str
+
+
+def bytes_to_chars(byte_list, encoding="utf-8"):
+    """
+    Decode bytes (represented as an integer between 0 and 255) to characters in
+    the specified encoding.
+    """
+    hex_array = [hex(a).replace("0x", "") for a in byte_list]
+    hex_array = " ".join([h if len(h) > 1 else f"0{h}" for h in hex_array])
+    return bytearray.fromhex(hex_array).decode(encoding)
+
+
+def tokenize_chars(line, lowercase=True, filter_punctuation=True, **kwargs):
+    """
+    Split a string into individual characters, optionally removing punctuation
+    and stop-words in the process.
     """
     line = line.lower() if lowercase else line
     line = strip_punctuation(line) if filter_punctuation else line
@@ -365,12 +161,234 @@ def tokenize_chars(line, lowercase=True, filter_punctuation=True):
 
 def remove_stop_words(words):
     """Remove stop words from a list of word strings"""
-    return [w for w in words if w not in _STOP_WORDS]
+    return [w for w in words if w.lower() not in _STOP_WORDS]
 
 
 def strip_punctuation(line):
     """Remove punctuation from a string"""
     return line.translate(_PUNC_TABLE).strip()
+
+
+#######################################################################
+#                          Byte-Pair Encoder                          #
+#######################################################################
+
+
+class BytePairEncoder(object):
+    def __init__(self, max_merges=3000, encoding="utf-8"):
+        """
+        A byte-pair encoder for sub-word embeddings.
+
+        Notes
+        -----
+        Byte-pair encoding [1][2] is a compression algorithm that iteratively
+        replaces the most frequently ocurring byte pairs in a set of documents
+        with a new, single token. It has gained popularity as a preprocessing
+        step for many NLP tasks due to its simplicity and expressiveness: using
+        a base coebook of just 256 unique tokens (bytes), any string can be
+        encoded.
+
+        References
+        ----------
+        .. [1] Gage, P. (1994). A new algorithm for data compression. *C
+           Users Journal, 12(2)*, 23–38.
+        .. [2] Sennrich, R., Haddow, B., & Birch, A. (2015). Neural machine
+           translation of rare words with subword units, *Proceedings of the
+           54th Annual Meeting of the Association for Computational
+           Linguistics,* 1715-1725.
+
+        Parameters
+        ----------
+        max_merges : int
+            The maximum number of byte pair merges to perform during the
+            :meth:`fit` operation. Default is 3000.
+        encoding : str
+            The encoding scheme for the documents used to train the encoder.
+            Default is `'utf-8'`.
+        """
+        self.parameters = {
+            "max_merges": max_merges,
+            "encoding": encoding,
+        }
+
+        # initialize the byte <-> token and token <-> byte dictionaries. bytes
+        # are represented in decimal as integers between 0 and 255. there is a
+        # 1:1 correspondence between token and byte representations up to 255.
+        self.byte2token = OrderedDict({i: i for i in range(256)})
+        self.token2byte = OrderedDict({v: k for k, v in self.byte2token.items()})
+
+    def fit(self, corpus_fps, encoding="utf-8"):
+        """
+        Train a byte pair codebook on a set of documents.
+
+        Parameters
+        ----------
+        corpus_fps : str or list of strs
+            The filepath / list of filepaths for the document(s) to be used to
+            learn the byte pair codebook.
+        encoding : str
+            The text encoding for documents. Common entries are either 'utf-8'
+            (no header byte), or 'utf-8-sig' (header byte). Default is
+            'utf-8'.
+        """
+        vocab = (
+            Vocabulary(
+                lowercase=False,
+                min_count=None,
+                max_tokens=None,
+                filter_stopwords=False,
+                filter_punctuation=False,
+                tokenizer="bytes",
+            )
+            .fit(corpus_fps, encoding=encoding)
+            .counts
+        )
+
+        # iteratively merge the most common byte bigram across the documents
+        for _ in range(self.parameters["max_merges"]):
+            pair_counts = self._get_counts(vocab)
+            most_common_bigram = max(pair_counts, key=pair_counts.get)
+            vocab = self._merge(most_common_bigram, vocab)
+
+        token_bytes = set()
+        for k in vocab.keys():
+            token_bytes = token_bytes.union([w for w in k.split(" ") if "-" in w])
+
+        for i, t in enumerate(token_bytes):
+            byte_tuple = tuple(int(j) for j in t.split("-"))
+            self.token2byte[256 + i] = byte_tuple
+            self.byte2token[byte_tuple] = 256 + i
+
+        return self
+
+    def _get_counts(self, vocab):
+        """Collect bigram counts for the tokens in vocab"""
+        pair_counts = defaultdict(int)
+        for word, count in vocab.items():
+            pairs = ngrams(word.split(" "), 2)
+            for p in pairs:
+                pair_counts[p] += count
+        return pair_counts
+
+    def _merge(self, bigram, vocab):
+        """Replace `bigram` with a single token and update vocab accordingly"""
+        v_out = {}
+        bg = re.escape(" ".join(bigram))
+        bigram_regex = re.compile(r"(?<!\S)" + bg + r"(?!\S)")
+        for word in vocab.keys():
+            # bigram "a b" becomes "a-b"
+            w_out = bigram_regex.sub("-".join(bigram), word)
+            v_out[w_out] = vocab[word]
+        return v_out
+
+    def transform(self, text):
+        """
+        Transform the words in `text` into their byte pair encoded token IDs.
+
+        Parameters
+        ----------
+        text: str or list of `N` strings
+            The list of strings to encode
+
+        Returns
+        -------
+        codes : list of `N` lists
+            A list of byte pair token IDs for each of the `N` strings in
+            `text`.
+
+        Examples
+        --------
+        >>> B = BytePairEncoder(max_merges=100).fit("./example.txt")
+        >>> encoded_tokens = B.transform("Hello! How are you 😁 ?")
+        >>> encoded_tokens
+        [[72, 879, 474, ...]]
+        """
+        if isinstance(text, str):
+            text = [text]
+        return [self._transform(string) for string in text]
+
+    def _transform(self, text):
+        """Transform a single text string to a list of byte-pair IDs"""
+        P = self.parameters
+        _bytes = tokenize_bytes_raw(text, encoding=P["encoding"])
+
+        encoded = []
+        for w in _bytes:
+            l, r = 0, len(w)
+            w = [int(i) for i in w.split(" ")]
+
+            while l < len(w):
+                candidate = tuple(w[l:r])
+
+                if len(candidate) > 1 and candidate in self.byte2token:
+                    # candidate is a collection of several bytes and is in our
+                    # vocab
+                    encoded.append(self.byte2token[candidate])
+                    l, r = r, len(w)
+                elif len(candidate) == 1:
+                    # candidate is a single byte and should always be in our
+                    # vocab
+                    encoded.append(candidate[0])
+                    l, r = r, len(w)
+                else:
+                    # candidate is not in vocab, so we decrease our context
+                    # window by 1 and try again
+                    r -= 1
+        return encoded
+
+    def inverse_transform(self, codes):
+        """
+        Transform an encoded sequence of byte pair codeword IDs back into
+        human-readable text.
+
+        Parameters
+        ----------
+        codes : list of `N` lists
+            A list of `N` lists. Each sublist is a collection of integer
+            byte-pair token IDs representing a particular text string.
+
+        Returns
+        -------
+        text: list of `N` strings
+            The decoded strings corresponding to the `N` sublists in `codes`.
+
+        Examples
+        --------
+        >>> B = BytePairEncoder(max_merges=100).fit("./example.txt")
+        >>> encoded_tokens = B.transform("Hello! How are you 😁 ?")
+        >>> encoded_tokens
+        [[72, 879, 474, ...]]
+        >>> B.inverse_transform(encoded_tokens)
+        ["Hello! How are you 😁 ?"]
+        """
+        if isinstance(codes[0], int):
+            codes = [codes]
+
+        decoded = []
+        P = self.parameters
+
+        for code in codes:
+            _bytes = [self.token2byte[t] if t > 255 else [t] for t in code]
+            _bytes = [b for blist in _bytes for b in blist]
+            decoded.append(bytes_to_chars(_bytes, encoding=P["encoding"]))
+        return decoded
+
+    @property
+    def codebook(self):
+        """
+        A list of the learned byte pair codewords, decoded into human-readable
+        format
+        """
+        return [
+            self.inverse_transform(t)[0]
+            for t in self.byte2token.keys()
+            if isinstance(t, tuple)
+        ]
+
+    @property
+    def tokens(self):
+        """A list of the byte pair codeword IDs"""
+        return list(self.token2byte.keys())
 
 
 #######################################################################
@@ -570,8 +588,10 @@ class TFIDFEncoder:
         min_count=0,
         smooth_idf=True,
         max_tokens=None,
-        input_type="filename",
+        input_type="files",
         filter_stopwords=True,
+        filter_punctuation=True,
+        tokenizer="words",
     ):
         r"""
         An object for compiling and encoding the term-frequency
@@ -606,7 +626,7 @@ class TFIDFEncoder:
             Only add the `max_tokens` most frequent tokens that occur more
             than `min_count` to the vocabulary.  If None, add all tokens
             greater that occur more than than `min_count`. Default is None.
-        input_type : {'filename', 'strings'}
+        input_type : {'files', 'strings'}
             If 'files', the sequence input to `fit` is expected to be a list
             of filepaths. If 'strings', the input is expected to be a list of
             lists, each sublist containing the raw strings for a single
@@ -614,6 +634,16 @@ class TFIDFEncoder:
         filter_stopwords : bool
             Whether to remove stopwords before encoding the words in the
             corpus. Default is True.
+        filter_punctuation : bool
+            Whether to remove punctuation before encoding the words in the
+            corpus. Default is True.
+        tokenizer : {'whitespace', 'words', 'characters', 'bytes'}
+            Strategy to follow when mapping strings to tokens. The
+            `'whitespace'` tokenizer splits strings at whitespace characters.
+            The `'words'` tokenizer splits strings using a "word" regex. The
+            `'characters'` tokenizer splits strings into individual characters.
+            The `'bytes'` tokenizer splits strings into a collection of
+            individual bytes.
         """
         # create a function to filter against words in the vocab
         self._filter_vocab = lambda words: words
@@ -647,9 +677,15 @@ class TFIDFEncoder:
             "input_type": input_type,
             "max_tokens": max_tokens,
             "smooth_idf": smooth_idf,
+            "tokenizer": tokenizer
+            if not isinstance(vocab, Vocabulary)
+            else vocab.hyperparameters["tokenizer"],
             "filter_stopwords": filter_stopwords
             if not isinstance(vocab, Vocabulary)
             else vocab.hyperparameters["filter_stopwords"],
+            "filter_punctuation": filter_punctuation
+            if not isinstance(vocab, Vocabulary)
+            else vocab.hyperparameters["filter_punctuation"],
         }
 
     def fit(self, corpus_seq, encoding="utf-8-sig"):
@@ -663,12 +699,15 @@ class TFIDFEncoder:
             The filepath / list of filepaths / raw string contents of the
             document(s) to be encoded, in accordance with the `input_type`
             parameter passed to the :meth:`__init__` method. Each document is
-            expected to be a newline-separated strings of text, with adjacent
-            tokens separated by a whitespace character.
+            expected to be a string of tokens separated by whitespace.
         encoding : str
             Specifies the text encoding for corpus if `input_type` is `files`.
             Common entries are either 'utf-8' (no header byte), or 'utf-8-sig'
             (header byte). Default is 'utf-8-sig'.
+
+        Returns
+        -------
+        self
         """
         H = self.hyperparameters
 
@@ -725,6 +764,7 @@ class TFIDFEncoder:
 
         # ... finally, calculate inverse document frequency
         self._calc_idf()
+        return self
 
     def _encode_document(
         self, doc, word2idx, idx2word, tokens, doc_count, bol_ix, eol_ix,
@@ -733,15 +773,30 @@ class TFIDFEncoder:
         H = self.hyperparameters
         lowercase = H["lowercase"]
         filter_stop = H["filter_stopwords"]
+        filter_punc = H["filter_punctuation"]
 
         if H["input_type"] == "files":
             with open(doc, "r", encoding=H["encoding"]) as handle:
                 doc = handle.read()
 
+        tokenizer_dict = {
+            "words": tokenize_words,
+            "characters": tokenize_chars,
+            "whitespace": tokenize_whitespace,
+            "bytes": tokenize_bytes_raw,
+        }
+        tokenizer = tokenizer_dict[H["tokenizer"]]
+
         n_words = 0
         lines = doc.split("\n")
         for line in lines:
-            words = tokenize_words(line, lowercase, filter_stop)
+            words = tokenizer(
+                line,
+                lowercase=lowercase,
+                filter_stopwords=filter_stop,
+                filter_punctuation=filter_punc,
+                encoding=H["encoding"],
+            )
             words = self._filter_vocab(words)
             n_words += len(words)
 
@@ -849,7 +904,10 @@ class TFIDFEncoder:
     def _sort_tokens(self):
         # sort tokens alphabetically and recode
         ix = 0
-        token2idx, idx2token, = {}, {}
+        token2idx, idx2token, = (
+            {},
+            {},
+        )
         special = ["<eol>", "<bol>", "<unk>"]
         words = sorted(self.token2idx.keys())
         term_freq = {d: {} for d in self.term_freq.keys()}
@@ -949,7 +1007,13 @@ class TFIDFEncoder:
 
 class Vocabulary:
     def __init__(
-        self, lowercase=True, min_count=None, max_tokens=None, filter_stopwords=True,
+        self,
+        lowercase=True,
+        min_count=None,
+        max_tokens=None,
+        filter_stopwords=True,
+        filter_punctuation=True,
+        tokenizer="words",
     ):
         """
         An object for compiling and encoding the unique tokens in a text corpus.
@@ -966,10 +1030,20 @@ class Vocabulary:
         max_tokens : int
             Only add the `max_tokens` most frequent tokens that occur more
             than `min_count` to the vocabulary.  If None, add all tokens
-            greater that occur more than than `min_count`. Default is None.
+            that occur more than than `min_count`. Default is None.
         filter_stopwords : bool
             Whether to remove stopwords before encoding the words in the
             corpus. Default is True.
+        filter_punctuation : bool
+            Whether to remove punctuation before encoding the words in the
+            corpus. Default is True.
+        tokenizer : {'whitespace', 'words', 'characters', 'bytes'}
+            Strategy to follow when mapping strings to tokens. The
+            `'whitespace'` tokenizer splits strings at whitespace characters.
+            The `'words'` tokenizer splits strings using a "word" regex. The
+            `'characters'` tokenizer splits strings into individual characters.
+            The `'bytes'` tokenizer splits strings into a collection of
+            individual bytes.
         """
         self.hyperparameters = {
             "id": "Vocabulary",
@@ -979,6 +1053,8 @@ class Vocabulary:
             "min_count": min_count,
             "max_tokens": max_tokens,
             "filter_stopwords": filter_stopwords,
+            "filter_punctuation": filter_punctuation,
+            "tokenizer": tokenizer,
         }
 
     def __len__(self):
@@ -1028,8 +1104,8 @@ class Vocabulary:
 
     def filter(self, words, unk=True):  # noqa: A003
         """
-        Filter or replace any word in `words` that does not occur in
-        `Vocabulary`
+        Filter (or replace) any word in `words` that is not present in
+        `Vocabulary`.
 
         Parameters
         ----------
@@ -1037,13 +1113,13 @@ class Vocabulary:
             A list of words to filter
         unk : bool
             Whether to replace any out of vocabulary words in `words` with the
-            <unk> token (unk = True) or skip them entirely (unk = False).
-            Default is True.
+            ``<unk>`` token (True) or skip them entirely (False).  Default is
+            True.
 
         Returns
         -------
         filtered : list of strs
-            The list of words filtered against the vocabulary.
+            The list of words filtered against the words in Vocabulary.
         """
         if unk:
             return [w if w in self else "<unk>" for w in words]
@@ -1052,7 +1128,7 @@ class Vocabulary:
     def words_to_indices(self, words):
         """
         Convert the words in `words` to their token indices. If a word is not
-        in the vocabulary, return the index for the <unk> token
+        in the vocabulary, return the index for the ``<unk>`` token
 
         Parameters
         ----------
@@ -1072,7 +1148,7 @@ class Vocabulary:
     def indices_to_words(self, indices):
         """
         Convert the indices in `indices` to their word values. If an index is
-        not in the vocabulary, return the the <unk> token.
+        not in the vocabulary, return the ``<unk>`` token.
 
         Parameters
         ----------
@@ -1102,6 +1178,10 @@ class Vocabulary:
             Specifies the text encoding for corpus. Common entries are either
             'utf-8' (no header byte), or 'utf-8-sig' (header byte). Default is
             'utf-8-sig'.
+
+        Returns
+        -------
+        self
         """
         if isinstance(corpus_fps, str):
             corpus_fps = [corpus_fps]
@@ -1113,10 +1193,19 @@ class Vocabulary:
         H = self.hyperparameters
         idx2word, word2idx = {}, {}
 
+        tokenizer_dict = {
+            "words": tokenize_words,
+            "characters": tokenize_chars,
+            "whitespace": tokenize_whitespace,
+            "bytes": tokenize_bytes_raw,
+        }
+
         min_count = H["min_count"]
         lowercase = H["lowercase"]
         max_tokens = H["max_tokens"]
         filter_stop = H["filter_stopwords"]
+        filter_punc = H["filter_punctuation"]
+        tokenizer = tokenizer_dict[H["tokenizer"]]
 
         H["encoding"] = encoding
         H["corpus_fps"] = corpus_fps
@@ -1133,7 +1222,13 @@ class Vocabulary:
         for d_ix, doc_fp in enumerate(corpus_fps):
             with open(doc_fp, "r", encoding=H["encoding"]) as doc:
                 for line in doc:
-                    words = tokenize_words(line, lowercase, filter_stop)
+                    words = tokenizer(
+                        line,
+                        lowercase=lowercase,
+                        filter_stopwords=filter_stop,
+                        filter_punctuation=filter_punc,
+                        encoding=H["encoding"],
+                    )
 
                     for ww in words:
                         if ww not in word2idx:
@@ -1164,6 +1259,7 @@ class Vocabulary:
         counts = {w: self._tokens[ix].count for w, ix in self.token2idx.items()}
         self.counts = Counter(counts)
         self._tokens = np.array(self._tokens)
+        return self
 
     def _keep_top_n_tokens(self):
         word2idx, idx2word = {}, {}

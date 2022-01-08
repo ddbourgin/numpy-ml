@@ -140,6 +140,7 @@ This repo includes code for the following models:
     - Feature standardization
     - One-hot encoding / decoding
     - Huffman coding / decoding
+    - Byte pair encoding / decoding
     - Term frequency-inverse document frequency (TF-IDF) encoding
     - MFCC encoding
 

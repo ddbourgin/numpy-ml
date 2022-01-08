@@ -27,7 +27,7 @@ For more details on the available models, see the [project documentation](https:
 ## Available models
 <details>
   <summary>Click to expand!</summary>
-  
+
 1. **Gaussian mixture model**
     - EM training
 
@@ -168,6 +168,7 @@ For more details on the available models, see the [project documentation](https:
     - Feature standardization
     - One-hot encoding / decoding
     - Huffman coding / decoding
+    - Byte pair encoding / decoding
     - Term frequency-inverse document frequency (TF-IDF) encoding
     - MFCC encoding
 
