@@ -24,6 +24,8 @@ can use `pip3 install -u 'numpy_ml[rl]'`.
 ## Documentation
 For more details on the available models, see the [project documentation](https://numpy-ml.readthedocs.io/).
 
+You can also read [introduction of wechat](https://mp.weixin.qq.com/s/rjgq0JZrMFRkrRVzpoNYZg).
+
 ## Available models
 <details>
   <summary>Click to expand!</summary>
