@@ -39,7 +39,7 @@ class Edge(object):
 
     def reverse(self):
         """Reverse the edge direction"""
-        return Edge(self.t, self.f, self.w)
+        return Edge(self.to, self.fr, self._w)
 
 
 #######################################################################
