@@ -9,9 +9,12 @@ tensorflow
 gym
 keras
 huffman
-librosa
+librosa==0.7.2
+llvmlite==0.32.1
+numba==0.45.0
 nltk
 hmmlearn
+statsmodels
 pre-commit
 tox
 pytest

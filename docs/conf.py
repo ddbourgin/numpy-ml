@@ -24,7 +24,7 @@ gh_url = "https://github.com/ddbourgin/numpy-ml"
 # -- Project information -----------------------------------------------------
 
 project = "numpy-ml"
-copyright = "2020, David Bourgin"
+copyright = "2022, David Bourgin"
 author = "David Bourgin"
 
 # The short X.Y version

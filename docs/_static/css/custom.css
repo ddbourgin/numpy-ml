@@ -1,16 +1,30 @@
 body {
-    font-size: 16px !important;
+    font-size: 15px !important;
 }
 
-table.field-list,
-table.footnote {
+/* gray background for parameters */
+table.field-list {
     background-color: #f9f9f9 !important;
+}
+
+/* style the footnote display */
+table.footnote td {
+    padding: 0.3em 0.5em !important;
+    line-height: 1.4em !important;
+}
+
+table li {
+    padding-bottom: 0.5em;
 }
 
 table.field-list th,
 table.field-list td {
-    padding: 0.8em !important;
+    padding: 0.5em !important;
     border: 1px solid #888 !important;
+}
+
+p.rubric {
+    margin-top: 0px !important;
 }
 
 /* recolor the code snippets in sidebar */
@@ -24,6 +38,12 @@ table.field-list td {
     }
 }
 
+
+/* sidebar pinned to the top of the page */
+div.sphinxsidebar {
+    position: absolute;
+}
+
 /* don't show table delimiters */
 table.docutils {
     border: none !important;
@@ -35,8 +55,4 @@ table.docutils {
 table.docutils td, table.docutils th {
     border: none;
     padding: 0.0em 0.0em;
-}
-
-table.footnote td {
-    padding: 0.3em 0.5em;
 }

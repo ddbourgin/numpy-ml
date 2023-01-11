@@ -1,6 +1,7 @@
 """Hidden Markov model module"""
 
 import numpy as np
+from numpy_ml.utils.misc import logsumexp
 
 
 class MultinomialHMM:
@@ -44,39 +45,38 @@ class MultinomialHMM:
         T : int
             The number of observations in each sequence in `O`.
         """
-        self.eps = np.finfo(float).eps if eps is None else eps
-
-        # transition matrix
-        self.A = A
-
-        # emission matrix
-        self.B = B
+        eps = np.finfo(float).eps if eps is None else eps
 
         # prior probability of each latent state
-        self.pi = pi
-        if self.pi is not None:
-            self.pi[self.pi == 0] = self.eps
+        if pi is not None:
+            pi[pi == 0] = eps
 
         # number of latent state types
-        self.N = None
-        if self.A is not None:
-            self.N = self.A.shape[0]
-            self.A[self.A == 0] = self.eps
+        N = None
+        if A is not None:
+            N = A.shape[0]
+            A[A == 0] = eps
 
         # number of observation types
-        self.V = None
-        if self.B is not None:
-            self.V = self.B.shape[1]
-            self.B[self.B == 0] = self.eps
+        V = None
+        if B is not None:
+            V = B.shape[1]
+            B[B == 0] = eps
 
-        # set of training sequences
-        self.O = None  # noqa: E741
+        self.parameters = {
+            "A": A,  # transition matrix
+            "B": B,  # emission matrix
+            "pi": pi,  # prior probability of each latent state
+        }
 
-        # number of sequences in O
-        self.I = None  # noqa: E741
+        self.hyperparameters = {
+            "eps": eps,  # epsilon
+        }
 
-        # number of observations in each sequence
-        self.T = None
+        self.derived_variables = {
+            "N": N,  # number of latent state types
+            "V": V,  # number of observation types
+        }
 
     def generate(self, n_steps, latent_state_types, obs_types):
         """
@@ -98,20 +98,23 @@ class MultinomialHMM:
         emissions : :py:class:`ndarray <numpy.ndarray>` of shape `(n_steps,)`
             The sampled emissions.
         """
+        P = self.parameters
+        A, B, pi = P["A"], P["B"], P["pi"]
+
         # sample the initial latent state
-        s = np.random.multinomial(1, self.pi).argmax()
+        s = np.random.multinomial(1, pi).argmax()
         states = [latent_state_types[s]]
 
         # generate an emission given latent state
-        v = np.random.multinomial(1, self.B[s, :]).argmax()
+        v = np.random.multinomial(1, B[s, :]).argmax()
         emissions = [obs_types[v]]
 
         # sample a latent transition, rinse, and repeat
         for i in range(n_steps - 1):
-            s = np.random.multinomial(1, self.A[s, :]).argmax()
+            s = np.random.multinomial(1, A[s, :]).argmax()
             states.append(latent_state_types[s])
 
-            v = np.random.multinomial(1, self.B[s, :]).argmax()
+            v = np.random.multinomial(1, B[s, :]).argmax()
             emissions.append(obs_types[v])
 
         return np.array(states), np.array(emissions)
@@ -119,8 +122,8 @@ class MultinomialHMM:
     def log_likelihood(self, O):
         r"""
         Given the HMM parameterized by :math:`(A`, B, \pi)` and an observation
-        sequence `O`, compute the marginal likelihood of the observations:
-        :math:`P(O \mid A,B,\pi)`, summing over latent states.
+        sequence `O`, compute the marginal likelihood of `O`,
+        :math:`P(O \mid A,B,\pi)`, by marginalizing over latent states.
 
         Notes
         -----
@@ -236,7 +239,10 @@ class MultinomialHMM:
             The probability of the latent state sequence in `best_path` under
             the HMM.
         """
-        eps = self.eps
+        P = self.parameters
+        N = self.derived_variables["N"]
+        eps = self.hyperparameters["eps"]
+        A, B, pi = P["A"], P["B"], P["pi"]
 
         if O.ndim == 1:
             O = O.reshape(1, -1)  # noqa: E741
@@ -250,22 +256,20 @@ class MultinomialHMM:
             raise ValueError("Can only decode a single sequence (O.shape[0] must be 1)")
 
         # initialize the viterbi and back_pointer matrices
-        viterbi = np.zeros((self.N, T))
-        back_pointer = np.zeros((self.N, T)).astype(int)
+        viterbi = np.zeros((N, T))
+        back_pointer = np.zeros((N, T)).astype(int)
 
         ot = O[0, 0]
-        for s in range(self.N):
+        for s in range(N):
             back_pointer[s, 0] = 0
-            viterbi[s, 0] = np.log(self.pi[s] + eps) + np.log(self.B[s, ot] + eps)
+            viterbi[s, 0] = np.log(pi[s] + eps) + np.log(B[s, ot] + eps)
 
         for t in range(1, T):
             ot = O[0, t]
-            for s in range(self.N):
+            for s in range(N):
                 seq_probs = [
-                    viterbi[s_, t - 1]
-                    + np.log(self.A[s_, s] + eps)
-                    + np.log(self.B[s, ot] + eps)
-                    for s_ in range(self.N)
+                    viterbi[s_, t - 1] + np.log(A[s_, s] + eps) + np.log(B[s, ot] + eps)
+                    for s_ in range(N)
                 ]
 
                 viterbi[s, t] = np.max(seq_probs)
@@ -281,6 +285,7 @@ class MultinomialHMM:
             pointer = back_pointer[pointer, t]
             best_path.append(pointer)
         best_path = best_path[::-1]
+
         return best_path, best_path_log_prob
 
     def _forward(self, Obs):
@@ -327,25 +332,29 @@ class MultinomialHMM:
         forward : :py:class:`ndarray <numpy.ndarray>` of shape `(N, T)`
             The forward trellis.
         """
-        eps = self.eps
+        P = self.parameters
+        N = self.derived_variables["N"]
+        eps = self.hyperparameters["eps"]
+        A, B, pi = P["A"], P["B"], P["pi"]
+
         T = Obs.shape[0]
 
         # initialize the forward probability matrix
-        forward = np.zeros((self.N, T))
+        forward = np.zeros((N, T))
 
         ot = Obs[0]
-        for s in range(self.N):
-            forward[s, 0] = np.log(self.pi[s] + eps) + np.log(self.B[s, ot] + eps)
+        for s in range(N):
+            forward[s, 0] = np.log(pi[s] + eps) + np.log(B[s, ot] + eps)
 
         for t in range(1, T):
             ot = Obs[t]
-            for s in range(self.N):
+            for s in range(N):
                 forward[s, t] = logsumexp(
                     [
                         forward[s_, t - 1]
-                        + np.log(self.A[s_, s] + eps)
-                        + np.log(self.B[s, ot] + eps)
-                        for s_ in range(self.N)
+                        + np.log(A[s_, s] + eps)
+                        + np.log(B[s, ot] + eps)
+                        for s_ in range(N)
                     ]  # noqa: C812
                 )
         return forward
@@ -391,27 +400,53 @@ class MultinomialHMM:
         backward : :py:class:`ndarray <numpy.ndarray>` of shape `(N, T)`
             The backward trellis.
         """
-        eps = self.eps
+        P = self.parameters
+        A, B = P["A"], P["B"]
+        N = self.derived_variables["N"]
+        eps = self.hyperparameters["eps"]
+
         T = Obs.shape[0]
 
         # initialize the backward trellis
-        backward = np.zeros((self.N, T))
+        backward = np.zeros((N, T))
 
-        for s in range(self.N):
+        for s in range(N):
             backward[s, T - 1] = 0
 
         for t in reversed(range(T - 1)):
             ot1 = Obs[t + 1]
-            for s in range(self.N):
+            for s in range(N):
                 backward[s, t] = logsumexp(
                     [
-                        np.log(self.A[s, s_] + eps)
-                        + np.log(self.B[s_, ot1] + eps)
+                        np.log(A[s, s_] + eps)
+                        + np.log(B[s_, ot1] + eps)
                         + backward[s_, t + 1]
-                        for s_ in range(self.N)
+                        for s_ in range(N)
                     ]  # noqa: C812
                 )
         return backward
+
+    def _initialize_parameters(self):
+        P = self.parameters
+        A, B, pi = P["A"], P["B"], P["pi"]
+        N, V = self.derived_variables["N"], self.derived_variables["V"]
+
+        # Uniform initialization of prior over latent states
+        if pi is None:
+            pi = np.ones(N)
+            pi = pi / pi.sum()
+
+        # Uniform initialization of A
+        if A is None:
+            A = np.ones((N, N))
+            A = A / A.sum(axis=1)[:, None]
+
+        # Random initialization of B
+        if B is None:
+            B = np.random.rand(N, V)
+            B = B / B.sum(axis=1)[:, None]
+
+        P["A"], P["B"], P["pi"] = A, B, pi
 
     def fit(
         self,
@@ -464,42 +499,31 @@ class MultinomialHMM:
         pi : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The estimated prior probabilities of each latent state.
         """
+        # observations
         if O.ndim == 1:
             O = O.reshape(1, -1)  # noqa: E741
 
-        # observations
-        self.O = O  # noqa: E741
-
         # number of training examples (I) and their lengths (T)
-        self.I, self.T = self.O.shape
+        I, T = O.shape
 
         # number of types of observation
-        self.V = len(observation_types)
+        self.derived_variables["V"] = len(observation_types)
 
         # number of latent state types
-        self.N = len(latent_state_types)
+        self.derived_variables["N"] = len(latent_state_types)
 
-        # Uniform initialization of prior over latent states
-        self.pi = pi
-        if self.pi is None:
-            self.pi = np.ones(self.N)
-            self.pi = self.pi / self.pi.sum()
+        self._initialize_parameters()
 
-        # Uniform initialization of A
-        self.A = np.ones((self.N, self.N))
-        self.A = self.A / self.A.sum(axis=1)[:, None]
-
-        # Random initialization of B
-        self.B = np.random.rand(self.N, self.V)
-        self.B = self.B / self.B.sum(axis=1)[:, None]
+        P = self.parameters
 
         # iterate E and M steps until convergence criteria is met
         step, delta = 0, np.inf
-        ll_prev = np.sum([self.log_likelihood(o) for o in self.O])
+        ll_prev = np.sum([self.log_likelihood(o) for o in O])
+
         while delta > tol:
-            gamma, xi, phi = self._Estep()
-            self.A, self.B, self.pi = self._Mstep(gamma, xi, phi)
-            ll = np.sum([self.log_likelihood(o) for o in self.O])
+            gamma, xi, phi = self._E_step(O)
+            P["A"], P["B"], P["pi"] = self._M_step(O, gamma, xi, phi)
+            ll = np.sum([self.log_likelihood(o) for o in O])
             delta = ll - ll_prev
             ll_prev = ll
             step += 1
@@ -508,9 +532,9 @@ class MultinomialHMM:
                 fstr = "[Epoch {}] LL: {:.3f} Delta: {:.5f}"
                 print(fstr.format(step, ll_prev, delta))
 
-        return self.A, self.B, self.pi
+        #  return A, B, pi
 
-    def _Estep(self):
+    def _E_step(self, O):
         r"""
         Run a single E-step update for the Baum-Welch/Forward-Backward
         algorithm. This step estimates ``xi`` and ``gamma``, the excepted
@@ -545,6 +569,11 @@ class MultinomialHMM:
 
         .. math:: \mathtt{gamma[i,j]} = P(q_j = i \mid O, A, B, \pi)
 
+        Parameters
+        ----------
+        O : :py:class:`ndarray <numpy.ndarray>` of shape `(I, T)`
+            The set of `I` training observations, each of length `T`.
+
         Returns
         -------
         gamma : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N, T)`
@@ -554,45 +583,51 @@ class MultinomialHMM:
         phi : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N)`
             The estimated prior counts for each latent state.
         """
-        eps = self.eps
+        I, T = O.shape
+        P = self.parameters
+        A, B = P["A"], P["B"]
+        N = self.derived_variables["N"]
+        eps = self.hyperparameters["eps"]
 
-        gamma = np.zeros((self.I, self.N, self.T))
-        xi = np.zeros((self.I, self.N, self.N, self.T))
-        phi = np.zeros((self.I, self.N))
+        phi = np.zeros((I, N))
+        gamma = np.zeros((I, N, T))
+        xi = np.zeros((I, N, N, T))
 
-        for i in range(self.I):
-            Obs = self.O[i, :]
+        for i in range(I):
+            Obs = O[i, :]
             fwd = self._forward(Obs)
             bwd = self._backward(Obs)
-            log_likelihood = logsumexp(fwd[:, self.T - 1])
+            log_likelihood = logsumexp(fwd[:, T - 1])
 
-            t = self.T - 1
-            for si in range(self.N):
+            t = T - 1
+            for si in range(N):
                 gamma[i, si, t] = fwd[si, t] + bwd[si, t] - log_likelihood
                 phi[i, si] = fwd[si, 0] + bwd[si, 0] - log_likelihood
 
-            for t in range(self.T - 1):
+            for t in range(T - 1):
                 ot1 = Obs[t + 1]
-                for si in range(self.N):
+                for si in range(N):
                     gamma[i, si, t] = fwd[si, t] + bwd[si, t] - log_likelihood
-                    for sj in range(self.N):
+                    for sj in range(N):
                         xi[i, si, sj, t] = (
                             fwd[si, t]
-                            + np.log(self.A[si, sj] + eps)
-                            + np.log(self.B[sj, ot1] + eps)
+                            + np.log(A[si, sj] + eps)
+                            + np.log(B[sj, ot1] + eps)
                             + bwd[sj, t + 1]
                             - log_likelihood
                         )
 
         return gamma, xi, phi
 
-    def _Mstep(self, gamma, xi, phi):
+    def _M_step(self, O, gamma, xi, phi):
         """
         Run a single M-step update for the Baum-Welch/Forward-Backward
         algorithm.
 
         Parameters
         ----------
+        O : :py:class:`ndarray <numpy.ndarray>` of shape `(I, T)`
+            The set of `I` training observations, each of length `T`.
         gamma : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N, T)`
             The estimated state-occupancy count matrix.
         xi : :py:class:`ndarray <numpy.ndarray>` of shape `(I, N, N, T)`
@@ -609,39 +644,44 @@ class MultinomialHMM:
         pi : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
             The estimated prior probabilities for each latent state.
         """
-        eps = self.eps
+        I, T = O.shape
+        P = self.parameters
+        DV = self.derived_variables
+        eps = self.hyperparameters["eps"]
+
+        N, V = DV["N"], DV["V"]
+        A, B, pi = P["A"], P["B"], P["pi"]
 
         # initialize the estimated transition (A) and emission (B) matrices
-        A = np.zeros((self.N, self.N))
-        B = np.zeros((self.N, self.V))
-        pi = np.zeros(self.N)
+        A = np.zeros((N, N))
+        B = np.zeros((N, V))
+        pi = np.zeros(N)
 
-        count_gamma = np.zeros((self.I, self.N, self.V))
-        count_xi = np.zeros((self.I, self.N, self.N))
+        count_gamma = np.zeros((I, N, V))
+        count_xi = np.zeros((I, N, N))
 
-        for i in range(self.I):
-            Obs = self.O[i, :]
-            for si in range(self.N):
-                for vk in range(self.V):
+        for i in range(I):
+            Obs = O[i, :]
+            for si in range(N):
+                for vk in range(V):
                     if not (Obs == vk).any():
-                        #  count_gamma[i, si, vk] = -np.inf
                         count_gamma[i, si, vk] = np.log(eps)
                     else:
                         count_gamma[i, si, vk] = logsumexp(gamma[i, si, Obs == vk])
 
-                for sj in range(self.N):
+                for sj in range(N):
                     count_xi[i, si, sj] = logsumexp(xi[i, si, sj, :])
 
-        pi = logsumexp(phi, axis=0) - np.log(self.I + eps)
+        pi = logsumexp(phi, axis=0) - np.log(I + eps)
         np.testing.assert_almost_equal(np.exp(pi).sum(), 1)
 
-        for si in range(self.N):
-            for vk in range(self.V):
+        for si in range(N):
+            for vk in range(V):
                 B[si, vk] = logsumexp(count_gamma[:, si, vk]) - logsumexp(
                     count_gamma[:, si, :]  # noqa: C812
                 )
 
-            for sj in range(self.N):
+            for sj in range(N):
                 A[si, sj] = logsumexp(count_xi[:, si, sj]) - logsumexp(
                     count_xi[:, si, :]  # noqa: C812
                 )
@@ -649,19 +689,3 @@ class MultinomialHMM:
             np.testing.assert_almost_equal(np.exp(A[si, :]).sum(), 1)
             np.testing.assert_almost_equal(np.exp(B[si, :]).sum(), 1)
         return np.exp(A), np.exp(B), np.exp(pi)
-
-
-#######################################################################
-#                                Utils                                #
-#######################################################################
-
-
-def logsumexp(log_probs, axis=None):
-    """
-    Redefine scipy.special.logsumexp
-    see: http://bayesjumping.net/log-sum-exp-trick/
-    """
-    _max = np.max(log_probs)
-    ds = log_probs - _max
-    exp_sum = np.exp(ds).sum(axis=axis)
-    return _max + np.log(exp_sum)

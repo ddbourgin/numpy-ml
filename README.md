@@ -25,6 +25,9 @@ can use `pip3 install -u 'numpy_ml[rl]'`.
 For more details on the available models, see the [project documentation](https://numpy-ml.readthedocs.io/).
 
 ## Available models
+<details>
+  <summary>Click to expand!</summary>
+
 1. **Gaussian mixture model**
     - EM training
 
@@ -92,6 +95,7 @@ For more details on the available models, see the [project documentation](https:
         - Leaky ReLU
         - ELU
         - SELU
+        - GELU
         - Exponential
         - Hard Sigmoid
         - Softplus
@@ -116,6 +120,9 @@ For more details on the available models, see the [project documentation](https:
     - Ridge regression
     - Logistic regression
     - Ordinary least squares
+    - Weighted linear regression
+    - Generalized linear model (log, logit, and identity link)
+    - Gaussian naive Bayes classifier
     - Bayesian linear regression w/ conjugate priors
         - Unknown mean, known variance (Gaussian prior)
         - Unknown mean, unknown variance (Normal-Gamma / Normal-Inverse-Wishart prior)
@@ -162,6 +169,7 @@ For more details on the available models, see the [project documentation](https:
     - Feature standardization
     - One-hot encoding / decoding
     - Huffman coding / decoding
+    - Byte pair encoding / decoding
     - Term frequency-inverse document frequency (TF-IDF) encoding
     - MFCC encoding
 
@@ -172,6 +180,7 @@ For more details on the available models, see the [project documentation](https:
     - Ball tree
     - Discrete sampler
     - Graph processing and generators
+</details>
 
 ## Contributing
 

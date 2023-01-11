@@ -5,8 +5,8 @@ from collections import Counter
 
 import numpy as np
 
-from ..linear_models.lm import LinearRegression
-from ..preprocessing.nlp import tokenize_words, ngrams, strip_punctuation
+from numpy_ml.linear_models import LinearRegression
+from numpy_ml.preprocessing.nlp import tokenize_words, ngrams, strip_punctuation
 
 
 class NGramBase(ABC):
@@ -506,7 +506,7 @@ class GoodTuringNGram(NGramBase):
             Specifies the text encoding for corpus. Common entries are 'utf-8',
             'utf-8-sig', 'utf-16'. Default is None.
         """
-        self._train(corpus_fp, vocab=None, encoding=None)
+        self._train(corpus_fp, vocab=vocab, encoding=encoding)
         self._calc_smoothed_counts()
 
     def log_prob(self, words, N):

@@ -6,6 +6,7 @@ The preprocessing module implements common data preprocessing routines.
     - Word and character tokenization
     - Punctuation and stop-word removal
     - Vocabulary / unigram count objects
+    - Byte-pair encoding ([Gage, 1994](http://www.pennelynn.com/Documents/CUJ/HTML/94HTML/19940045.HTM); [Sennrich, Haddow, & Birch, 2015](https://arxiv.org/pdf/1508.07909.pdf))
     - [Huffman tree](https://en.wikipedia.org/wiki/Huffman_coding) encoding / decoding
     - Term frequency-inverse document frequency ([tf-idf](https://en.wikipedia.org/wiki/Tf%E2%80%93idf)) encoding
 

@@ -37,3 +37,19 @@
 	:members:
 	:undoc-members:
 	:inherited-members:
+
+``GaussianNBClassifier``
+-----------------------------------------
+
+.. autoclass:: numpy_ml.linear_models.GaussianNBClassifier
+	:members:
+	:undoc-members:
+	:inherited-members:
+
+``GeneralizedLinearModel``
+-----------------------------------------
+
+.. autoclass:: numpy_ml.linear_models.GeneralizedLinearModel
+	:members:
+	:undoc-members:
+	:inherited-members:

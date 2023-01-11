@@ -1,5 +1,5 @@
 """A collection of activation function objects for building neural networks"""
-
+from math import erf
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -91,7 +91,7 @@ class ReLU(ActivationBase):
 
     References
     ----------
-    .. [*] Karpathy, A. "CS231n: Convolutional neural networks for visual recognition".
+    .. [*] Karpathy, A. "CS231n: Convolutional neural networks for visual recognition."
     """
 
     def __init__(self):
@@ -154,7 +154,7 @@ class LeakyReLU(ActivationBase):
     References
     ----------
     .. [*] Mass, L. M., Hannun, A. Y, & Ng, A. Y. (2013). "Rectifier
-       nonlinearities improve neural network acoustic models". *Proceedings of
+       nonlinearities improve neural network acoustic models." *Proceedings of
        the 30th International Conference of Machine Learning, 30*.
     """
 
@@ -205,6 +205,100 @@ class LeakyReLU(ActivationBase):
             \frac{\partial^2 \text{LeakyReLU}}{\partial x_i^2}  =  0
         """
         return np.zeros_like(x)
+
+
+class GELU(ActivationBase):
+    def __init__(self, approximate=True):
+        r"""
+        A Gaussian error linear unit (GELU). [*]_
+
+        Notes
+        -----
+        A ReLU alternative. GELU weights inputs by their value, rather than
+        gates inputs by their sign, as in vanilla ReLUs.
+
+        References
+        ----------
+        .. [*] Hendrycks, D., & Gimpel, K. (2016). "Bridging nonlinearities and
+           stochastic regularizers with Gaussian error linear units." *CoRR*.
+
+        Parameters
+        ----------
+        approximate : bool
+            Whether to use a faster but less precise approximation to the Gauss
+            error function when calculating the unit activation and gradient.
+            Default is True.
+        """
+        self.approximate = True
+        super().__init__()
+
+    def __str__(self):
+        """Return a string representation of the activation function"""
+        return f"GELU(approximate={self.approximate})"
+
+    def fn(self, z):
+        r"""
+        Compute the GELU function on the elements of input `z`.
+
+        .. math::
+
+            \text{GELU}(z_i) = z_i P(Z \leq z_i) = z_i \Phi(z_i)
+                = z_i \cdot \frac{1}{2}(1 + \text{erf}(x/\sqrt{2}))
+        """
+        pi, sqrt, tanh = np.pi, np.sqrt, np.tanh
+
+        if self.approximate:
+            return 0.5 * z * (1 + tanh(sqrt(2 / pi) * (z + 0.044715 * z ** 3)))
+        return 0.5 * z * (1 + erf(z / sqrt(2)))
+
+    def grad(self, x):
+        r"""
+        Evaluate the first derivative of the GELU function on the elements
+        of input `x`.
+
+        .. math::
+
+            \frac{\partial \text{GELU}}{\partial x_i}  =
+                \frac{1}{2} + \frac{1}{2}\left(\text{erf}(\frac{x}{\sqrt{2}}) +
+                    \frac{x + \text{erf}'(\frac{x}{\sqrt{2}})}{\sqrt{2}}\right)
+
+        where :math:`\text{erf}'(x) = \frac{2}{\sqrt{\pi}} \cdot \exp\{-x^2\}`.
+        """
+        pi, exp, sqrt, tanh = np.pi, np.exp, np.sqrt, np.tanh
+
+        s = x / sqrt(2)
+        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x ** 2))  # noqa: E731
+
+        if self.approximate:
+            approx = tanh(sqrt(2 / pi) * (x + 0.044715 * x ** 3))
+            dx = 0.5 + 0.5 * approx + ((0.5 * x * erf_prime(s)) / sqrt(2))
+        else:
+            dx = 0.5 + 0.5 * erf(s) + ((0.5 * x * erf_prime(s)) / sqrt(2))
+        return dx
+
+    def grad2(self, x):
+        r"""
+        Evaluate the second derivative of the GELU function on the elements
+        of input `x`.
+
+        .. math::
+
+            \frac{\partial^2 \text{GELU}}{\partial x_i^2} =
+                \frac{1}{2\sqrt{2}} \left\[
+                    \text{erf}'(\frac{x}{\sqrt{2}}) +
+                    \frac{1}{\sqrt{2}} \text{erf}''(\frac{x}{\sqrt{2}})
+                \right]
+
+        where :math:`\text{erf}'(x) = \frac{2}{\sqrt{\pi}} \cdot \exp\{-x^2\}` and
+        :math:`\text{erf}''(x) = \frac{-4x}{\sqrt{\pi}} \cdot \exp\{-x^2\}`.
+        """
+        pi, exp, sqrt = np.pi, np.exp, np.sqrt
+        s = x / sqrt(2)
+
+        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x ** 2))  # noqa: E731
+        erf_prime2 = lambda x: -4 * x * exp(-(x ** 2)) / sqrt(pi)  # noqa: E731
+        ddx = (1 / 2 * sqrt(2)) * (1 + erf_prime(s) + (erf_prime2(s) / sqrt(2)))
+        return ddx
 
 
 class Tanh(ActivationBase):
@@ -305,7 +399,7 @@ class Identity(Affine):
 
         Notes
         -----
-        :class:`Identity` is just syntactic sugar for :class:`Affine` with
+        :class:`Identity` is syntactic sugar for :class:`Affine` with
         slope = 1 and intercept = 0.
         """
         super().__init__(slope=1, intercept=0)

@@ -1,11 +1,26 @@
+"""A module containing objects to instantiate various neural network components."""
 import re
 from functools import partial
-from ast import literal_eval as eval
+from ast import literal_eval as _eval
 
 import numpy as np
 
 from ..optimizers import OptimizerBase, SGD, AdaGrad, RMSProp, Adam
-from ..activations import ActivationBase, Affine, ReLU, Tanh, Sigmoid, LeakyReLU
+from ..activations import (
+    ELU,
+    GELU,
+    SELU,
+    ReLU,
+    Tanh,
+    Affine,
+    Sigmoid,
+    Identity,
+    SoftPlus,
+    LeakyReLU,
+    Exponential,
+    HardSigmoid,
+    ActivationBase,
+)
 from ..schedulers import (
     SchedulerBase,
     ConstantScheduler,
@@ -26,18 +41,20 @@ from ..utils import (
 class ActivationInitializer(object):
     def __init__(self, param=None):
         """
-        A class for initializing activation functions. Valid inputs are:
-            (a) __str__ representations of `ActivationBase` instances
-            (b) `ActivationBase` instances
+        A class for initializing activation functions. Valid `param` values
+        are:
+            (a) ``__str__`` representations of an `ActivationBase` instance
+            (b) `ActivationBase` instance
 
         If `param` is `None`, return the identity function: f(X) = X
         """
         self.param = param
 
     def __call__(self):
+        """Initialize activation function"""
         param = self.param
         if param is None:
-            act = Affine(slope=1, intercept=0)
+            act = Identity()
         elif isinstance(param, ActivationBase):
             act = param
         elif isinstance(param, str):
@@ -47,13 +64,24 @@ class ActivationInitializer(object):
         return act
 
     def init_from_str(self, act_str):
+        """Initialize activation function from the `param` string"""
         act_str = act_str.lower()
         if act_str == "relu":
             act_fn = ReLU()
         elif act_str == "tanh":
             act_fn = Tanh()
+        elif act_str == "selu":
+            act_fn = SELU()
         elif act_str == "sigmoid":
             act_fn = Sigmoid()
+        elif act_str == "identity":
+            act_fn = Identity()
+        elif act_str == "hardsigmoid":
+            act_fn = HardSigmoid()
+        elif act_str == "softplus":
+            act_fn = SoftPlus()
+        elif act_str == "exponential":
+            act_fn = Exponential()
         elif "affine" in act_str:
             r = r"affine\(slope=(.*), intercept=(.*)\)"
             slope, intercept = re.match(r, act_str).groups()
@@ -62,6 +90,14 @@ class ActivationInitializer(object):
             r = r"leaky relu\(alpha=(.*)\)"
             alpha = re.match(r, act_str).groups()[0]
             act_fn = LeakyReLU(float(alpha))
+        elif "gelu" in act_str:
+            r = r"gelu\(approximate=(.*)\)"
+            approx = re.match(r, act_str).groups()[0] == "true"
+            act_fn = GELU(approximation=approx)
+        elif "elu" in act_str:
+            r = r"elu\(alpha=(.*)\)"
+            approx = re.match(r, act_str).groups()[0]
+            act_fn = ELU(alpha=float(alpha))
         else:
             raise ValueError("Unknown activation: {}".format(act_str))
         return act_fn
@@ -70,7 +106,8 @@ class ActivationInitializer(object):
 class SchedulerInitializer(object):
     def __init__(self, param=None, lr=None):
         """
-        A class for initializing learning rate schedulers. Valid inputs are:
+        A class for initializing learning rate schedulers. Valid `param` values
+        are:
             (a) __str__ representations of `SchedulerBase` instances
             (b) `SchedulerBase` instances
             (c) Parameter dicts (e.g., as produced via the `summary` method in
@@ -86,6 +123,7 @@ class SchedulerInitializer(object):
         self.param = param
 
     def __call__(self):
+        """Initialize scheduler"""
         param = self.param
         if param is None:
             scheduler = ConstantScheduler(self.lr)
@@ -98,9 +136,10 @@ class SchedulerInitializer(object):
         return scheduler
 
     def init_from_str(self):
+        """Initialize scheduler from the param string"""
         r = r"([a-zA-Z]*)=([^,)]*)"
         sch_str = self.param.lower()
-        kwargs = dict([(i, eval(j)) for (i, j) in re.findall(r, sch_str)])
+        kwargs = {i: _eval(j) for i, j in re.findall(r, sch_str)}
 
         if "constant" in sch_str:
             scheduler = ConstantScheduler(**kwargs)
@@ -115,6 +154,7 @@ class SchedulerInitializer(object):
         return scheduler
 
     def init_from_dict(self):
+        """Initialize scheduler from the param dictionary"""
         S = self.param
         sc = S["hyperparameters"] if "hyperparameters" in S else None
 
@@ -136,7 +176,7 @@ class SchedulerInitializer(object):
 class OptimizerInitializer(object):
     def __init__(self, param=None):
         """
-        A class for initializing optimizers. Valid inputs are:
+        A class for initializing optimizers. Valid `param` values are:
             (a) __str__ representations of `OptimizerBase` instances
             (b) `OptimizerBase` instances
             (c) Parameter dicts (e.g., as produced via the `summary` method in
@@ -147,6 +187,7 @@ class OptimizerInitializer(object):
         self.param = param
 
     def __call__(self):
+        """Initialize the optimizer"""
         param = self.param
         if param is None:
             opt = SGD()
@@ -159,9 +200,10 @@ class OptimizerInitializer(object):
         return opt
 
     def init_from_str(self):
+        """Initialize optimizer from the `param` string"""
         r = r"([a-zA-Z]*)=([^,)]*)"
         opt_str = self.param.lower()
-        kwargs = dict([(i, eval(j)) for (i, j) in re.findall(r, opt_str)])
+        kwargs = {i: _eval(j) for i, j in re.findall(r, opt_str)}
         if "sgd" in opt_str:
             optimizer = SGD(**kwargs)
         elif "adagrad" in opt_str:
@@ -175,12 +217,13 @@ class OptimizerInitializer(object):
         return optimizer
 
     def init_from_dict(self):
-        O = self.param
-        cc = O["cache"] if "cache" in O else None
-        op = O["hyperparameters"] if "hyperparameters" in O else None
+        """Initialize optimizer from the `param` dictonary"""
+        D = self.param
+        cc = D["cache"] if "cache" in D else None
+        op = D["hyperparameters"] if "hyperparameters" in D else None
 
         if op is None:
-            raise ValueError("Must have `hyperparemeters` key: {}".format(O))
+            raise ValueError("`param` dictionary has no `hyperparemeters` key")
 
         if op and op["id"] == "SGD":
             optimizer = SGD()
@@ -237,6 +280,7 @@ class WeightInitializer(object):
             self._fn = partial(truncated_normal, mean=0, std=1)
 
     def __call__(self, weight_shape):
+        """Initialize weights according to the specified strategy"""
         if "glorot" in self.mode:
             gain = self._calc_glorot_gain()
             W = self._fn(weight_shape, gain)

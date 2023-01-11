@@ -200,6 +200,27 @@ def test_leakyrelu_activation(N=50):
         i += 1
 
 
+def test_gelu_activation(N=50):
+    from numpy_ml.neural_nets.activations import GELU
+
+    N = np.inf if N is None else N
+
+    i = 0
+    while i < N:
+        n_dims = np.random.randint(1, 100)
+        z = random_stochastic_matrix(1, n_dims)
+        approx = np.random.choice([True, False])
+
+        mine = GELU(approximate=False)
+        mine_approx = GELU(approximate=True)
+        gold = lambda z: F.gelu(torch.FloatTensor(z)).numpy()
+        np.testing.assert_allclose(mine.fn(z), gold(z), rtol=1e-3)
+        assert_almost_equal(mine.fn(z), mine_approx.fn(z))
+
+        print("PASSED")
+        i += 1
+
+
 #######################################################################
 #                      Activation Gradients                           #
 #######################################################################
@@ -274,6 +295,26 @@ def test_relu_grad(N=50):
         n_dims = np.random.randint(1, 100)
         z = random_tensor((n_ex, n_dims))
         assert_almost_equal(mine.grad(z), gold(z))
+        print("PASSED")
+        i += 1
+
+
+def test_gelu_grad(N=50):
+    from numpy_ml.neural_nets.activations import GELU
+
+    N = np.inf if N is None else N
+
+    mine = GELU(approximate=False)
+    mine_approx = GELU(approximate=True)
+    gold = torch_gradient_generator(F.gelu)
+
+    i = 0
+    while i < N:
+        n_ex = np.random.randint(1, 100)
+        n_dims = np.random.randint(1, 100)
+        z = random_tensor((n_ex, n_dims))
+        assert_almost_equal(mine.grad(z), gold(z), decimal=3)
+        assert_almost_equal(mine.grad(z), mine_approx.grad(z))
         print("PASSED")
         i += 1
 

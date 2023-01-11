@@ -10,7 +10,11 @@ from scipy.fftpack import dct
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from librosa.core.time_frequency import fft_frequencies
+try:
+    from librosa.core.time_frequency import fft_frequencies
+except ImportError:
+    # for librosa >= 0.8.0
+    from librosa import fft_frequencies
 from librosa.feature import mfcc as lr_mfcc
 from librosa.util import frame
 from librosa.filters import mel
@@ -244,7 +248,7 @@ def test_mel_filterbank(N=15):
             n_fft=window_len,
             n_mels=n_filters,
             htk=True,
-            norm=norm if norm == 1 else None,
+            norm="slaney" if norm == 1 else None,
         )
 
         np.testing.assert_almost_equal(mine, theirs)
