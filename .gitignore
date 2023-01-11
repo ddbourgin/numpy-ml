@@ -1,9 +1,11 @@
 ### OSX ###
 # General
 .DS_Store
+.gitignore
 .AppleDouble
 .LSOverride
-
+*.xml
+*.iml
 # Icon must end with two \r
 Icon
 
