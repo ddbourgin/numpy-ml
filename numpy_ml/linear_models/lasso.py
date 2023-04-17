@@ -40,7 +40,6 @@ class LassoRegression:
 
             if np.linalg.norm(self.beta - beta_old) < self.tol:
                 break
-
     def predict(self, X):
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
