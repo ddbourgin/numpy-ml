@@ -9,7 +9,7 @@ To use this code as a starting point for ML prototyping / experimentation, just 
 
 ```sh
 $ git clone https://github.com/ddbourgin/numpy-ml.git
-$ cd numpy-ml && virtualenv npml && source npml/bin/activate
+$ cd numpy_ml && virtualenv npml && source npml/bin/activate
 $ pip3 install -r requirements-dev.txt
 ```
 
