@@ -44,5 +44,4 @@ class LassoRegression:
     def predict(self, X):
         if self.fit_intercept:
             X = np.c_[np.ones(X.shape[0]), X]
-
         return X @ self.beta
