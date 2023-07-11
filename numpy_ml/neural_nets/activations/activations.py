@@ -229,7 +229,7 @@ class GELU(ActivationBase):
             error function when calculating the unit activation and gradient.
             Default is True.
         """
-        self.approximate = True
+        self.approximate = approximate
         super().__init__()
 
     def __str__(self):
