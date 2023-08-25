@@ -23,7 +23,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install llvmlite
       run: |
-        sudo apt-get install llvm-10
+        sudo apt-get install llvm-11
         python -m pip install llvmlite==0.32.1
     - name: Install dependencies
       run: |
