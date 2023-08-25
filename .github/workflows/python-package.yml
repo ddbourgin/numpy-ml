@@ -21,10 +21,10 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install llvmlite
+    - name: Install llvm
       run: |
         sudo apt-get install llvm-11
-        python -m pip install llvmlite==0.32.1
+        LLVM_CONFIG=/usr/bin/llvm-config-11 pip install numba==0.45.0 llvmlite==0.32.1
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
