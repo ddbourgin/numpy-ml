@@ -69,6 +69,7 @@ class Trainer(object):
         t0 = time()
         render_every = np.inf if render_every is None else render_every
         sf = smooth_factor
+        smooth_tot = 0
 
         for ep in range(n_episodes):
             tot_rwd, duration, n_steps = self._train_episode(max_steps)
