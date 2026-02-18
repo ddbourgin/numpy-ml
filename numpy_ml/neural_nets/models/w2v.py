@@ -295,6 +295,7 @@ class Word2Vec(object):
 
     def _train_epoch(self, corpus_fps, encoding):
         total_loss = 0
+        smooth_loss = 0
         batch_generator = self.minibatcher(corpus_fps, encoding)
         for ix, (X, target) in enumerate(batch_generator):
             loss = self._train_batch(X, target)
