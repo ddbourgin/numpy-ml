@@ -109,6 +109,7 @@ def test_gp_regression(N=15):
 
         preds, _ = gp.predict(X_test)
         gold_preds = gold.predict(X_test)
+        preds = np.asarray(preds).reshape(gold_preds.shape)
         np.testing.assert_almost_equal(preds, gold_preds)
 
         mll = gp.marginal_log_likelihood()

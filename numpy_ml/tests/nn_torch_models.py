@@ -1297,14 +1297,16 @@ class TorchDeconv2DLayer(nn.Module):
         assert self.layer1.weight.shape == W.shape
         assert self.layer1.bias.shape == b.flatten().shape
 
-        self.layer1.weight = nn.Parameter(torch.FloatTensor(W))
-        self.layer1.bias = nn.Parameter(torch.FloatTensor(b.flatten()))
+        self.layer1.weight = nn.Parameter(torch.DoubleTensor(np.ascontiguousarray(W)))
+        self.layer1.bias = nn.Parameter(torch.DoubleTensor(b.flatten()))
 
     def forward(self, X):
         # (N, H, W, C) -> (N, C, H, W)
         self.X = np.moveaxis(X, [0, 1, 2, 3], [0, -2, -1, -3])
         if not isinstance(self.X, torch.Tensor):
-            self.X = torchify(self.X)
+            self.X = torch.autograd.Variable(
+                torch.DoubleTensor(np.ascontiguousarray(self.X)), requires_grad=True
+            )
 
         self.X.retain_grad()
 

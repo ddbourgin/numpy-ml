@@ -1,6 +1,6 @@
 numpy
 scipy
-sklearn
+scikit-learn==1.3.2
 torch
 networkx
 matplotlib

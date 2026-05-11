@@ -38,7 +38,7 @@ def test_linear_regression(N=10):
         print(f"Fit intercept: {fit_intercept}")
 
         # Fit gold standard model on the entire dataset
-        lr_gold = LinearRegressionGold(fit_intercept=fit_intercept, normalize=False)
+        lr_gold = LinearRegressionGold(fit_intercept=fit_intercept)
         lr_gold.fit(X, y, sample_weight=weights)
 
         lr_mine = LinearRegression(fit_intercept=fit_intercept)

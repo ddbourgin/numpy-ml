@@ -17,7 +17,7 @@ from ..utils.kernels import KernelInitializer
 
 class GPRegression:
     def __init__(self, kernel="RBFKernel", alpha=1e-10):
-        """
+        r"""
         A Gaussian Process (GP) regression model.
 
         .. math::
@@ -62,7 +62,7 @@ class GPRegression:
         self.parameters["GP_mean"] = mu
 
     def predict(self, X, conf_interval=0.95, return_cov=False):
-        """
+        r"""
         Return the MAP estimate for :math:`y^*`, corresponding the mean/mode of
         the posterior predictive distribution, :math:`p(y^* \mid x^*, X, y)`.
 
@@ -154,7 +154,7 @@ class GPRegression:
         return (pp_mean, conf) if not return_cov else (pp_mean, conf, pp_cov)
 
     def marginal_log_likelihood(self, kernel_params=None):
-        """
+        r"""
         Compute the log of the marginal likelihood (i.e., the log model
         evidence), :math:`p(y \mid X, \\text{kernel_params})`.
 

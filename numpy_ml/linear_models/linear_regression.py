@@ -210,7 +210,7 @@ class LinearRegression:
             X = np.c_[np.sqrt(weights), X]
 
         self.sigma_inv = np.linalg.pinv(X.T @ X)
-        self.beta = np.atleast_2d(self.sigma_inv @ X.T @ y)
+        self.beta = self.sigma_inv @ X.T @ y
 
         self._is_fit = True
         return self

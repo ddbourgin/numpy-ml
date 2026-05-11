@@ -1,6 +1,6 @@
 import heapq
 from copy import copy
-from collections import Hashable
+from collections.abc import Hashable
 
 import numpy as np
 

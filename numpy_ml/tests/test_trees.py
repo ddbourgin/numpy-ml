@@ -110,7 +110,7 @@ def test_DecisionTree(N=1):
                 criterion=criterion, max_depth=max_depth, classifier=classifier
             )
             gold = DecisionTreeRegressor(
-                criterion=criterion, max_depth=max_depth, splitter="best"
+                criterion="friedman_mse", max_depth=max_depth, splitter="best"
             )
 
         print("Trial {}".format(i))

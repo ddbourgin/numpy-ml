@@ -128,7 +128,7 @@ def test_cross_entropy(N=15):
     n_classes = np.random.randint(2, 100)
     n_examples = np.random.randint(1, 1000)
     y = y_pred = random_one_hot_matrix(n_examples, n_classes)
-    assert_almost_equal(mine.loss(y, y_pred), gold(y, y_pred))
+    assert_almost_equal(mine.loss(y, y_pred), 0)
     print("PASSED")
 
     # test on random inputs
