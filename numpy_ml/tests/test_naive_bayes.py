@@ -42,13 +42,13 @@ def test_GaussianNB(N=10):
 
             np.testing.assert_almost_equal(jointi, jointi_mine)
 
-            n_jk = -0.5 * np.sum(np.log(2.0 * np.pi * sklearn_NB.sigma_[j, :] + eps))
+            n_jk = -0.5 * np.sum(np.log(2.0 * np.pi * sklearn_NB.var_[j, :] + eps))
             n_jk_mine = -0.5 * np.sum(np.log(2.0 * np.pi * P["sigma"][j] + eps))
 
             np.testing.assert_almost_equal(n_jk_mine, n_jk)
 
             n_jk2 = n_jk - 0.5 * np.sum(
-                ((X_test - sklearn_NB.theta_[j, :]) ** 2) / (sklearn_NB.sigma_[j, :]), 1
+                ((X_test - sklearn_NB.theta_[j, :]) ** 2) / (sklearn_NB.var_[j, :]), 1
             )
 
             n_jk2_mine = n_jk_mine - 0.5 * np.sum(
@@ -63,7 +63,7 @@ def test_GaussianNB(N=10):
 
         np.testing.assert_almost_equal(P["prior"], sklearn_NB.class_prior_)
         np.testing.assert_almost_equal(P["mean"], sklearn_NB.theta_)
-        np.testing.assert_almost_equal(P["sigma"], sklearn_NB.sigma_)
+        np.testing.assert_almost_equal(P["sigma"], sklearn_NB.var_)
         np.testing.assert_almost_equal(
             sklearn_NB._joint_log_likelihood(X_test),
             NB._log_posterior(X_test),
