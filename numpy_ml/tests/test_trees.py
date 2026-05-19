@@ -104,7 +104,7 @@ def test_DecisionTree(N=1):
             X, X_test, Y, Y_test = train_test_split(X, Y, test_size=0.3, random_state=i)
 
             # initialize model
-            criterion = "mse"
+            criterion = "squared_error"
             loss = mean_squared_error
             mine = DecisionTree(
                 criterion=criterion, max_depth=max_depth, classifier=classifier
@@ -195,7 +195,7 @@ def test_RandomForest(N=1):
             X, X_test, Y, Y_test = train_test_split(X, Y, test_size=0.3, random_state=i)
 
             # initialize model
-            criterion = "mse"
+            criterion = "squared_error"
             loss = mean_squared_error
             mine = RandomForest(
                 criterion=criterion,
@@ -297,7 +297,7 @@ def test_gbdt(N=1):
             X, X_test, Y, Y_test = train_test_split(X, Y, test_size=0.3, random_state=i)
 
             # initialize model
-            criterion = "mse"
+            criterion = "squared_error"
             loss = mean_squared_error
             mine = GradientBoostedDecisionTree(
                 n_iter=n_trees,
