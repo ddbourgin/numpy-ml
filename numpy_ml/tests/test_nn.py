@@ -1,4 +1,5 @@
 # flake8: noqa
+import sys
 import time
 from copy import deepcopy
 
@@ -9,6 +10,8 @@ from sklearn.metrics import log_loss, mean_squared_error
 
 # for testing sigmoid
 from scipy.special import expit
+
+import pytest
 
 import torch
 import torch.nn as nn
@@ -28,8 +31,6 @@ from numpy_ml.utils.testing import (
 )
 
 from .nn_torch_models import (
-    TFNCELoss,
-    WGAN_GP_tf,
     torch_xe_grad,
     torch_mse_grad,
     TorchVAELoss,
@@ -55,6 +56,9 @@ from .nn_torch_models import (
     TorchSkipConnectionIdentity,
     TorchMultiHeadedAttentionModule,
 )
+
+if "tensorflow" in sys.modules:
+    from .nn_torch_models import TFNCELoss, WGAN_GP_tf
 
 #######################################################################
 #                           Debug Formatter                           #
@@ -238,6 +242,7 @@ def test_WGAN_GP_loss(N=5):
         i += 1
 
 
+@pytest.mark.skipif("tensorflow" not in sys.modules, reason="tensorflow not installed")
 def test_NCELoss(N=1):
     from numpy_ml.neural_nets.losses import NCELoss
     from numpy_ml.utils.data_structures import DiscreteSampler
@@ -2323,6 +2328,7 @@ def fit_VAE():
     BV.fit(X_train, n_epochs=1, verbose=False)
 
 
+@pytest.mark.skipif("tensorflow" not in sys.modules, reason="tensorflow not installed")
 def test_WGAN_GP(N=1):
     from numpy_ml.neural_nets.models.wgan_gp import WGAN_GP
 
