@@ -2,8 +2,8 @@
 from collections import Counter
 
 # gold-standard imports
-import huffman
 import numpy as np
+import pytest
 
 from scipy.fftpack import dct
 
@@ -34,6 +34,7 @@ from numpy_ml.utils.testing import random_paragraph
 
 
 def test_huffman(N=15):
+    huffman = pytest.importorskip("huffman")
     np.random.seed(12345)
 
     i = 0
