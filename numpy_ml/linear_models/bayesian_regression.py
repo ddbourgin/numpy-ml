@@ -111,7 +111,7 @@ class BayesianLinearRegressionUnknownVariance:
         # sigma
         I = np.eye(N)  # noqa: E741
         a = y - (X @ mu)
-        b = np.linalg.inv(X @ V @ X.T + I)
+        b = np.linalg.pinv(X @ V @ X.T + I)
         c = y - (X @ mu)
 
         shape = N + alpha
@@ -122,8 +122,8 @@ class BayesianLinearRegressionUnknownVariance:
         sigma = scale / (shape - 1)
 
         # mean
-        V_inv = np.linalg.inv(V)
-        L = np.linalg.inv(V_inv + X.T @ X)
+        V_inv = np.linalg.pinv(V)
+        L = np.linalg.pinv(V_inv + X.T @ X)
         R = V_inv @ mu + X.T @ y
 
         mu = L @ R
@@ -263,8 +263,8 @@ class BayesianLinearRegressionKnownVariance:
         mu = self.mu
         sigma = self.sigma
 
-        V_inv = np.linalg.inv(V)
-        L = np.linalg.inv(V_inv + X.T @ X)
+        V_inv = np.linalg.pinv(V)
+        L = np.linalg.pinv(V_inv + X.T @ X)
         R = V_inv @ mu + X.T @ y
 
         mu = L @ R

@@ -197,7 +197,7 @@ class LinearRegression:
         N = X.shape[0]
 
         weights = np.ones(N) if weights is None else np.atleast_1d(weights)
-        weights = np.squeeze(weights) if weights.size > 1 else weights
+        weights = np.atleast_1d(np.squeeze(weights)) if weights.size > 1 else weights
         err_str = f"weights must have shape ({N},) but got {weights.shape}"
         assert weights.shape == (N,), err_str
 

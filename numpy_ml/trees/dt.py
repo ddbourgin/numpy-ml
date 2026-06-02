@@ -120,7 +120,10 @@ class DecisionTree:
         return np.array([self._traverse(x, self.root, prob=True) for x in X])
 
     def _grow(self, X, Y, cur_depth=0):
-        # if all labels are the same, return a leaf
+        # if all labels are the same, or node is empty, return a leaf
+        if len(Y) == 0:
+            prob = np.zeros(self.n_classes) if self.classifier else 0.0
+            return Leaf(prob)
         if len(set(Y)) == 1:
             if self.classifier:
                 prob = np.zeros(self.n_classes)

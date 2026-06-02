@@ -56,7 +56,7 @@ class KNN:
             Targets for the `N` rows in `X`.
         """
         if X.ndim != 2:
-            raise Exception("X must be two-dimensional")
+            raise ValueError("X must be two-dimensional")
         self._ball_tree.fit(X, y)
 
     def predict(self, X):
@@ -88,14 +88,15 @@ class KNN:
                     pred, _ = sorted(counts, key=lambda x: (-x[1], x[0]))[0]
                 elif H["weights"] == "distance":
                     best_score = -np.inf
+                    eps = np.finfo(float).eps
                     for label in set(targets):
-                        scores = [1 / n.distance for n in nearest if n.val == label]
+                        scores = [1 / max(n.distance, eps) for n in nearest if n.val == label]
                         pred = label if np.sum(scores) > best_score else pred
             else:
                 if H["weights"] == "uniform":
                     pred = np.mean(targets)
                 elif H["weights"] == "distance":
-                    weights = [1 / n.distance for n in nearest]
+                    weights = [1 / max(n.distance, eps) for n in nearest]
                     pred = np.average(targets, weights=weights)
             predictions.append(pred)
         return np.array(predictions)

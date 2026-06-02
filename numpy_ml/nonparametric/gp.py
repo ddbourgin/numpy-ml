@@ -5,7 +5,7 @@ from numpy.linalg import slogdet, inv
 try:
     _SCIPY = True
     from scipy.stats import norm
-except:
+except ImportError:
     _SCIPY = False
     warnings.warn(
         "Could not import scipy.stats. Confidence scores "
