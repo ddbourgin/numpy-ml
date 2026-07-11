@@ -192,3 +192,7 @@ library](https://docs.python.org/3/library/) and [NumPy](https://www.numpy.org/)
 circumstances ;)
 
 See full contributing guidelines [here](./CONTRIBUTING.md).
+
+---
+
+*[Mukller](https://github.com/Mukller)*
