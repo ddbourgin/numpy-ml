@@ -1,7 +1,7 @@
 # Linear Models
 The `linear_models` module includes:
 
-1. [OLS linear regression](https://en.wikipedia.org/wiki/Ordinary_least_squares) with maximum likelihood parameter estimates via the normal equation. 
+1. [OLS linear regression](https://en.wikipedia.org/wiki/Ordinary_least_squares) with maximum likelihood parameter estimates via the normal equation.
     - Includes optional weight arguments for [weighted least squares](https://en.wikipedia.org/wiki/Weighted_least_squares)
     - Supports batch and online coefficient updates.
 3. [Ridge regression / Tikhonov regularization](https://en.wikipedia.org/wiki/Tikhonov_regularization)
