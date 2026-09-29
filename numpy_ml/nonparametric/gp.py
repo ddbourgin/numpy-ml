@@ -206,7 +206,7 @@ class GPRegression:
             K = kernel(X, X)
 
         # add isotropic noise to kernel diagonal
-        K += np.eye(K.shape[0]) * alpha
+        K = K + np.eye(K.shape[0]) * alpha
 
         Kinv = inv(K)
         Klogdet = -0.5 * slogdet(K)[1]
