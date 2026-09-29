@@ -669,8 +669,10 @@ class MultinomialHMM:
                     else:
                         count_gamma[i, si, vk] = logsumexp(gamma[i, si, Obs == vk])
 
-                for sj in range(N):
-                    count_xi[i, si, sj] = logsumexp(xi[i, si, sj, :])
+                if T > 1:
+                    for sj in range(N):
+                        # T observations contain only T - 1 state transitions.
+                        count_xi[i, si, sj] = logsumexp(xi[i, si, sj, : T - 1])
 
         pi = logsumexp(phi, axis=0) - np.log(I + eps)
         np.testing.assert_almost_equal(np.exp(pi).sum(), 1)
@@ -681,11 +683,13 @@ class MultinomialHMM:
                     count_gamma[:, si, :]  # noqa: C812
                 )
 
-            for sj in range(N):
-                A[si, sj] = logsumexp(count_xi[:, si, sj]) - logsumexp(
-                    count_xi[:, si, :]  # noqa: C812
-                )
-
-            np.testing.assert_almost_equal(np.exp(A[si, :]).sum(), 1)
+            if T > 1:
+                for sj in range(N):
+                    A[si, sj] = logsumexp(count_xi[:, si, sj]) - logsumexp(
+                        count_xi[:, si, :]  # noqa: C812
+                    )
+                np.testing.assert_almost_equal(np.exp(A[si, :]).sum(), 1)
             np.testing.assert_almost_equal(np.exp(B[si, :]).sum(), 1)
-        return np.exp(A), np.exp(B), np.exp(pi)
+        # Singleton sequences provide no evidence for changing transitions.
+        A = np.exp(A) if T > 1 else P["A"].copy()
+        return A, np.exp(B), np.exp(pi)
