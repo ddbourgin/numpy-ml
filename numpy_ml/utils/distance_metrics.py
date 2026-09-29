@@ -1,6 +1,14 @@
 import numpy as np
 
 
+def _difference(x, y):
+    # Subtract integers exactly before converting the distance to floating point.
+    if x.dtype.kind in "uib" and y.dtype.kind in "uib":
+        return np.asarray(x.astype(object) - y.astype(object), dtype=np.float64)
+    dtype = np.result_type(x.dtype, y.dtype, np.float64)
+    return x.astype(dtype, copy=False) - y.astype(dtype, copy=False)
+
+
 def euclidean(x, y):
     """
     Compute the Euclidean (`L2`) distance between two real vectors
@@ -23,7 +31,7 @@ def euclidean(x, y):
     d : float
         The L2 distance between **x** and **y**.
     """
-    return np.sqrt(np.sum((x - y) ** 2))
+    return np.sqrt(np.sum((_difference(x, y)) ** 2))
 
 
 def manhattan(x, y):
@@ -48,7 +56,7 @@ def manhattan(x, y):
     d : float
         The L1 distance between **x** and **y**.
     """
-    return np.sum(np.abs(x - y))
+    return np.sum(np.abs(_difference(x, y)))
 
 
 def chebyshev(x, y):
@@ -73,7 +81,7 @@ def chebyshev(x, y):
     d : float
         The Chebyshev distance between **x** and **y**.
     """
-    return np.max(np.abs(x - y))
+    return np.max(np.abs(_difference(x, y)))
 
 
 def minkowski(x, y, p):
@@ -103,7 +111,7 @@ def minkowski(x, y, p):
     d : float
         The Minkowski-`p` distance between **x** and **y**.
     """
-    return np.sum(np.abs(x - y) ** p) ** (1 / p)
+    return np.sum(np.abs(_difference(x, y)) ** p) ** (1 / p)
 
 
 def hamming(x, y):
