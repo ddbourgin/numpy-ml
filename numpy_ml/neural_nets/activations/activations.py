@@ -1,8 +1,9 @@
 """A collection of activation function objects for building neural networks"""
-from math import erf
+
 from abc import ABC, abstractmethod
 
 import numpy as np
+from scipy.special import erf
 
 
 class ActivationBase(ABC):
@@ -248,57 +249,46 @@ class GELU(ActivationBase):
         pi, sqrt, tanh = np.pi, np.sqrt, np.tanh
 
         if self.approximate:
-            return 0.5 * z * (1 + tanh(sqrt(2 / pi) * (z + 0.044715 * z ** 3)))
+            return 0.5 * z * (1 + tanh(sqrt(2 / pi) * (z + 0.044715 * z**3)))
         return 0.5 * z * (1 + erf(z / sqrt(2)))
 
     def grad(self, x):
         r"""
-        Evaluate the first derivative of the GELU function on the elements
-        of input `x`.
+        Evaluate the first derivative of the selected GELU forward function.
 
-        .. math::
-
-            \frac{\partial \text{GELU}}{\partial x_i}  =
-                \frac{1}{2} + \frac{1}{2}\left(\text{erf}(\frac{x}{\sqrt{2}}) +
-                    \frac{x + \text{erf}'(\frac{x}{\sqrt{2}})}{\sqrt{2}}\right)
-
-        where :math:`\text{erf}'(x) = \frac{2}{\sqrt{\pi}} \cdot \exp\{-x^2\}`.
+        The exact branch is :math:`\Phi(x) + x\phi(x)`. For the tanh
+        approximation, let :math:`u = \sqrt{2/\pi}(x + 0.044715x^3)` and
+        :math:`t = \tanh(u)`. Its derivative is
+        :math:`(1 + t)/2 + x(1 - t^2)u'/2`.
         """
-        pi, exp, sqrt, tanh = np.pi, np.exp, np.sqrt, np.tanh
-
-        s = x / sqrt(2)
-        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x ** 2))  # noqa: E731
-
         if self.approximate:
-            approx = tanh(sqrt(2 / pi) * (x + 0.044715 * x ** 3))
-            dx = 0.5 + 0.5 * approx + ((0.5 * x * erf_prime(s)) / sqrt(2))
-        else:
-            dx = 0.5 + 0.5 * erf(s) + ((0.5 * x * erf_prime(s)) / sqrt(2))
-        return dx
+            coefficient = np.sqrt(2 / np.pi)
+            argument = coefficient * (x + 0.044715 * x**3)
+            argument_grad = coefficient * (1 + 3 * 0.044715 * x**2)
+            tanh = np.tanh(argument)
+            return 0.5 * (1 + tanh) + 0.5 * x * (1 - tanh**2) * argument_grad
+        density = np.exp(-0.5 * x**2) / np.sqrt(2 * np.pi)
+        return 0.5 * (1 + erf(x / np.sqrt(2))) + x * density
 
     def grad2(self, x):
         r"""
-        Evaluate the second derivative of the GELU function on the elements
-        of input `x`.
+        Evaluate the second derivative of the selected GELU forward function.
 
-        .. math::
-
-            \frac{\partial^2 \text{GELU}}{\partial x_i^2} =
-                \frac{1}{2\sqrt{2}} \left\[
-                    \text{erf}'(\frac{x}{\sqrt{2}}) +
-                    \frac{1}{\sqrt{2}} \text{erf}''(\frac{x}{\sqrt{2}})
-                \right]
-
-        where :math:`\text{erf}'(x) = \frac{2}{\sqrt{\pi}} \cdot \exp\{-x^2\}` and
-        :math:`\text{erf}''(x) = \frac{-4x}{\sqrt{\pi}} \cdot \exp\{-x^2\}`.
+        The exact branch is :math:`(2 - x^2)\phi(x)`. With the same
+        :math:`u` and :math:`t` as in :meth:`grad`, the tanh approximation is
+        :math:`(1 - t^2)[u' + x(u'' - 2t(u')^2)/2]`.
         """
-        pi, exp, sqrt = np.pi, np.exp, np.sqrt
-        s = x / sqrt(2)
-
-        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x ** 2))  # noqa: E731
-        erf_prime2 = lambda x: -4 * x * exp(-(x ** 2)) / sqrt(pi)  # noqa: E731
-        ddx = (1 / 2 * sqrt(2)) * (1 + erf_prime(s) + (erf_prime2(s) / sqrt(2)))
-        return ddx
+        if self.approximate:
+            coefficient = np.sqrt(2 / np.pi)
+            argument = coefficient * (x + 0.044715 * x**3)
+            argument_grad = coefficient * (1 + 3 * 0.044715 * x**2)
+            argument_grad2 = coefficient * 6 * 0.044715 * x
+            tanh = np.tanh(argument)
+            return (1 - tanh**2) * (
+                argument_grad + 0.5 * x * (argument_grad2 - 2 * tanh * argument_grad**2)
+            )
+        density = np.exp(-0.5 * x**2) / np.sqrt(2 * np.pi)
+        return (2 - x**2) * density
 
 
 class Tanh(ActivationBase):
@@ -336,7 +326,7 @@ class Tanh(ActivationBase):
                 -2 \tanh(x) \left(\frac{\partial \tanh}{\partial x_i}\right)
         """
         tanh_x = np.tanh(x)
-        return -2 * tanh_x * (1 - tanh_x ** 2)
+        return -2 * tanh_x * (1 - tanh_x**2)
 
 
 class Affine(ActivationBase):
@@ -595,7 +585,9 @@ class SELU(ActivationBase):
                 &=  \text{scale} \times \alpha e^{x_i} \ \ \ \ &&\text{otherwise}
         """
         return np.where(
-            x >= 0, np.ones_like(x) * self.scale, np.exp(x) * self.alpha * self.scale,
+            x >= 0,
+            np.ones_like(x) * self.scale,
+            np.exp(x) * self.alpha * self.scale,
         )
 
     def grad2(self, x):
