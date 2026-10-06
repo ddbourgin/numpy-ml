@@ -1,4 +1,5 @@
 """A collection of activation function objects for building neural networks"""
+
 from math import erf
 from abc import ABC, abstractmethod
 
@@ -248,7 +249,7 @@ class GELU(ActivationBase):
         pi, sqrt, tanh = np.pi, np.sqrt, np.tanh
 
         if self.approximate:
-            return 0.5 * z * (1 + tanh(sqrt(2 / pi) * (z + 0.044715 * z ** 3)))
+            return 0.5 * z * (1 + tanh(sqrt(2 / pi) * (z + 0.044715 * z**3)))
         return 0.5 * z * (1 + erf(z / sqrt(2)))
 
     def grad(self, x):
@@ -267,10 +268,10 @@ class GELU(ActivationBase):
         pi, exp, sqrt, tanh = np.pi, np.exp, np.sqrt, np.tanh
 
         s = x / sqrt(2)
-        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x ** 2))  # noqa: E731
+        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x**2))  # noqa: E731
 
         if self.approximate:
-            approx = tanh(sqrt(2 / pi) * (x + 0.044715 * x ** 3))
+            approx = tanh(sqrt(2 / pi) * (x + 0.044715 * x**3))
             dx = 0.5 + 0.5 * approx + ((0.5 * x * erf_prime(s)) / sqrt(2))
         else:
             dx = 0.5 + 0.5 * erf(s) + ((0.5 * x * erf_prime(s)) / sqrt(2))
@@ -295,8 +296,8 @@ class GELU(ActivationBase):
         pi, exp, sqrt = np.pi, np.exp, np.sqrt
         s = x / sqrt(2)
 
-        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x ** 2))  # noqa: E731
-        erf_prime2 = lambda x: -4 * x * exp(-(x ** 2)) / sqrt(pi)  # noqa: E731
+        erf_prime = lambda x: (2 / sqrt(pi)) * exp(-(x**2))  # noqa: E731
+        erf_prime2 = lambda x: -4 * x * exp(-(x**2)) / sqrt(pi)  # noqa: E731
         ddx = (1 / 2 * sqrt(2)) * (1 + erf_prime(s) + (erf_prime2(s) / sqrt(2)))
         return ddx
 
@@ -336,7 +337,7 @@ class Tanh(ActivationBase):
                 -2 \tanh(x) \left(\frac{\partial \tanh}{\partial x_i}\right)
         """
         tanh_x = np.tanh(x)
-        return -2 * tanh_x * (1 - tanh_x ** 2)
+        return -2 * tanh_x * (1 - tanh_x**2)
 
 
 class Affine(ActivationBase):
@@ -595,7 +596,9 @@ class SELU(ActivationBase):
                 &=  \text{scale} \times \alpha e^{x_i} \ \ \ \ &&\text{otherwise}
         """
         return np.where(
-            x >= 0, np.ones_like(x) * self.scale, np.exp(x) * self.alpha * self.scale,
+            x >= 0,
+            np.ones_like(x) * self.scale,
+            np.exp(x) * self.alpha * self.scale,
         )
 
     def grad2(self, x):
@@ -693,7 +696,7 @@ class SoftPlus(ActivationBase):
 
             \text{SoftPlus}(z_i) = \log(1 + e^{z_i})
         """
-        return np.log(np.exp(z) + 1)
+        return np.logaddexp(0, z)
 
     def grad(self, x):
         r"""
@@ -704,8 +707,12 @@ class SoftPlus(ActivationBase):
 
             \frac{\partial \text{SoftPlus}}{\partial x_i} = \frac{e^{x_i}}{1 + e^{x_i}}
         """
-        exp_x = np.exp(x)
-        return exp_x / (exp_x + 1)
+        exp_negative_abs = np.exp(-np.abs(x))
+        return np.where(
+            x >= 0,
+            1 / (1 + exp_negative_abs),
+            exp_negative_abs / (1 + exp_negative_abs),
+        )
 
     def grad2(self, x):
         r"""
@@ -717,5 +724,6 @@ class SoftPlus(ActivationBase):
             \frac{\partial^2 \text{SoftPlus}}{\partial x_i^2} =
                 \frac{e^{x_i}}{(1 + e^{x_i})^2}
         """
-        exp_x = np.exp(x)
-        return exp_x / ((exp_x + 1) ** 2)
+        # This remains accurate when the first derivative rounds to one.
+        exp_negative_abs = np.exp(-np.abs(x))
+        return exp_negative_abs / (1 + exp_negative_abs) ** 2
