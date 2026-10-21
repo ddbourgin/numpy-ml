@@ -90,7 +90,9 @@ class KNN:
                     best_score = -np.inf
                     for label in set(targets):
                         scores = [1 / n.distance for n in nearest if n.val == label]
-                        pred = label if np.sum(scores) > best_score else pred
+                        score = np.sum(scores)
+                        if score > best_score:
+                            pred, best_score = label, score
             else:
                 if H["weights"] == "uniform":
                     pred = np.mean(targets)
