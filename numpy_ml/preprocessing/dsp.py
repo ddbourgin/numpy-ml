@@ -402,13 +402,13 @@ def to_frames(x, frame_width, stride, writeable=False):
     assert stride >= 1
     assert len(x) >= frame_width
 
-    # get the size for an element in x in bits
-    byte = x.itemsize
+    # Preserve the actual sample stride of sliced and reversed signals.
+    sample_stride = x.strides[0]
     n_frames = (len(x) - frame_width) // stride + 1
     return as_strided(
         x,
         shape=(n_frames, frame_width),
-        strides=(byte * stride, byte),
+        strides=(sample_stride * stride, sample_stride),
         writeable=writeable,
     )
 
