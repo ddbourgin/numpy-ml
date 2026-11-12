@@ -13,6 +13,11 @@ def batch_resample(X, new_dim, mode="bilinear"):
     Resample each image (or similar grid-based 2D signal) in a batch to
     `new_dim` using the specified resampling strategy.
 
+    Notes
+    -----
+    The sampling grid spans the first through the last input pixel in each
+    spatial dimension. An output dimension of one samples the first pixel.
+
     Parameters
     ----------
     X : :py:class:`ndarray <numpy.ndarray>` of shape `(n_ex, in_rows, in_cols, in_channels)`
@@ -38,8 +43,8 @@ def batch_resample(X, new_dim, mode="bilinear"):
     n_ex, in_rows, in_cols, n_in = X.shape
 
     # compute coordinates to resample
-    x = np.tile(np.linspace(0, in_cols - 2, out_cols), out_rows)
-    y = np.repeat(np.linspace(0, in_rows - 2, out_rows), out_cols)
+    x = np.tile(np.linspace(0, in_cols - 1, out_cols), out_rows)
+    y = np.repeat(np.linspace(0, in_rows - 1, out_rows), out_cols)
 
     # resample each image
     resampled = []
@@ -47,7 +52,7 @@ def batch_resample(X, new_dim, mode="bilinear"):
         r = interpolate(X[i, ...], x, y)
         r = r.reshape(out_rows, out_cols, n_in)
         resampled.append(r)
-    return np.dstack(resampled)
+    return np.stack(resampled, axis=0)
 
 
 def nn_interpolate_2D(X, x, y):
@@ -111,7 +116,8 @@ def bilinear_interpolate(X, x, y):
     Notes
     -----
     Assumes the current entries in X reflect equally-spaced
-    samples from a 2D integer grid.
+    samples from a 2D integer grid. Coordinates outside the grid are clamped
+    to the nearest boundary pixel.
 
     Modified from https://bit.ly/2NMb1Dr
 
@@ -130,25 +136,23 @@ def bilinear_interpolate(X, x, y):
         The samples for each (x,y) coordinate computed via bilinear
         interpolation
     """
+    x = np.clip(x, 0, X.shape[1] - 1)
+    y = np.clip(y, 0, X.shape[0] - 1)
     x0 = np.floor(x).astype(int)
     y0 = np.floor(y).astype(int)
-    x1 = x0 + 1
-    y1 = y0 + 1
-
-    x0 = np.clip(x0, 0, X.shape[1] - 1)
-    y0 = np.clip(y0, 0, X.shape[0] - 1)
-    x1 = np.clip(x1, 0, X.shape[1] - 1)
-    y1 = np.clip(y1, 0, X.shape[0] - 1)
+    x1 = np.minimum(x0 + 1, X.shape[1] - 1)
+    y1 = np.minimum(y0 + 1, X.shape[0] - 1)
 
     Ia = X[y0, x0, :].T
     Ib = X[y1, x0, :].T
     Ic = X[y0, x1, :].T
     Id = X[y1, x1, :].T
 
-    wa = (x1 - x) * (y1 - y)
-    wb = (x1 - x) * (y - y0)
-    wc = (x - x0) * (y1 - y)
-    wd = (x - x0) * (y - y0)
+    dx, dy = x - x0, y - y0
+    wa = (1 - dx) * (1 - dy)
+    wb = (1 - dx) * dy
+    wc = dx * (1 - dy)
+    wd = dx * dy
 
     return (Ia * wa).T + (Ib * wb).T + (Ic * wc).T + (Id * wd).T
 
