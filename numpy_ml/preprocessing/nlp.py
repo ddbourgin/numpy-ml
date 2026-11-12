@@ -62,7 +62,11 @@ def ngrams(sequence, N):
 
 
 def tokenize_whitespace(
-    line, lowercase=True, filter_stopwords=True, filter_punctuation=True, **kwargs,
+    line,
+    lowercase=True,
+    filter_stopwords=True,
+    filter_punctuation=True,
+    **kwargs,
 ):
     """
     Split a string at any whitespace characters, optionally removing
@@ -70,7 +74,8 @@ def tokenize_whitespace(
     """
     line = line.lower() if lowercase else line
     words = line.split()
-    line = [strip_punctuation(w) for w in words] if filter_punctuation else line
+    if filter_punctuation:
+        words = [word for word in map(strip_punctuation, words) if word]
     return remove_stop_words(words) if filter_stopwords else words
 
 
