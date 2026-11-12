@@ -221,6 +221,9 @@ class BytePairEncoder(object):
         """
         Train a byte pair codebook on a set of documents.
 
+        Training ends before the merge budget is reached if no adjacent byte
+        pairs remain.
+
         Parameters
         ----------
         corpus_fps : str or list of strs
@@ -247,6 +250,8 @@ class BytePairEncoder(object):
         # iteratively merge the most common byte bigram across the documents
         for _ in range(self.parameters["max_merges"]):
             pair_counts = self._get_counts(vocab)
+            if not pair_counts:
+                break
             most_common_bigram = max(pair_counts, key=pair_counts.get)
             vocab = self._merge(most_common_bigram, vocab)
 
