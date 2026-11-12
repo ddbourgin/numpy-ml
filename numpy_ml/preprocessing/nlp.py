@@ -254,7 +254,10 @@ class BytePairEncoder(object):
         for k in vocab.keys():
             token_bytes = token_bytes.union([w for w in k.split(" ") if "-" in w])
 
-        for i, t in enumerate(token_bytes):
+        # Replace the old codebook only after learning the new vocabulary.
+        self.byte2token = OrderedDict({i: i for i in range(256)})
+        self.token2byte = OrderedDict({v: k for k, v in self.byte2token.items()})
+        for i, t in enumerate(sorted(token_bytes)):
             byte_tuple = tuple(int(j) for j in t.split("-"))
             self.token2byte[256 + i] = byte_tuple
             self.byte2token[byte_tuple] = 256 + i
