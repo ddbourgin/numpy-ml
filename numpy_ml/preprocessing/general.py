@@ -347,7 +347,7 @@ class FeatureHasher:
 
     def _encode_dense(self, examples):
         N = len(examples)
-        table = np.zeros(N, self.n_dim)  # dense
+        table = np.zeros((N, self.n_dim))  # dense
 
         for row, feat_dict in enumerate(examples):
             for f_id, val in feat_dict.items():
@@ -367,7 +367,7 @@ class FeatureHasher:
 
     def _encode_sparse(self, examples):
         N = len(examples)
-        idxs, data = [], []
+        rows, cols, data = [], [], []
 
         for row, feat_dict in enumerate(examples):
             for f_id, val in feat_dict.items():
@@ -381,8 +381,9 @@ class FeatureHasher:
 
                 h = int(self.hash(f_id).hexdigest(), base=16)
                 col = h % self.n_dim
-                idxs.append((row, col))
+                rows.append(row)
+                cols.append(col)
                 data.append(np.sign(h) * val)
 
-        table = csr_matrix((data, zip(*idxs)), shape=(N, self.n_dim))
+        table = csr_matrix((data, (rows, cols)), shape=(N, self.n_dim))
         return table
