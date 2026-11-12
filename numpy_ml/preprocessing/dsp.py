@@ -267,9 +267,8 @@ def DFT(frame, positive_only=True):
     F = np.arange(N).reshape(1, -1) * np.arange(N).reshape(-1, 1)
     F = np.exp(F * (-1j * 2 * np.pi / N))
 
-    # vdot only operates on vectors (rather than ndarrays), so we have to
-    # loop over each basis vector in F explicitly
-    spectrum = np.array([np.vdot(f, frame) for f in F])
+    # Multiply without conjugating the negative-exponent Fourier basis.
+    spectrum = F @ frame
     return spectrum[: (N // 2) + 1] if positive_only else spectrum
 
 
@@ -294,7 +293,7 @@ def dft_bins(N, fs=44000, positive_only=True):
         DFT spectrum
     """
     if positive_only:
-        freq_bins = np.linspace(0, fs / 2, 1 + N // 2, endpoint=True)
+        freq_bins = np.arange(1 + N // 2) * fs / N
     else:
         l, r = (1 + (N - 1) / 2, (1 - N) / 2) if N % 2 else (N / 2, -N / 2)
         freq_bins = np.r_[np.arange(l), np.arange(r, 0)] * fs / N
