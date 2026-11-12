@@ -47,9 +47,9 @@ _WORD_REGEX_W_PUNC = re.compile(r"(?u)\w+|[^a-zA-Z0-9\s]")
 _WORD_REGEX_W_PUNC_AND_WHITESPACE = re.compile(r"(?u)s?\w+\s?|\s?[^a-zA-Z0-9\s]\s?")
 
 _PUNC_BYTE_REGEX = re.compile(
-    r"(33|34|35|36|37|38|39|40|41|42|43|44|45|"
+    r"(?<!\d)(33|34|35|36|37|38|39|40|41|42|43|44|45|"
     r"46|47|58|59|60|61|62|63|64|91|92|93|94|"
-    r"95|96|123|124|125|126)",
+    r"95|96|123|124|125|126)(?!\d)",
 )
 _PUNCTUATION = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 _PUNC_TABLE = str.maketrans("", "", _PUNCTUATION)
