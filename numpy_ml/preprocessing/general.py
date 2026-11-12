@@ -176,8 +176,8 @@ class Standardizer:
     @property
     def parameters(self):
         params = {
-            "mean": self._mean if hasattr(self, "mean") else None,
-            "std": self._std if hasattr(self, "std") else None,
+            "mean": self._mean if hasattr(self, "_mean") else None,
+            "std": self._std if hasattr(self, "_std") else None,
         }
         return params
 
@@ -188,6 +188,9 @@ class Standardizer:
         """
         Store the feature-wise mean and standard deviation across the samples
         in `X` for future scaling.
+
+        Features with zero variance use a unit scale so their transforms remain
+        finite and can be inverted.
 
         Parameters
         ----------
@@ -208,6 +211,7 @@ class Standardizer:
 
         if self.with_std:
             std = np.std(X, axis=0, ddof=0)
+            std[std == 0] = 1
 
         self._mean = mean
         self._std = std
