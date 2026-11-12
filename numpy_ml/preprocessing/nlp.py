@@ -923,8 +923,12 @@ class TFIDFEncoder:
                 ix += 1
 
         for w in special:
+            old_ix = self.token2idx[w]
             token2idx[w] = len(token2idx)
             idx2token[len(idx2token)] = w
+            for d in self.term_freq.keys():
+                if old_ix in self.term_freq[d]:
+                    term_freq[d][token2idx[w]] = self.term_freq[d][old_ix]
 
         self.token2idx = token2idx
         self.idx2token = idx2token
